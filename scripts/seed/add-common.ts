@@ -81,6 +81,14 @@ export async function collectFields(
   args: ParsedArgs,
   fields: readonly { key: string; prompt: string; required?: boolean }[]
 ): Promise<Record<string, string>> {
+  const allowedKeys = new Set(fields.map((field) => field.key));
+
+  for (const key of args.values.keys()) {
+    if (!allowedKeys.has(key)) {
+      throw new Error(`unknown option --${key}`);
+    }
+  }
+
   const missingRequired = fields.some(
     (field) => field.required === true && !hasValue(args.values.get(field.key))
   );

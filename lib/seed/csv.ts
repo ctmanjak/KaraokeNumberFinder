@@ -41,6 +41,7 @@ export function parseCsv(text: string): string[][] {
   let row: string[] = [];
   let field = "";
   let inQuotes = false;
+  let quotedFieldClosed = false;
 
   for (let index = 0; index < text.length; index += 1) {
     const char = text[index];
@@ -52,13 +53,42 @@ export function parseCsv(text: string): string[][] {
         index += 1;
       } else if (char === '"') {
         inQuotes = false;
+        quotedFieldClosed = true;
       } else {
         field += char;
       }
       continue;
     }
 
+    if (quotedFieldClosed) {
+      if (char === ",") {
+        row.push(field);
+        field = "";
+        quotedFieldClosed = false;
+        continue;
+      }
+
+      if (char === "\n") {
+        row.push(field);
+        rows.push(row);
+        row = [];
+        field = "";
+        quotedFieldClosed = false;
+        continue;
+      }
+
+      if (char === "\r") {
+        continue;
+      }
+
+      throw new Error("invalid character after closing quote");
+    }
+
     if (char === '"') {
+      if (field.length > 0) {
+        throw new Error("quote in the middle of an unquoted field");
+      }
+
       inQuotes = true;
     } else if (char === ",") {
       row.push(field);
@@ -71,6 +101,10 @@ export function parseCsv(text: string): string[][] {
     } else if (char !== "\r") {
       field += char;
     }
+  }
+
+  if (inQuotes) {
+    throw new Error("unterminated quoted field");
   }
 
   if (field.length > 0 || row.length > 0 || text.endsWith(",")) {

@@ -1,5 +1,11 @@
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  cpSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -217,6 +223,54 @@ describe("seed add helpers", () => {
     );
   });
 
+  it("rolls back the appended row when post-add validation fails", () => {
+    const seedDir = copyFixture("valid");
+    const before = readFileSync(
+      path.join(seedDir, "karaoke_entries.csv"),
+      "utf8"
+    );
+
+    const result = addEntryRow(
+      {
+        song_id: "song_fixture_001",
+        provider_id: "provider_alpha",
+        karaoke_number: "67890",
+        version_info: "Future",
+        availability_status: "available",
+        last_verified_at: "2999-01-01",
+        source_name: "Generic provider source",
+        verified_by: "ops_fixture"
+      },
+      { seedDir }
+    );
+    const after = readFileSync(
+      path.join(seedDir, "karaoke_entries.csv"),
+      "utf8"
+    );
+
+    expect(result.validation?.errors.map((error) => error.message)).toContain(
+      "last_verified_at must not be in the future"
+    );
+    expect(after).toBe(before);
+  });
+
+  it("reports malformed CSV as a validation error", () => {
+    const seedDir = copyFixture("valid");
+
+    writeFileSync(
+      path.join(seedDir, "song_aliases.csv"),
+      `${SEED_FILE_HEADERS["song_aliases.csv"].join(",")}\n` +
+        'alias_bad,song_fixture_001,bad "quote,en,english_title,badquote,,,"source",ops_fixture,\n',
+      "utf8"
+    );
+
+    const result = validateSeedDirectory(seedDir);
+
+    expect(result.errors.map((error) => error.message)).toContain(
+      "invalid CSV: quote in the middle of an unquoted field"
+    );
+  });
+
   it("supports fixture-based argument input through the add-alias CLI", () => {
     const seedDir = copyFixture("valid");
     const viteNode = path.join(ROOT_DIR, "node_modules/.bin/vite-node");
@@ -248,6 +302,131 @@ describe("seed add helpers", () => {
     expect(row?.[2]).toBe("Fixture CLI Alias");
     expect(row?.[5]).toBe("fixtureclialias");
     expect(row?.[6]).toBe("");
+  });
+
+  it("supports fixture-based argument input through the add-song CLI", () => {
+    const seedDir = copyFixture("valid");
+    const viteNode = path.join(ROOT_DIR, "node_modules/.bin/vite-node");
+
+    execFileSync(
+      viteNode,
+      [
+        "scripts/seed/add-song.ts",
+        "--seed-dir",
+        seedDir,
+        "--original-language",
+        "ja",
+        "--canonical-title",
+        "CLI Original Title",
+        "--display-title",
+        "CLI Display Title",
+        "--canonical-artist",
+        "CLI Artist",
+        "--release-year",
+        "2026",
+        "--source-name",
+        "Generic song source",
+        "--verified-by",
+        "ops_fixture"
+      ],
+      { cwd: ROOT_DIR, stdio: "pipe" }
+    );
+
+    const result = validateSeedDirectory(seedDir);
+    const row = parseSeedFile(seedDir, "songs.csv").at(-1);
+
+    expect(result.errors).toEqual([]);
+    expect(row).toEqual([
+      "song_ja_0001",
+      "ja",
+      "CLI Original Title",
+      "CLI Display Title",
+      "CLI Artist",
+      "2026",
+      "",
+      "",
+      "Generic song source",
+      "ops_fixture",
+      ""
+    ]);
+  });
+
+  it("supports fixture-based argument input through the add-entry CLI", () => {
+    const seedDir = copyFixture("valid");
+    const viteNode = path.join(ROOT_DIR, "node_modules/.bin/vite-node");
+
+    execFileSync(
+      viteNode,
+      [
+        "scripts/seed/add-entry.ts",
+        "--seed-dir",
+        seedDir,
+        "--song-id",
+        "song_fixture_001",
+        "--provider-id",
+        "provider_alpha",
+        "--karaoke-number",
+        "67890",
+        "--version-info",
+        "CLI Version",
+        "--availability-status",
+        "available",
+        "--last-verified-at",
+        "2026-06-26",
+        "--source-name",
+        "Generic provider source",
+        "--verified-by",
+        "ops_fixture"
+      ],
+      { cwd: ROOT_DIR, stdio: "pipe" }
+    );
+
+    const result = validateSeedDirectory(seedDir);
+    const row = parseSeedFile(seedDir, "karaoke_entries.csv").at(-1);
+
+    expect(result.errors).toEqual([]);
+    expect(row).toEqual([
+      "entry_song_fixture_001_provider_alpha_cli_version",
+      "song_fixture_001",
+      "provider_alpha",
+      "67890",
+      "CLI Version",
+      "available",
+      "2026-06-26",
+      "",
+      "Generic provider source",
+      "ops_fixture",
+      ""
+    ]);
+  });
+
+  it("rejects unknown CLI options", () => {
+    const seedDir = copyFixture("valid");
+    const viteNode = path.join(ROOT_DIR, "node_modules/.bin/vite-node");
+
+    expect(() =>
+      execFileSync(
+        viteNode,
+        [
+          "scripts/seed/add-alias.ts",
+          "--seed-dir",
+          seedDir,
+          "--song-id",
+          "song_fixture_001",
+          "--alias",
+          "Fixture Typo Alias",
+          "--language",
+          "en",
+          "--alias-type",
+          "english_title",
+          "--source-nam",
+          "typo",
+          "--verified-by",
+          "ops_fixture"
+        ],
+        { cwd: ROOT_DIR, stdio: "pipe" }
+      )
+    ).toThrow(/unknown option --source-nam/u);
   });
 });
 

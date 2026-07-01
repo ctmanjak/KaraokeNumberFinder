@@ -189,7 +189,19 @@ function readSeedCsv(
   issues: SeedValidationIssue[]
 ): CsvRecord[] {
   const text = readFileSync(filePath, "utf8").replace(/^\uFEFF/u, "");
-  const rows = parseCsv(text);
+  let rows: string[][];
+
+  try {
+    rows = parseCsv(text);
+  } catch (error) {
+    issues.push({
+      severity: "error",
+      file,
+      message: `invalid CSV: ${errorMessage(error)}`
+    });
+    return [];
+  }
+
   const expectedHeader = SEED_FILE_HEADERS[file];
   const actualHeader = rows[0] ?? [];
 
@@ -624,4 +636,8 @@ function startOfUtcDay(date: Date): Date {
 
 function isBlank(value: string | undefined): boolean {
   return value === undefined || value.trim() === "";
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

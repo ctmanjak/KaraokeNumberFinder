@@ -320,6 +320,10 @@ function appendAndValidate(
       ? undefined
       : validateSeedDirectory(seedDir);
 
+  if (validation !== undefined && validation.errors.length > 0) {
+    writeCsvRows(table.filePath, table.rows);
+  }
+
   return {
     file: table.file,
     rowNumber,
