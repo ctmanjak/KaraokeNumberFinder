@@ -1,0 +1,3 @@
+id,song_id,provider_id,karaoke_number,version_info,availability_status,last_verified_at,source_url,source_name,verified_by,verification_note
+entry_fixture_001_alpha,song_fixture_001,provider_alpha,12345,Original,available,2026-06-25,https://example.com/provider-alpha,Generic provider source,ops_fixture,Fixture available entry
+entry_fixture_001_beta,song_fixture_001,provider_beta,,Original,not_available,2026-06-25,https://example.com/provider-beta,Generic provider source,ops_fixture,Fixture not available entry
