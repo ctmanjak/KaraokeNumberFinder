@@ -39,7 +39,7 @@ export function normalizeSearchText(input: string): string {
   return input
     .trim()
     .normalize("NFKC")
-    .toLocaleLowerCase()
+    .toLowerCase()
     .replace(BRACKET_SYMBOL_PATTERN, "")
     .replace(SEARCH_WEAK_SYMBOL_PATTERN, "")
     .replace(WHITESPACE_PATTERN, "");
@@ -48,7 +48,7 @@ export function normalizeSearchText(input: string): string {
 export function extractHangulChosung(input: string): string {
   let chosung = "";
 
-  for (const char of input) {
+  for (const char of input.normalize("NFC")) {
     const codePoint = char.codePointAt(0);
 
     if (

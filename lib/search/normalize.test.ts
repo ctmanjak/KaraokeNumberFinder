@@ -28,6 +28,12 @@ describe("extractHangulChosung", () => {
     expect(extractHangulChosung("잔혹한 천사의 테제")).toBe("ㅈㅎㅎㅊㅅㅇㅌㅈ");
   });
 
+  it("extracts the same initials from decomposed Hangul input", () => {
+    expect(extractHangulChosung("잔혹한 천사의 테제".normalize("NFD"))).toBe(
+      "ㅈㅎㅎㅊㅅㅇㅌㅈ"
+    );
+  });
+
   it("returns an empty string when the input has no Hangul syllables", () => {
     expect(extractHangulChosung("Zankoku na Tenshi no Thesis")).toBe("");
   });
@@ -44,6 +50,13 @@ describe("extractHangulChosung", () => {
 describe("buildAliasSearchFields", () => {
   it("builds seed alias search fields from one source alias", () => {
     expect(buildAliasSearchFields(" 잔혹한 천사의 테제 ")).toEqual({
+      normalizedAlias: "잔혹한천사의테제",
+      chosungAlias: "ㅈㅎㅎㅊㅅㅇㅌㅈ"
+    });
+  });
+
+  it("builds the same chosungAlias from decomposed Hangul aliases", () => {
+    expect(buildAliasSearchFields("잔혹한 천사의 테제".normalize("NFD"))).toEqual({
       normalizedAlias: "잔혹한천사의테제",
       chosungAlias: "ㅈㅎㅎㅊㅅㅇㅌㅈ"
     });
