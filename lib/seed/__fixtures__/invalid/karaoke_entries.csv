@@ -1,0 +1,11 @@
+id,song_id,provider_id,karaoke_number,version_info,availability_status,last_verified_at,source_url,source_name,verified_by,verification_note
+entry_missing_song,song_missing,provider_alpha,12345,Original,available,2026-06-25,https://example.com/provider-alpha,Generic provider source,ops_fixture,Missing song FK
+entry_missing_provider,song_fixture_001,provider_missing,12345,Original,available,2026-06-25,https://example.com/provider-missing,Generic provider source,ops_fixture,Missing provider FK
+entry_available_missing_number,song_fixture_001,provider_alpha,,Missing number,available,2026-06-25,https://example.com/provider-alpha,Generic provider source,ops_fixture,Available without number
+entry_not_available_with_number,song_fixture_001,provider_alpha,12345,Not available,not_available,2026-06-25,https://example.com/provider-alpha,Generic provider source,ops_fixture,Unavailable with number
+entry_temp_missing_date,song_fixture_001,provider_alpha,,Temp missing date,temporarily_unavailable,,https://example.com/provider-alpha,Generic provider source,ops_fixture,Temp without date
+entry_bad_status,song_fixture_001,provider_alpha,,Bad status,retired,2026-06-25,https://example.com/provider-alpha,Generic provider source,ops_fixture,Bad status
+entry_missing_source,song_fixture_001,provider_alpha,55555,Missing source,available,2026-06-25,https://example.com/provider-alpha,,ops_fixture,Missing source name
+entry_duplicate_a,song_fixture_001,provider_alpha,99999,Duplicate,available,2026-06-25,https://example.com/provider-alpha,Generic provider source,ops_fixture,Duplicate key first
+entry_duplicate_b,song_fixture_001,provider_alpha,99999,Duplicate,available,2026-06-25,https://example.com/provider-alpha,Generic provider source,ops_fixture,Duplicate key second
+entry_missing_song,song_fixture_001,provider_beta,77777,Future date,available,2026-07-02,https://example.com/provider-beta,Generic provider source,ops_fixture,Duplicate entry id and future date

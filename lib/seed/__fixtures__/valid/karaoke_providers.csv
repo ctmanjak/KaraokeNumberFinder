@@ -1,0 +1,3 @@
+id,name,country,is_active,display_order,is_default,source_url,source_name,verified_by,verification_note
+provider_alpha,Generic Provider Alpha,KR,true,10,true,https://example.com/provider-alpha,Generic provider source,ops_fixture,Fixture provider
+provider_beta,Generic Provider Beta,KR,true,20,false,https://example.com/provider-beta,Generic provider source,ops_fixture,Fixture provider

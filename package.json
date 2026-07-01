@@ -12,6 +12,7 @@
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "test": "vitest run",
+    "seed:validate": "vite-node scripts/seed/validate.ts",
     "db:validate": "prisma validate",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio"
