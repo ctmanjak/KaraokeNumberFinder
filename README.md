@@ -43,12 +43,29 @@ Next.js 16은 기본 빌드에서 Turbopack을 사용합니다. `postcss`는 의
 
 ```bash
 npm install
+cp .env.example .env
 npm run dev
 ```
 
 브라우저에서 `http://localhost:3000`을 엽니다.
 
-로컬 환경변수는 `.env.example`을 기준으로 설정합니다. Prisma schema와 실제 DB 연결은 다음 milestone 작업에서 구성합니다.
+로컬 환경변수는 `.env.example`을 기준으로 설정합니다. PostgreSQL 연결 문자열은 `DATABASE_URL`에 둡니다. Prisma 7에서는 이 값을 `prisma/schema.prisma`가 아니라 루트 `prisma.config.ts`에서 읽습니다.
+
+```dotenv
+DATABASE_URL="postgresql://user:password@localhost:5432/karaoke_number_finder?schema=public"
+```
+
+로컬 PostgreSQL은 Homebrew, Postgres.app, Docker 등 팀원이 편한 방식으로 실행할 수 있습니다. Homebrew 예시는 다음과 같습니다.
+
+```bash
+brew install postgresql@16
+brew services start postgresql@16
+createdb karaoke_number_finder
+```
+
+Docker Compose는 아직 도입하지 않았습니다. T02 범위에서는 Prisma 7 CLI가 `prisma.config.ts`를 통해 `DATABASE_URL`로 로컬 PostgreSQL에 연결할 수 있으면 충분하며, 공유 DB 실행 방식이 필요해지면 후속 티켓에서 Compose를 추가합니다.
+
+Prisma Client는 `prisma-client` generator로 `lib/generated/prisma`에 생성됩니다. 생성물은 저장소에 커밋하지 않고 필요할 때 `npm run db:generate`로 다시 만듭니다.
 
 ## 검증 명령
 
@@ -57,6 +74,8 @@ npm run format
 npm run typecheck
 npm run lint
 npm run test
+npm run db:validate
+npm run db:generate
 npm run build
 npm audit
 ```
@@ -71,6 +90,9 @@ npm audit
 | `npm run format`       | 포맷 검사          |
 | `npm run format:write` | 포맷 적용          |
 | `npm run test`         | 테스트 실행        |
+| `npm run db:validate`  | Prisma schema 검사 |
+| `npm run db:generate`  | Prisma Client 생성 |
+| `npm run db:studio`    | Prisma Studio 실행 |
 
 ## 프로젝트 구조
 

@@ -5,6 +5,7 @@ coverage
 .env
 .env*.local
 .idea
+lib/generated/
 *.log
 dist
 tsconfig.tsbuildinfo
