@@ -56,7 +56,9 @@ describe("buildAliasSearchFields", () => {
   });
 
   it("builds the same chosungAlias from decomposed Hangul aliases", () => {
-    expect(buildAliasSearchFields("잔혹한 천사의 테제".normalize("NFD"))).toEqual({
+    expect(
+      buildAliasSearchFields("잔혹한 천사의 테제".normalize("NFD"))
+    ).toEqual({
       normalizedAlias: "잔혹한천사의테제",
       chosungAlias: "ㅈㅎㅎㅊㅅㅇㅌㅈ"
     });
