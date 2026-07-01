@@ -6,3 +6,120 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum AliasType {
+  canonical_title
+  display_title
+  artist
+  romanized_title
+  english_title
+  translated_title
+  content
+  abbreviation
+  common_name
+  alternate_spelling
+
+  @@map("alias_type")
+}
+
+enum AvailabilityStatus {
+  available
+  not_available
+  temporarily_unavailable
+  unknown
+
+  @@map("availability_status")
+}
+
+model Song {
+  id               String         @id @db.VarChar(128)
+  originalLanguage String         @map("original_language") @db.VarChar(16)
+  canonicalTitle   String         @map("canonical_title") @db.VarChar(512)
+  displayTitle     String         @map("display_title") @db.VarChar(512)
+  canonicalArtist  String         @map("canonical_artist") @db.VarChar(512)
+  releaseYear      Int?           @map("release_year")
+  tieIn            String?        @map("tie_in") @db.VarChar(512)
+  sourceUrl        String?        @map("source_url") @db.Text
+  sourceName       String?        @map("source_name") @db.VarChar(256)
+  verifiedBy       String         @map("verified_by") @db.VarChar(128)
+  verificationNote String?        @map("verification_note") @db.Text
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  aliases          SongAlias[]
+  karaokeEntries   KaraokeEntry[]
+
+  @@index([originalLanguage], map: "songs_original_language_idx")
+  @@index([displayTitle], map: "songs_display_title_idx")
+  @@index([canonicalTitle], map: "songs_canonical_title_idx")
+  @@index([canonicalArtist], map: "songs_canonical_artist_idx")
+  @@map("songs")
+}
+
+model SongAlias {
+  id               String    @id @db.VarChar(160)
+  songId           String    @map("song_id") @db.VarChar(128)
+  alias            String    @db.VarChar(512)
+  language         String    @db.VarChar(16)
+  aliasType        AliasType @map("alias_type")
+  normalizedAlias  String    @map("normalized_alias") @db.VarChar(512)
+  chosungAlias     String?   @map("chosung_alias") @db.VarChar(512)
+  sourceUrl        String?   @map("source_url") @db.Text
+  sourceName       String?   @map("source_name") @db.VarChar(256)
+  verifiedBy       String    @map("verified_by") @db.VarChar(128)
+  verificationNote String?   @map("verification_note") @db.Text
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  song             Song      @relation(fields: [songId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([songId, normalizedAlias, aliasType], map: "song_aliases_song_normalized_type_key")
+  @@index([normalizedAlias], map: "song_aliases_normalized_alias_idx")
+  @@index([chosungAlias], map: "song_aliases_chosung_alias_idx")
+  @@index([language, aliasType], map: "song_aliases_language_type_idx")
+  @@map("song_aliases")
+}
+
+model KaraokeProvider {
+  id                   String         @id @db.VarChar(128)
+  name                 String         @db.VarChar(256)
+  country              String         @db.VarChar(2)
+  isActive             Boolean        @default(true) @map("is_active")
+  displayOrder         Int            @map("display_order")
+  isDefault            Boolean        @default(false) @map("is_default")
+  sourceUrl            String?        @map("source_url") @db.Text
+  sourceName           String?        @map("source_name") @db.VarChar(256)
+  verifiedBy           String         @map("verified_by") @db.VarChar(128)
+  verificationNote     String?        @map("verification_note") @db.Text
+  lastCatalogUpdatedAt DateTime?      @map("last_catalog_updated_at") @db.Date
+  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  karaokeEntries       KaraokeEntry[]
+
+  @@unique([country, name], map: "karaoke_providers_country_name_key")
+  @@index([isActive, isDefault], map: "karaoke_providers_active_default_idx")
+  @@index([country, isActive, displayOrder], map: "karaoke_providers_country_active_order_idx")
+  @@map("karaoke_providers")
+}
+
+model KaraokeEntry {
+  id                 String             @id @db.VarChar(192)
+  songId             String             @map("song_id") @db.VarChar(128)
+  providerId         String             @map("provider_id") @db.VarChar(128)
+  karaokeNumber      String             @default("") @map("karaoke_number") @db.VarChar(64)
+  versionInfo        String             @default("") @map("version_info") @db.VarChar(256)
+  availabilityStatus AvailabilityStatus @map("availability_status")
+  lastVerifiedAt     DateTime?          @map("last_verified_at") @db.Date
+  sourceUrl          String?            @map("source_url") @db.Text
+  sourceName         String             @map("source_name") @db.VarChar(256)
+  verifiedBy         String?            @map("verified_by") @db.VarChar(128)
+  verificationNote   String?            @map("verification_note") @db.Text
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  song               Song               @relation(fields: [songId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  provider           KaraokeProvider    @relation(fields: [providerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([songId, providerId, versionInfo, karaokeNumber], map: "karaoke_entries_song_provider_version_number_key")
+  @@index([providerId, availabilityStatus], map: "karaoke_entries_provider_status_idx")
+  @@index([songId, availabilityStatus], map: "karaoke_entries_song_status_idx")
+  @@index([lastVerifiedAt], map: "karaoke_entries_last_verified_at_idx")
+  @@map("karaoke_entries")
+}

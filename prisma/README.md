@@ -1,16 +1,18 @@
 # Prisma
 
-This directory contains the Prisma setup for `[M1-T02]`.
+This directory contains the Prisma setup and first milestone schema.
 
-`schema.prisma` intentionally contains only:
+`schema.prisma` contains:
 
 - Prisma Client generator using the Prisma 7 `prisma-client` provider
 - Explicit generated client output at `lib/generated/prisma`
 - PostgreSQL datasource provider
-
-Domain models and migrations are reserved for `[M1-T03]`.
+- First milestone search-loop models: `Song`, `SongAlias`, `KaraokeProvider`, `KaraokeEntry`
+- Search and karaoke status enums: `AliasType`, `AvailabilityStatus`
 
 Prisma 7 reads the database connection URL from the root `prisma.config.ts`, not from a `url` field inside `schema.prisma`.
+
+Authentication and user-data models are intentionally not part of this milestone schema. `User`, `Favorite`, `SearchHistory`, and `UserPreference` should be added in a later authentication milestone.
 
 ## Local database
 
@@ -34,7 +36,7 @@ brew services start postgresql@16
 createdb karaoke_number_finder
 ```
 
-Docker Compose is not required for T02. If you prefer Docker, run a local PostgreSQL container and point `DATABASE_URL` at that container.
+Docker Compose is not required for the first milestone. If you prefer Docker, run a local PostgreSQL container and point `DATABASE_URL` at that container.
 
 ## Prisma 7 config
 
@@ -55,7 +57,7 @@ export default defineConfig({
 });
 ```
 
-`schema.prisma` keeps only the datasource provider:
+`schema.prisma` keeps only the datasource provider in the datasource block:
 
 ```prisma
 datasource db {
@@ -63,14 +65,28 @@ datasource db {
 }
 ```
 
+## Schema notes
+
+The stable IDs are explicit strings because seed CSV files own the public identifiers. Prisma and PostgreSQL do not generate `Song`, `SongAlias`, `KaraokeProvider`, or `KaraokeEntry` IDs automatically.
+
+Model fields use Prisma-friendly camelCase and map to snake_case database tables and columns. This keeps TypeScript usage ergonomic while matching the CSV/API naming convention in the database.
+
+Timestamps are database-managed:
+
+- `created_at` uses `now()`
+- `updated_at` uses Prisma `@updatedAt`
+
+Provider names and counts are data only. The schema must not encode specific providers.
+
 ## Commands
 
 ```bash
 npm run db:validate
+npx prisma migrate dev --name add_core_search_schema
 npm run db:generate
 npm run db:studio
 ```
 
 `db:validate` checks that `schema.prisma` and `prisma.config.ts` are valid. `db:generate` generates Prisma Client into `lib/generated/prisma`. `db:studio` opens Prisma Studio after the database is reachable.
 
-T02 does not create migrations because no Prisma models exist yet.
+Use `npx prisma migrate dev --name add_core_search_schema` after changing the schema locally. The generated migration is committed under `prisma/migrations`; the generated Prisma Client under `lib/generated/prisma` is ignored and should not be committed.

@@ -75,9 +75,10 @@ npm run typecheck
 npm run lint
 npm run test
 npm run db:validate
+npx prisma migrate dev --name add_core_search_schema
 npm run db:generate
 npm run build
-npm audit
+npm audit --audit-level=moderate
 ```
 
 | 명령어                 | 설명               |
@@ -93,6 +94,14 @@ npm audit
 | `npm run db:validate`  | Prisma schema 검사 |
 | `npm run db:generate`  | Prisma Client 생성 |
 | `npm run db:studio`    | Prisma Studio 실행 |
+
+Prisma migration은 Prisma 7 설정 파일을 통해 `.env`의 `DATABASE_URL`을 읽습니다.
+
+```bash
+npx prisma migrate dev --name add_core_search_schema
+```
+
+Prisma Client는 `lib/generated/prisma`에 생성되며 저장소에 커밋하지 않습니다.
 
 ## 프로젝트 구조
 
