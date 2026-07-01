@@ -13,6 +13,9 @@
     "format:write": "prettier --write .",
     "test": "vitest run",
     "seed:validate": "vite-node scripts/seed/validate.ts",
+    "seed:add-song": "vite-node scripts/seed/add-song.ts",
+    "seed:add-alias": "vite-node scripts/seed/add-alias.ts",
+    "seed:add-entry": "vite-node scripts/seed/add-entry.ts",
     "db:validate": "prisma validate",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio"

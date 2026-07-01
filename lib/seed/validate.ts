@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { buildAliasSearchFields } from "../search/normalize";
+import { parseCsv, type CsvRecord } from "./csv";
 
 export type SeedValidationSeverity = "error" | "warning";
 
@@ -22,11 +23,6 @@ export type SeedFileName =
   | "songs.csv"
   | "song_aliases.csv"
   | "karaoke_entries.csv";
-
-type CsvRecord = {
-  rowNumber: number;
-  values: Record<string, string>;
-};
 
 const STALE_VERIFICATION_DAYS = 180;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -122,7 +118,7 @@ const REQUIRED_FIELDS: Record<SeedFileName, readonly string[]> = {
   ]
 };
 
-const ALIAS_TYPES = new Set([
+export const ALIAS_TYPES = new Set([
   "canonical_title",
   "display_title",
   "artist",
@@ -135,7 +131,7 @@ const ALIAS_TYPES = new Set([
   "alternate_spelling"
 ]);
 
-const AVAILABILITY_STATUSES = new Set([
+export const AVAILABILITY_STATUSES = new Set([
   "available",
   "not_available",
   "temporarily_unavailable",
@@ -193,7 +189,19 @@ function readSeedCsv(
   issues: SeedValidationIssue[]
 ): CsvRecord[] {
   const text = readFileSync(filePath, "utf8").replace(/^\uFEFF/u, "");
-  const rows = parseCsv(text);
+  let rows: string[][];
+
+  try {
+    rows = parseCsv(text);
+  } catch (error) {
+    issues.push({
+      severity: "error",
+      file,
+      message: `invalid CSV: ${errorMessage(error)}`
+    });
+    return [];
+  }
+
   const expectedHeader = SEED_FILE_HEADERS[file];
   const actualHeader = rows[0] ?? [];
 
@@ -236,51 +244,6 @@ function readSeedCsv(
       }
     ];
   });
-}
-
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let inQuotes = false;
-
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index];
-    const next = text[index + 1];
-
-    if (inQuotes) {
-      if (char === '"' && next === '"') {
-        field += '"';
-        index += 1;
-      } else if (char === '"') {
-        inQuotes = false;
-      } else {
-        field += char;
-      }
-      continue;
-    }
-
-    if (char === '"') {
-      inQuotes = true;
-    } else if (char === ",") {
-      row.push(field);
-      field = "";
-    } else if (char === "\n") {
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = "";
-    } else if (char !== "\r") {
-      field += char;
-    }
-  }
-
-  if (field.length > 0 || row.length > 0 || text.endsWith(",")) {
-    row.push(field);
-    rows.push(row);
-  }
-
-  return rows;
 }
 
 function sameHeader(
@@ -673,4 +636,8 @@ function startOfUtcDay(date: Date): Date {
 
 function isBlank(value: string | undefined): boolean {
   return value === undefined || value.trim() === "";
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
