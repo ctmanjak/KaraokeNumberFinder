@@ -1,2 +1,3 @@
 id,original_language,canonical_title,display_title,canonical_artist,release_year,tie_in,source_url,source_name,verified_by,verification_note
 song_fixture_001,ja,Fixture Original Title,픽스처 노래,Fixture Artist,2024,Fixture Series OP,https://example.com/song,Generic song source,ops_fixture,Fixture song
+song_fixture_001,ja,Duplicate Fixture Title,중복 픽스처 노래,Fixture Artist,2024,Fixture Series OP,https://example.com/song-duplicate,Generic song source,ops_fixture,Duplicate song id

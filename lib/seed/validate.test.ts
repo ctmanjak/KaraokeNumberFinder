@@ -39,9 +39,15 @@ describe("validateSeedDirectory", () => {
     });
     const messages = result.errors.map(formatSeedValidationIssue);
 
+    expect(result.errors).toHaveLength(21);
+    expect(result.warnings).toHaveLength(0);
     expect(messages).toEqual(
       expect.arrayContaining([
         "karaoke_providers.csv: exactly one active provider must have is_default=true",
+        "karaoke_providers.csv row 4: is_active must be one of true, false",
+        "karaoke_providers.csv row 4: is_default must be one of true, false",
+        "karaoke_providers.csv row 4: duplicate id already used at row 2",
+        "songs.csv row 3: duplicate id already used at row 2",
         "song_aliases.csv row 2: song_id song_missing not found in songs.csv",
         expect.stringContaining(
           "song_aliases.csv row 3: alias_type must be one of"
@@ -49,6 +55,7 @@ describe("validateSeedDirectory", () => {
         "song_aliases.csv row 4: normalized_alias must be fixturesong",
         "song_aliases.csv row 5: chosung_alias must be ㅍㅅㅊㄴㄹ",
         "song_aliases.csv row 6: duplicate song_id + normalized_alias + alias_type already used at row 4",
+        "song_aliases.csv row 7: duplicate id already used at row 3",
         "karaoke_entries.csv row 2: song_id song_missing not found in songs.csv",
         "karaoke_entries.csv row 3: provider_id provider_missing not found in karaoke_providers.csv",
         "karaoke_entries.csv row 4: karaoke_number is required when availability_status=available",
@@ -58,7 +65,9 @@ describe("validateSeedDirectory", () => {
           "karaoke_entries.csv row 7: availability_status must be one of"
         ),
         "karaoke_entries.csv row 8: source_name is required",
-        "karaoke_entries.csv row 10: duplicate song_id + provider_id + version_info + karaoke_number already used at row 9"
+        "karaoke_entries.csv row 10: duplicate song_id + provider_id + version_info + karaoke_number already used at row 9",
+        "karaoke_entries.csv row 11: last_verified_at must not be in the future",
+        "karaoke_entries.csv row 11: duplicate id already used at row 2"
       ])
     );
   });
@@ -68,6 +77,8 @@ describe("validateSeedDirectory", () => {
       now: NOW
     });
 
+    expect(result.errors).toHaveLength(4);
+    expect(result.warnings).toHaveLength(0);
     expect(result.errors.map(formatSeedValidationIssue)).toEqual(
       expect.arrayContaining([
         "karaoke_providers.csv: karaoke_providers.csv is required",

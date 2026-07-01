@@ -4,7 +4,7 @@ import {
 } from "../../lib/seed/validate";
 
 const seedDir = parseSeedDir(process.argv.slice(2));
-const result = validateSeedDirectory(seedDir);
+const result = runValidation(seedDir);
 
 for (const warning of result.warnings) {
   console.warn(`warning: ${formatSeedValidationIssue(warning)}`);
@@ -40,4 +40,21 @@ function parseSeedDir(args: string[]): string {
   }
 
   return value;
+}
+
+function runValidation(
+  seedDir: string
+): ReturnType<typeof validateSeedDirectory> {
+  try {
+    return validateSeedDirectory(seedDir);
+  } catch (error) {
+    console.error(`error: failed to validate seed directory ${seedDir}`);
+    console.error(`error: ${errorMessage(error)}`);
+    console.error("Seed validation failed with 1 error(s) and 0 warning(s).");
+    process.exit(1);
+  }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

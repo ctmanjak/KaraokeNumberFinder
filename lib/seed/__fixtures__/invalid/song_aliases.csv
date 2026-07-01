@@ -4,3 +4,4 @@ alias_bad_type,song_fixture_001,Fixture Song,ro,bad_type,fixturesong,,https://ex
 alias_bad_normalized,song_fixture_001,Fixture Song,ro,romanized_title,wrong,,https://example.com/song,Generic song source,ops_fixture,Bad normalized alias
 alias_bad_chosung,song_fixture_001,픽스처 노래,ko,display_title,픽스처노래,wrong,https://example.com/song,Generic song source,ops_fixture,Bad chosung alias
 alias_duplicate,song_fixture_001,Fixture Song,ro,romanized_title,fixturesong,,https://example.com/song,Generic song source,ops_fixture,Duplicate alias key
+alias_bad_type,song_fixture_001,Another Fixture Alias,en,english_title,anotherfixturealias,,https://example.com/song,Generic song source,ops_fixture,Duplicate alias id

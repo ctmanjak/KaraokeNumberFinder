@@ -141,6 +141,7 @@ const AVAILABILITY_STATUSES = new Set([
   "temporarily_unavailable",
   "unknown"
 ]);
+const BOOLEAN_VALUES = new Set(["true", "false"]);
 
 export function validateSeedDirectory(
   seedDir = "seed",
@@ -342,6 +343,21 @@ function validateEnums(
   records: Map<SeedFileName, CsvRecord[]>,
   issues: SeedValidationIssue[]
 ): void {
+  for (const provider of records.get("karaoke_providers.csv") ?? []) {
+    for (const field of ["is_active", "is_default"]) {
+      const value = provider.values[field];
+
+      if (!isBlank(value) && !BOOLEAN_VALUES.has(value)) {
+        issues.push({
+          severity: "error",
+          file: "karaoke_providers.csv",
+          row: provider.rowNumber,
+          message: `${field} must be one of true, false`
+        });
+      }
+    }
+  }
+
   for (const alias of records.get("song_aliases.csv") ?? []) {
     if (
       !isBlank(alias.values.alias_type) &&
@@ -515,7 +531,19 @@ function validateEntryStatusRules(
         continue;
       }
 
-      if (daysBetween(parsed, now) > STALE_VERIFICATION_DAYS) {
+      const verifiedDaysAgo = daysBetween(parsed, now);
+
+      if (verifiedDaysAgo < 0) {
+        issues.push({
+          severity: "error",
+          file: "karaoke_entries.csv",
+          row: entry.rowNumber,
+          message: "last_verified_at must not be in the future"
+        });
+        continue;
+      }
+
+      if (verifiedDaysAgo > STALE_VERIFICATION_DAYS) {
         issues.push({
           severity: "warning",
           file: "karaoke_entries.csv",
@@ -531,6 +559,16 @@ function validateDuplicates(
   records: Map<SeedFileName, CsvRecord[]>,
   issues: SeedValidationIssue[]
 ): void {
+  for (const file of SEED_FILE_NAMES) {
+    reportDuplicateKeys(
+      file,
+      records.get(file) ?? [],
+      (record) => record.values.id,
+      "duplicate id",
+      issues
+    );
+  }
+
   reportDuplicateKeys(
     "song_aliases.csv",
     records.get("song_aliases.csv") ?? [],
