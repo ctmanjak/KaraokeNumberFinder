@@ -1,15 +1,22 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { formatSeedValidationIssue, validateSeedDirectory } from "./validate";
+import { cleanupSeedDirs, makeSeedDir, readFixture } from "./test-utils";
 
 const FIXTURES_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   "__fixtures__"
 );
 const NOW = new Date("2026-07-01T00:00:00.000Z");
+const VALID_DIR = path.join(FIXTURES_DIR, "valid");
+const tempSeedDirs: string[] = [];
+
+afterEach(() => {
+  cleanupSeedDirs(tempSeedDirs);
+});
 
 describe("validateSeedDirectory", () => {
   it("accepts a valid seed CSV set", () => {
@@ -88,4 +95,36 @@ describe("validateSeedDirectory", () => {
       ])
     );
   });
+
+  it("rejects numeric and date values that import parsing would reject", () => {
+    const seedDir = makeTempSeedDir({
+      "karaoke_providers.csv": readFixture(
+        VALID_DIR,
+        "karaoke_providers.csv"
+      ).replace(",10,", ",1e2,"),
+      "songs.csv": readFixture(VALID_DIR, "songs.csv").replace(
+        ",2024,",
+        ",2024.5,"
+      ),
+      "karaoke_entries.csv": readFixture(
+        VALID_DIR,
+        "karaoke_entries.csv"
+      ).replace("2026-06-25", "2026-02-30")
+    });
+    const result = validateSeedDirectory(seedDir, { now: NOW });
+
+    expect(result.errors.map(formatSeedValidationIssue)).toEqual(
+      expect.arrayContaining([
+        "karaoke_providers.csv row 2: display_order must be an integer",
+        "songs.csv row 2: release_year must be an integer",
+        "karaoke_entries.csv row 2: last_verified_at must be YYYY-MM-DD"
+      ])
+    );
+  });
 });
+
+function makeTempSeedDir(overrides: Parameters<typeof makeSeedDir>[2]): string {
+  const seedDir = makeSeedDir(VALID_DIR, "seed-validate-test-", overrides);
+  tempSeedDirs.push(seedDir);
+  return seedDir;
+}

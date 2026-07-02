@@ -163,6 +163,7 @@ export function validateSeedDirectory(
   validateRequiredFields(records, issues);
   validateProviderDefaults(records.get("karaoke_providers.csv") ?? [], issues);
   validateEnums(records, issues);
+  validateNumericFields(records, issues);
   validateForeignKeys(records, issues);
   validateAliasSearchFields(records.get("song_aliases.csv") ?? [], issues);
   validateEntryStatusRules(
@@ -349,6 +350,48 @@ function validateEnums(
         ).join(", ")}`
       });
     }
+  }
+}
+
+function validateNumericFields(
+  records: Map<SeedFileName, CsvRecord[]>,
+  issues: SeedValidationIssue[]
+): void {
+  for (const provider of records.get("karaoke_providers.csv") ?? []) {
+    validateIntegerField(
+      "karaoke_providers.csv",
+      provider,
+      "display_order",
+      issues
+    );
+  }
+
+  for (const song of records.get("songs.csv") ?? []) {
+    if (!isBlank(song.values.release_year)) {
+      validateIntegerField("songs.csv", song, "release_year", issues);
+    }
+  }
+}
+
+function validateIntegerField(
+  file: SeedFileName,
+  record: CsvRecord,
+  field: string,
+  issues: SeedValidationIssue[]
+): void {
+  const value = record.values[field];
+
+  if (isBlank(value)) {
+    return;
+  }
+
+  if (!/^-?\d+$/u.test(value.trim())) {
+    issues.push({
+      severity: "error",
+      file,
+      row: record.rowNumber,
+      message: `${field} must be an integer`
+    });
   }
 }
 
@@ -619,7 +662,14 @@ function parseDateOnly(value: string): Date | null {
   }
 
   const date = new Date(`${value}T00:00:00.000Z`);
-  return Number.isNaN(date.getTime()) ? null : date;
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== value
+  ) {
+    return null;
+  }
+
+  return date;
 }
 
 function daysBetween(past: Date, current: Date): number {
