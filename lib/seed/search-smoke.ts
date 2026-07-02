@@ -28,6 +28,11 @@ export type SearchSmokeResult = {
   failures: SearchSmokeFailure[];
 };
 
+export type SearchSmokeReportEntry = {
+  level: "info" | "error";
+  text: string;
+};
+
 export type SearchSmokeDbClient = {
   songAlias: {
     findMany(args: SearchSmokeFindManyArgs): Promise<SearchSmokeAliasRow[]>;
@@ -198,18 +203,23 @@ function buildSearchSmokeAliasConditions(
   return conditions;
 }
 
-export function formatSearchSmokeResult(result: SearchSmokeResult): string[] {
-  const lines = [
-    `Search smoke fixture: ${result.fixturePath}`,
-    `Search smoke cases: ${result.cases.length}`
+export function formatSearchSmokeResult(
+  result: SearchSmokeResult
+): SearchSmokeReportEntry[] {
+  const entries: SearchSmokeReportEntry[] = [
+    { level: "info", text: `Search smoke fixture: ${result.fixturePath}` },
+    { level: "info", text: `Search smoke cases: ${result.cases.length}` }
   ];
 
   if (result.failures.length === 0) {
-    lines.push("Search smoke passed.");
-    return lines;
+    entries.push({ level: "info", text: "Search smoke passed." });
+    return entries;
   }
 
-  lines.push(`Search smoke failed: ${result.failures.length} failure(s).`);
+  entries.push({
+    level: "error",
+    text: `Search smoke failed: ${result.failures.length} failure(s).`
+  });
 
   for (const failure of result.failures) {
     const matched =
@@ -219,12 +229,13 @@ export function formatSearchSmokeResult(result: SearchSmokeResult): string[] {
     const label =
       failure.case.label === null ? "" : ` label=${failure.case.label}`;
 
-    lines.push(
-      `failure: row=${failure.case.row}${label} query=${JSON.stringify(failure.case.query)} expected_song_id=${failure.case.expectedSongId} matched_song_ids=${matched}`
-    );
+    entries.push({
+      level: "error",
+      text: `failure: row=${failure.case.row}${label} query=${JSON.stringify(failure.case.query)} expected_song_id=${failure.case.expectedSongId} matched_song_ids=${matched}`
+    });
   }
 
-  return lines;
+  return entries;
 }
 
 function parseCaseRecord(record: CsvRecord): SearchSmokeCase {
@@ -270,6 +281,8 @@ function nullableString(value: string): string | null {
 }
 
 function normalizeChosungQuery(input: string): string {
+  // Keep NFC here: NFKC rewrites Hangul compatibility jamo such as "ㅍㅅ",
+  // which must stay byte-compatible with stored chosung_alias values.
   return input
     .trim()
     .normalize("NFC")

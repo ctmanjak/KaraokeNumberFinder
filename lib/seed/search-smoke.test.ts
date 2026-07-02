@@ -106,9 +106,10 @@ describe("runSearchSmoke", () => {
     );
 
     expect(result.failures).toHaveLength(1);
-    expect(formatSearchSmokeResult(result)).toContain(
-      'failure: row=2 label=mismatch query="픽스처 노래" expected_song_id=song_missing matched_song_ids=song_fixture_001'
-    );
+    expect(formatSearchSmokeResult(result)).toContainEqual({
+      level: "error",
+      text: 'failure: row=2 label=mismatch query="픽스처 노래" expected_song_id=song_missing matched_song_ids=song_fixture_001'
+    });
   });
 
   it("checks the expected song directly when the display match list is capped", async () => {
