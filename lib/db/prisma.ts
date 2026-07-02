@@ -8,6 +8,8 @@ type GlobalWithPrisma = typeof globalThis & {
 };
 
 const globalForPrisma = globalThis as GlobalWithPrisma;
+const PG_POOL_MAX_CONNECTIONS = 5;
+const PG_POOL_CONNECTION_TIMEOUT_MS = 5_000;
 
 export function getPrismaClient(): PrismaClient {
   if (globalForPrisma.karaokeNumberFinderPrisma === undefined) {
@@ -27,12 +29,15 @@ function createPgPoolConfig(): PoolConfig {
 
   const rejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED;
 
-  if (rejectUnauthorized === undefined || rejectUnauthorized.trim() === "") {
-    return { connectionString };
+  const config: PoolConfig = {
+    connectionString,
+    max: PG_POOL_MAX_CONNECTIONS,
+    connectionTimeoutMillis: PG_POOL_CONNECTION_TIMEOUT_MS
+  };
+
+  if (rejectUnauthorized !== undefined && rejectUnauthorized.trim() !== "") {
+    config.ssl = { rejectUnauthorized: rejectUnauthorized !== "false" };
   }
 
-  return {
-    connectionString,
-    ssl: { rejectUnauthorized: rejectUnauthorized !== "false" }
-  };
+  return config;
 }
