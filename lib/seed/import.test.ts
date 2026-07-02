@@ -42,7 +42,8 @@ describe("importSeedDirectory", () => {
           sourceUrl: "https://example.com/provider-alpha",
           sourceName: "Generic provider source",
           verifiedBy: "ops_fixture",
-          verificationNote: "Fixture provider"
+          verificationNote: "Fixture provider",
+          lastCatalogUpdatedAt: new Date("2026-06-01T00:00:00.000Z")
         })
       ],
       song: [

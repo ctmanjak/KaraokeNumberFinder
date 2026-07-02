@@ -1,3 +1,5 @@
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,6 +12,12 @@ const FIXTURES_DIR = path.join(
   "__fixtures__"
 );
 const NOW = new Date("2026-07-01T00:00:00.000Z");
+const SEED_FILES = [
+  "karaoke_providers.csv",
+  "songs.csv",
+  "song_aliases.csv",
+  "karaoke_entries.csv"
+] as const;
 
 describe("validateSeedDirectory", () => {
   it("accepts a valid seed CSV set", () => {
@@ -88,4 +96,47 @@ describe("validateSeedDirectory", () => {
       ])
     );
   });
+
+  it("rejects numeric and date values that import parsing would reject", () => {
+    const seedDir = makeSeedDir({
+      "karaoke_providers.csv": readFixture("karaoke_providers.csv").replace(
+        ",10,",
+        ",1e2,"
+      ),
+      "songs.csv": readFixture("songs.csv").replace(",2024,", ",2024.5,"),
+      "karaoke_entries.csv": readFixture("karaoke_entries.csv").replace(
+        "2026-06-25",
+        "2026-02-30"
+      )
+    });
+    const result = validateSeedDirectory(seedDir, { now: NOW });
+
+    expect(result.errors.map(formatSeedValidationIssue)).toEqual(
+      expect.arrayContaining([
+        "karaoke_providers.csv row 2: display_order must be an integer",
+        "songs.csv row 2: release_year must be an integer",
+        "karaoke_entries.csv row 2: last_verified_at must be YYYY-MM-DD"
+      ])
+    );
+  });
 });
+
+function makeSeedDir(
+  overrides: Partial<Record<(typeof SEED_FILES)[number], string>>
+): string {
+  const seedDir = mkdtempSync(path.join(tmpdir(), "seed-validate-test-"));
+
+  for (const file of SEED_FILES) {
+    writeFileSync(
+      path.join(seedDir, file),
+      overrides[file] ?? readFixture(file),
+      "utf8"
+    );
+  }
+
+  return seedDir;
+}
+
+function readFixture(file: (typeof SEED_FILES)[number]): string {
+  return readFileSync(path.join(FIXTURES_DIR, "valid", file), "utf8");
+}

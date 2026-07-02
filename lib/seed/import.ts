@@ -456,20 +456,27 @@ function sameImportData(
   existing: Record<string, unknown>,
   incoming: Record<string, unknown>
 ): boolean {
+  const comparableKeys = Object.keys(incoming).filter(isComparableKey);
+
   return (
-    JSON.stringify(sortObjectKeys(normalizeComparable(existing))) ===
-    JSON.stringify(sortObjectKeys(normalizeComparable(incoming)))
+    JSON.stringify(
+      sortObjectKeys(normalizeComparable(existing, comparableKeys))
+    ) ===
+    JSON.stringify(
+      sortObjectKeys(normalizeComparable(incoming, comparableKeys))
+    )
   );
 }
 
 function normalizeComparable(
-  row: Record<string, unknown>
+  row: Record<string, unknown>,
+  keys: readonly string[]
 ): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(row)
-      .filter(([key]) => key !== "createdAt" && key !== "updatedAt")
-      .map(([key, value]) => [key, normalizeValue(value)])
-  );
+  return Object.fromEntries(keys.map((key) => [key, normalizeValue(row[key])]));
+}
+
+function isComparableKey(key: string): boolean {
+  return key !== "createdAt" && key !== "updatedAt";
 }
 
 function normalizeValue(value: unknown): unknown {
