@@ -103,6 +103,55 @@ npx prisma migrate dev --name add_core_search_schema
 
 Prisma Client는 `lib/generated/prisma`에 생성되며 저장소에 커밋하지 않습니다.
 
+## Public API
+
+### `GET /api/providers`
+
+인증 없이 DB의 `KaraokeProvider` 데이터를 기준으로 제공사 목록을 반환합니다. 기본값은 활성 제공사만 조회합니다.
+
+```bash
+curl "http://localhost:3000/api/providers"
+curl "http://localhost:3000/api/providers?country=KR"
+curl "http://localhost:3000/api/providers?active_only=false"
+```
+
+Query parameters:
+
+| 이름          | 기본값 | 설명                                            |
+| ------------- | ------ | ----------------------------------------------- |
+| `country`     | 없음   | ISO 3166-1 alpha-2 대문자 2글자 국가 코드 필터  |
+| `active_only` | `true` | `true`면 활성 제공사만, `false`면 비활성도 포함 |
+
+응답은 `display_order`, `name`, `id` 순으로 안정 정렬됩니다.
+`last_catalog_updated_at`은 값이 있으면 `YYYY-MM-DD` 날짜 문자열로 반환합니다.
+
+```json
+{
+  "items": [
+    {
+      "id": "provider_alpha",
+      "name": "Generic Provider Alpha",
+      "country": "KR",
+      "is_active": true,
+      "display_order": 10,
+      "is_default": true,
+      "last_catalog_updated_at": null
+    }
+  ]
+}
+```
+
+오류 응답은 다음 형태를 사용합니다.
+
+```json
+{
+  "error": {
+    "code": "INVALID_QUERY",
+    "message": "active_only must be either true or false."
+  }
+}
+```
+
 ## 프로젝트 구조
 
 ```text
