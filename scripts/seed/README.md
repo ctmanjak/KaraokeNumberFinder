@@ -3,7 +3,7 @@
 Seed validation, add, dry-run, import, and search smoke commands are reserved for
 `[M1-T06]` through `[M1-T09]`.
 
-Current state after `[M1-T08]`:
+Current state after `[M1-T09]`:
 
 - `npm run seed:validate` validates the default `seed/` directory.
 - `npm run seed:validate -- --seed-dir path/to/fixture` validates another seed
@@ -16,6 +16,10 @@ Current state after `[M1-T08]`:
   against another seed directory.
 - `npm run seed:import -- --seed-dir path/to/fixture` imports another seed
   directory.
+- `npm run seed:search-smoke` verifies that imported seed aliases match the
+  expected `song_id` values in `seed/search-smoke.csv`.
+- `npm run seed:search-smoke -- --fixture path/to/file` uses another smoke
+  fixture.
 - `npm run seed:add-song` appends a generated-ID song row to `songs.csv`.
 - `npm run seed:add-alias` appends a generated-ID alias row to
   `song_aliases.csv`.
@@ -24,11 +28,38 @@ Current state after `[M1-T08]`:
 - Validation errors are printed with `file row N` where a row is involved.
 - Any error exits non-zero. Warning-only validation exits zero.
 - `last_verified_at` values older than 180 days are warnings.
-- Search smoke commands are not implemented yet.
 - Scripts must treat `seed/*.csv` headers as the source of truth for column order.
 - Provider rows must be read from CSV/DB data. Do not hardcode specific provider names or IDs.
 - Add/import commands must preserve existing CSV headers and avoid adding
   placeholder data.
+
+## Search smoke CLI usage
+
+`seed:search-smoke` expects migrations and seed import to already be applied to
+the database selected by `DATABASE_URL`. It does not import seed data itself.
+
+```sh
+npm run seed:search-smoke
+npm run seed:search-smoke -- --fixture path/to/search-smoke.csv
+```
+
+Fixture columns:
+
+```csv
+query,expected_song_id,label
+픽스처 노래,song_fixture_001,hangul display title
+Fixture Song,song_fixture_001,romanized title
+Fixture Series,song_fixture_001,content alias
+ㅍㅅ,song_fixture_001,hangul chosung
+```
+
+Each row runs the shared normalization rules against `SongAlias.normalized_alias`
+using exact, prefix, and partial matching. Two-or-more-character Hangul chosung
+queries also match `SongAlias.chosung_alias` by prefix. One-character chosung
+queries, fuzzy matching, and typo correction are intentionally excluded.
+
+Failures exit non-zero and print the fixture row, query, expected `song_id`, and
+the actual matched `song_id` list.
 
 ## Import CLI usage
 

@@ -1,7 +1,6 @@
 import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
-import type { PoolConfig } from "pg";
 
 import {
   formatSeedImportResult,
@@ -9,6 +8,7 @@ import {
   type SeedImportDbClient
 } from "../../lib/seed/import";
 import { PrismaClient } from "../../lib/generated/prisma/client";
+import { createSeedPgPoolConfig } from "./db-config";
 
 type ParsedArgs = {
   seedDir: string;
@@ -21,17 +21,7 @@ type SeedPrismaClient = Pick<
 >;
 
 const args = parseCliArgs(process.argv.slice(2));
-const databaseUrl = process.env.DATABASE_URL;
-
-if (databaseUrl === undefined || databaseUrl.trim() === "") {
-  console.error("error: DATABASE_URL is required for seed import.");
-  console.error(
-    "Set DATABASE_URL using the existing Prisma environment configuration, then rerun seed:import."
-  );
-  process.exit(1);
-}
-
-const adapter = new PrismaPg(createPgPoolConfig(databaseUrl));
+const adapter = new PrismaPg(createPgPoolConfig());
 const prisma = new PrismaClient({ adapter });
 
 try {
@@ -108,17 +98,13 @@ function parseCliArgs(args: string[]): ParsedArgs {
   }
 }
 
-function createPgPoolConfig(connectionString: string): PoolConfig {
-  const rejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED;
-
-  if (rejectUnauthorized === undefined || rejectUnauthorized.trim() === "") {
-    return { connectionString };
+function createPgPoolConfig() {
+  try {
+    return createSeedPgPoolConfig("seed:import");
+  } catch (error) {
+    console.error(`error: ${errorMessage(error)}`);
+    process.exit(1);
   }
-
-  return {
-    connectionString,
-    ssl: { rejectUnauthorized: rejectUnauthorized !== "false" }
-  };
 }
 
 function toSeedImportDbClient(prisma: PrismaClient): SeedImportDbClient {

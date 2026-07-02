@@ -1,1 +1,4 @@
 id,song_id,alias,language,alias_type,normalized_alias,chosung_alias,source_url,source_name,verified_by,verification_note
+alias_fixture_001_ko,song_fixture_001,픽스처 노래,ko,display_title,픽스처노래,ㅍㅅㅊㄴㄹ,https://example.com/song-fixture-001,Generic song source,ops_fixture,Hangul display title smoke case
+alias_fixture_001_ro,song_fixture_001,Fixture Song,ro,romanized_title,fixturesong,,https://example.com/song-fixture-001,Generic song source,ops_fixture,Romanized title smoke case
+alias_fixture_001_content,song_fixture_001,Fixture Series OP,en,content,fixtureseriesop,,https://example.com/song-fixture-001,Generic song source,ops_fixture,Content alias smoke case
