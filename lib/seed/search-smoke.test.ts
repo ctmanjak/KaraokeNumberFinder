@@ -54,6 +54,12 @@ describe("readSearchSmokeCases", () => {
       readSearchSmokeCases(path.join(FIXTURES_DIR, "invalid.csv"))
     ).toThrow("row 2: expected_song_id is required");
   });
+
+  it("rejects fixture rows with an unexpected column count", () => {
+    expect(() =>
+      readSearchSmokeCases(path.join(FIXTURES_DIR, "extra-column.csv"))
+    ).toThrow("row 2: expected 3 columns but found 4");
+  });
 });
 
 describe("searchImportedSeedSongs", () => {
@@ -104,6 +110,15 @@ describe("runSearchSmoke", () => {
       'failure: row=2 label=mismatch query="픽스처 노래" expected_song_id=song_missing matched_song_ids=song_fixture_001'
     );
   });
+
+  it("checks the expected song directly when the display match list is capped", async () => {
+    const result = await runSearchSmoke(
+      fakeDbWithManyPrefixMatches(),
+      path.join(FIXTURES_DIR, "valid.csv")
+    );
+
+    expect(result.failures).toEqual([]);
+  });
 });
 
 type FakeAlias = SearchSmokeAliasRow & {
@@ -146,7 +161,45 @@ function fakeDb(): SearchSmokeDbClient {
   };
 }
 
+function fakeDbWithManyPrefixMatches(): SearchSmokeDbClient {
+  const db = fakeDb();
+  const aliases = Array.from({ length: 55 }, (_, index): FakeAlias => {
+    const id = String(index + 1).padStart(3, "0");
+
+    return {
+      id: `alias_other_${id}`,
+      songId: `song_other_${id}`,
+      normalizedAlias: "픽스처노래",
+      chosungAlias: "ㅍㅅㅊㄴㄹ"
+    };
+  });
+
+  return {
+    songAlias: {
+      findMany: async (args) => {
+        const baseRows = await db.songAlias.findMany({
+          ...args,
+          take: Number.MAX_SAFE_INTEGER
+        });
+        const rows = [
+          ...aliases
+            .filter((alias) => matches(alias, args))
+            .sort(compareAlias)
+            .map((alias) => ({ songId: alias.songId })),
+          ...baseRows
+        ];
+
+        return rows.slice(0, args.take);
+      }
+    }
+  };
+}
+
 function matches(alias: FakeAlias, args: SearchSmokeFindManyArgs): boolean {
+  if (args.where.songId !== undefined && alias.songId !== args.where.songId) {
+    return false;
+  }
+
   return args.where.OR.some((condition) => {
     if ("normalizedAlias" in condition) {
       if ("equals" in condition.normalizedAlias) {

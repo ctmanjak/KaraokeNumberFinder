@@ -37,6 +37,7 @@ export type SearchSmokeDbClient = {
 export type SearchSmokeFindManyArgs = {
   where: {
     OR: SearchSmokeAliasCondition[];
+    songId?: string;
   };
   select: {
     songId: true;
@@ -72,6 +73,7 @@ export type SearchSmokeAliasRow = {
 };
 
 const DEFAULT_TAKE = 50;
+const EXPECTED_MATCH_TAKE = 1;
 const SEARCH_SMOKE_HEADERS = ["query", "expected_song_id", "label"] as const;
 const SEARCH_WEAK_SYMBOL_PATTERN = /[-_・.'!?]/gu;
 const BRACKET_SYMBOL_PATTERN = /[()[\]{}]/gu;
@@ -99,6 +101,8 @@ export function readSearchSmokeCases(fixturePath: string): SearchSmokeCase[] {
     );
   }
 
+  validateRowLengths(fixturePath, rows);
+
   return recordsFromCsvRows(SEARCH_SMOKE_HEADERS, rows).map(parseCaseRecord);
 }
 
@@ -113,7 +117,10 @@ export async function runSearchSmoke(
     const matches = await searchImportedSeedSongs(db, smokeCase.query);
     const matchedSongIds = matches.map((match) => match.songId);
 
-    if (!matchedSongIds.includes(smokeCase.expectedSongId)) {
+    if (
+      !matchedSongIds.includes(smokeCase.expectedSongId) &&
+      !(await searchImportedSeedHasExpectedSong(db, smokeCase))
+    ) {
       failures.push({ case: smokeCase, matchedSongIds });
     }
   }
@@ -126,6 +133,50 @@ export async function searchImportedSeedSongs(
   query: string,
   options: { take?: number } = {}
 ): Promise<SearchSmokeMatch[]> {
+  const conditions = buildSearchSmokeAliasConditions(query);
+
+  if (conditions.length === 0) {
+    return [];
+  }
+
+  const aliases = await db.songAlias.findMany({
+    where: { OR: conditions },
+    select: { songId: true },
+    orderBy: [{ songId: "asc" }, { id: "asc" }],
+    take: options.take ?? DEFAULT_TAKE
+  });
+
+  return uniqueSongIds(aliases.map((alias) => alias.songId)).map((songId) => ({
+    songId
+  }));
+}
+
+async function searchImportedSeedHasExpectedSong(
+  db: SearchSmokeDbClient,
+  smokeCase: SearchSmokeCase
+): Promise<boolean> {
+  const conditions = buildSearchSmokeAliasConditions(smokeCase.query);
+
+  if (conditions.length === 0) {
+    return false;
+  }
+
+  const aliases = await db.songAlias.findMany({
+    where: {
+      songId: smokeCase.expectedSongId,
+      OR: conditions
+    },
+    select: { songId: true },
+    orderBy: [{ songId: "asc" }, { id: "asc" }],
+    take: EXPECTED_MATCH_TAKE
+  });
+
+  return aliases.length > 0;
+}
+
+function buildSearchSmokeAliasConditions(
+  query: string
+): SearchSmokeAliasCondition[] {
   const normalizedQuery = normalizeSearchText(query);
 
   if (normalizedQuery.length === 0) {
@@ -144,16 +195,7 @@ export async function searchImportedSeedSongs(
     conditions.push({ chosungAlias: { startsWith: chosungQuery } });
   }
 
-  const aliases = await db.songAlias.findMany({
-    where: { OR: conditions },
-    select: { songId: true },
-    orderBy: [{ songId: "asc" }, { id: "asc" }],
-    take: options.take ?? DEFAULT_TAKE
-  });
-
-  return uniqueSongIds(aliases.map((alias) => alias.songId)).map((songId) => ({
-    songId
-  }));
+  return conditions;
 }
 
 export function formatSearchSmokeResult(result: SearchSmokeResult): string[] {
@@ -199,6 +241,23 @@ function parseCaseRecord(record: CsvRecord): SearchSmokeCase {
   }
 
   return { row: record.rowNumber, query, expectedSongId, label };
+}
+
+function validateRowLengths(
+  fixturePath: string,
+  rows: readonly string[][]
+): void {
+  for (const [index, row] of rows.slice(1).entries()) {
+    if (row.length === 1 && row[0]?.trim() === "") {
+      continue;
+    }
+
+    if (row.length !== SEARCH_SMOKE_HEADERS.length) {
+      throw new Error(
+        `${fixturePath} row ${index + 2}: expected ${SEARCH_SMOKE_HEADERS.length} columns but found ${row.length}`
+      );
+    }
+  }
 }
 
 function uniqueSongIds(songIds: readonly string[]): string[] {
