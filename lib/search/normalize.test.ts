@@ -4,6 +4,7 @@ import {
   buildAliasSearchFields,
   canUseHangulChosungSearch,
   extractHangulChosung,
+  normalizeChosungQuery,
   normalizeSearchText
 } from "./normalize";
 
@@ -81,3 +82,23 @@ describe("canUseHangulChosungSearch", () => {
     expect(canUseHangulChosungSearch("ㅈ")).toBe(false);
   });
 });
+
+describe("normalizeChosungQuery", () => {
+  it("keeps Hangul compatibility jamo while removing spaces and weak symbols", () => {
+    expect(normalizeChosungQuery(" ㅈ-ㅎ ")).toBe("ㅈㅎ");
+  });
+
+  it("preserves compatibility jamo code points", () => {
+    const compatibilityJamo = "ㅍㅅ";
+    const normalized = normalizeChosungQuery(compatibilityJamo);
+
+    expect(normalized).toBe(compatibilityJamo);
+    expect([...normalized].map(codePointOf)).toEqual(
+      [...compatibilityJamo].map(codePointOf)
+    );
+  });
+});
+
+function codePointOf(value: string): number | undefined {
+  return value.codePointAt(0);
+}
