@@ -1,1 +1,3 @@
 id,song_id,provider_id,karaoke_number,version_info,availability_status,last_verified_at,source_url,source_name,verified_by,verification_note
+entry_fixture_001_alpha,song_fixture_001,provider_alpha,10001,Original,available,2026-07-02,https://example.com/provider-alpha/search,Generic provider source,ops_fixture,Search smoke fixture entry
+entry_fixture_001_beta,song_fixture_001,provider_beta,20002,Original,available,2026-07-02,https://example.com/provider-beta/search,Generic provider source,ops_fixture,Search smoke fixture entry
