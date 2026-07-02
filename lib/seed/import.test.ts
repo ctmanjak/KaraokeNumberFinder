@@ -1,3 +1,5 @@
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -5,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   importSeedDirectory,
+  readSeedImportTables,
   type AliasImportData,
   type EntryImportData,
   type ProviderImportData,
@@ -18,12 +21,18 @@ const FIXTURES_DIR = path.join(
 );
 const VALID_DIR = path.join(FIXTURES_DIR, "valid");
 const INVALID_DIR = path.join(FIXTURES_DIR, "invalid");
+const SEED_FILES = [
+  "karaoke_providers.csv",
+  "songs.csv",
+  "song_aliases.csv",
+  "karaoke_entries.csv"
+] as const;
 
 describe("importSeedDirectory", () => {
   it("plans dry-run operations without changing the database", async () => {
     const db = new FakeSeedImportDb({
       karaokeProvider: [
-        {
+        reverseObject({
           id: "provider_alpha",
           name: "Generic Provider Alpha",
           country: "KR",
@@ -34,7 +43,7 @@ describe("importSeedDirectory", () => {
           sourceName: "Generic provider source",
           verifiedBy: "ops_fixture",
           verificationNote: "Fixture provider"
-        }
+        })
       ],
       song: [
         {
@@ -94,14 +103,28 @@ describe("importSeedDirectory", () => {
   });
 
   it("imports valid CSV rows in provider, song, alias, entry order", async () => {
-    const db = new FakeSeedImportDb();
+    const db = new FakeSeedImportDb({
+      karaokeProvider: [
+        {
+          id: "provider_alpha",
+          name: "Generic Provider Alpha",
+          country: "KR",
+          isActive: true,
+          displayOrder: 10,
+          isDefault: true,
+          sourceUrl: "https://example.com/provider-alpha",
+          sourceName: "Generic provider source",
+          verifiedBy: "ops_fixture",
+          verificationNote: "Fixture provider"
+        }
+      ]
+    });
 
     const result = await importSeedDirectory(db, { seedDir: VALID_DIR });
 
     expect(result.applied).toBe(true);
     expect(result.errors).toEqual([]);
     expect(db.upsertLog).toEqual([
-      "karaokeProvider:provider_alpha",
       "karaokeProvider:provider_beta",
       "song:song_fixture_001",
       "songAlias:alias_fixture_001_ko",
@@ -113,6 +136,34 @@ describe("importSeedDirectory", () => {
     expect(db.store.song.size).toBe(1);
     expect(db.store.songAlias.size).toBe(2);
     expect(db.store.karaokeEntry.size).toBe(2);
+  });
+
+  it("rejects non-plain integer values while reading import rows", () => {
+    for (const displayOrder of ["", "1e2", "1.5"]) {
+      const seedDir = makeSeedDir({
+        "karaoke_providers.csv": readFixture("karaoke_providers.csv").replace(
+          ",10,",
+          `,${displayOrder},`
+        )
+      });
+
+      expect(() => readSeedImportTables(seedDir)).toThrow(
+        `expected integer but received ${displayOrder}`
+      );
+    }
+  });
+
+  it("rejects normalized or invalid date-only values while reading import rows", () => {
+    const seedDir = makeSeedDir({
+      "karaoke_entries.csv": readFixture("karaoke_entries.csv").replace(
+        "2026-06-25",
+        "2026-02-30"
+      )
+    });
+
+    expect(() => readSeedImportTables(seedDir)).toThrow(
+      "expected valid YYYY-MM-DD date but received 2026-02-30"
+    );
   });
 
   it("does not plan or import when validation fails", async () => {
@@ -250,4 +301,30 @@ function mapRows<TData extends { id: string }>(
   rows: readonly TData[]
 ): Map<string, TData> {
   return new Map(rows.map((row) => [row.id, row]));
+}
+
+function reverseObject<TData extends object>(value: TData): TData {
+  return Object.fromEntries(
+    Object.entries(value).reverse()
+  ) as unknown as TData;
+}
+
+function makeSeedDir(
+  overrides: Partial<Record<(typeof SEED_FILES)[number], string>>
+): string {
+  const seedDir = mkdtempSync(path.join(tmpdir(), "seed-import-test-"));
+
+  for (const file of SEED_FILES) {
+    writeFileSync(
+      path.join(seedDir, file),
+      overrides[file] ?? readFixture(file),
+      "utf8"
+    );
+  }
+
+  return seedDir;
+}
+
+function readFixture(file: (typeof SEED_FILES)[number]): string {
+  return readFileSync(path.join(VALID_DIR, file), "utf8");
 }

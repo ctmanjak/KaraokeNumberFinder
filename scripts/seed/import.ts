@@ -1,6 +1,7 @@
 import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
+import type { PoolConfig } from "pg";
 
 import {
   formatSeedImportResult,
@@ -14,6 +15,11 @@ type ParsedArgs = {
   dryRun: boolean;
 };
 
+type SeedPrismaClient = Pick<
+  PrismaClient,
+  "karaokeProvider" | "song" | "songAlias" | "karaokeEntry"
+>;
+
 const args = parseCliArgs(process.argv.slice(2));
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -25,17 +31,14 @@ if (databaseUrl === undefined || databaseUrl.trim() === "") {
   process.exit(1);
 }
 
-const adapter = new PrismaPg({ connectionString: databaseUrl });
+const adapter = new PrismaPg(createPgPoolConfig(databaseUrl));
 const prisma = new PrismaClient({ adapter });
 
 try {
-  const result = await importSeedDirectory(
-    prisma as unknown as SeedImportDbClient,
-    {
-      seedDir: args.seedDir,
-      dryRun: args.dryRun
-    }
-  );
+  const result = await importSeedDirectory(toSeedImportDbClient(prisma), {
+    seedDir: args.seedDir,
+    dryRun: args.dryRun
+  });
 
   for (const line of formatSeedImportResult(result)) {
     if (line.startsWith("error:")) {
@@ -103,6 +106,101 @@ function parseCliArgs(args: string[]): ParsedArgs {
     console.error(`error: ${errorMessage(error)}`);
     process.exit(1);
   }
+}
+
+function createPgPoolConfig(connectionString: string): PoolConfig {
+  const rejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED;
+
+  if (rejectUnauthorized === undefined || rejectUnauthorized.trim() === "") {
+    return { connectionString };
+  }
+
+  return {
+    connectionString,
+    ssl: { rejectUnauthorized: rejectUnauthorized !== "false" }
+  };
+}
+
+function toSeedImportDbClient(prisma: PrismaClient): SeedImportDbClient {
+  return {
+    karaokeProvider: {
+      findMany: (args) => prisma.karaokeProvider.findMany(args),
+      upsert: (args) => prisma.karaokeProvider.upsert(args)
+    },
+    song: {
+      findMany: (args) => prisma.song.findMany(args),
+      upsert: (args) => prisma.song.upsert(args)
+    },
+    songAlias: {
+      findMany: (args) => prisma.songAlias.findMany(args),
+      upsert: (args) =>
+        prisma.songAlias.upsert({
+          ...args,
+          create: args.create as Parameters<
+            typeof prisma.songAlias.upsert
+          >[0]["create"],
+          update: args.update as Parameters<
+            typeof prisma.songAlias.upsert
+          >[0]["update"]
+        })
+    },
+    karaokeEntry: {
+      findMany: (args) => prisma.karaokeEntry.findMany(args),
+      upsert: (args) =>
+        prisma.karaokeEntry.upsert({
+          ...args,
+          create: args.create as Parameters<
+            typeof prisma.karaokeEntry.upsert
+          >[0]["create"],
+          update: args.update as Parameters<
+            typeof prisma.karaokeEntry.upsert
+          >[0]["update"]
+        })
+    },
+    $transaction: (run) =>
+      prisma.$transaction((tx) => run(toSeedImportTransactionClient(tx)))
+  };
+}
+
+function toSeedImportTransactionClient(
+  prisma: SeedPrismaClient
+): Omit<SeedImportDbClient, "$transaction"> {
+  return {
+    karaokeProvider: {
+      findMany: (args) => prisma.karaokeProvider.findMany(args),
+      upsert: (args) => prisma.karaokeProvider.upsert(args)
+    },
+    song: {
+      findMany: (args) => prisma.song.findMany(args),
+      upsert: (args) => prisma.song.upsert(args)
+    },
+    songAlias: {
+      findMany: (args) => prisma.songAlias.findMany(args),
+      upsert: (args) =>
+        prisma.songAlias.upsert({
+          ...args,
+          create: args.create as Parameters<
+            typeof prisma.songAlias.upsert
+          >[0]["create"],
+          update: args.update as Parameters<
+            typeof prisma.songAlias.upsert
+          >[0]["update"]
+        })
+    },
+    karaokeEntry: {
+      findMany: (args) => prisma.karaokeEntry.findMany(args),
+      upsert: (args) =>
+        prisma.karaokeEntry.upsert({
+          ...args,
+          create: args.create as Parameters<
+            typeof prisma.karaokeEntry.upsert
+          >[0]["create"],
+          update: args.update as Parameters<
+            typeof prisma.karaokeEntry.upsert
+          >[0]["update"]
+        })
+    }
+  };
 }
 
 function errorMessage(error: unknown): string {

@@ -173,9 +173,16 @@ export async function importSeedDirectory(
     return { ...plan, mode, applied: false };
   }
 
+  const rowPlansByFile = new Map(
+    SEED_IMPORT_ORDER.map((file) => [
+      file,
+      plan.rows.filter((row) => row.file === file)
+    ])
+  );
+
   await db.$transaction(async (tx) => {
     for (const table of tables) {
-      await upsertTable(tx, table);
+      await upsertTable(tx, table, rowPlansByFile.get(table.file) ?? []);
     }
   });
 
@@ -395,11 +402,21 @@ function parseEntry(record: CsvRecord): EntryImportData {
 
 async function upsertTable(
   tx: SeedImportTransactionClient,
-  table: SeedImportTable
+  table: SeedImportTable,
+  rowPlans: readonly SeedImportRowPlan[]
 ): Promise<void> {
   const model = modelFor(tx, table.file);
+  const writableIds = new Set(
+    rowPlans
+      .filter((row) => row.action === "create" || row.action === "update")
+      .map((row) => row.id)
+  );
 
   for (const row of table.data) {
+    if (!writableIds.has(row.id)) {
+      continue;
+    }
+
     await model.upsert({
       where: { id: row.id },
       create: row,
@@ -440,8 +457,8 @@ function sameImportData(
   incoming: Record<string, unknown>
 ): boolean {
   return (
-    JSON.stringify(normalizeComparable(existing)) ===
-    JSON.stringify(normalizeComparable(incoming))
+    JSON.stringify(sortObjectKeys(normalizeComparable(existing))) ===
+    JSON.stringify(sortObjectKeys(normalizeComparable(incoming)))
   );
 }
 
@@ -463,6 +480,12 @@ function normalizeValue(value: unknown): unknown {
   return value;
 }
 
+function sortObjectKeys(row: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(row).sort(([left], [right]) => left.localeCompare(right))
+  );
+}
+
 function countAction(
   rows: readonly SeedImportRowPlan[],
   action: SeedImportAction
@@ -479,7 +502,13 @@ function nullableInteger(value: string): number | null {
 }
 
 function parseInteger(value: string): number {
-  const parsed = Number(value);
+  const trimmed = value.trim();
+
+  if (!/^-?\d+$/u.test(trimmed)) {
+    throw new Error(`expected integer but received ${value}`);
+  }
+
+  const parsed = Number(trimmed);
 
   if (!Number.isInteger(parsed)) {
     throw new Error(`expected integer but received ${value}`);
@@ -501,9 +530,24 @@ function parseBoolean(value: string): boolean {
 }
 
 function nullableDateOnly(value: string): Date | null {
-  if (value.trim() === "") {
+  const trimmed = value.trim();
+
+  if (trimmed === "") {
     return null;
   }
 
-  return new Date(`${value}T00:00:00.000Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(trimmed)) {
+    throw new Error(`expected YYYY-MM-DD date but received ${value}`);
+  }
+
+  const date = new Date(`${trimmed}T00:00:00.000Z`);
+
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== trimmed
+  ) {
+    throw new Error(`expected valid YYYY-MM-DD date but received ${value}`);
+  }
+
+  return date;
 }
