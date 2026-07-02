@@ -1,9 +1,7 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
   importSeedDirectory,
@@ -14,6 +12,7 @@ import {
   type SeedImportDbClient,
   type SongImportData
 } from "./import";
+import { cleanupSeedDirs, makeSeedDir, readFixture } from "./test-utils";
 
 const FIXTURES_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -21,12 +20,11 @@ const FIXTURES_DIR = path.join(
 );
 const VALID_DIR = path.join(FIXTURES_DIR, "valid");
 const INVALID_DIR = path.join(FIXTURES_DIR, "invalid");
-const SEED_FILES = [
-  "karaoke_providers.csv",
-  "songs.csv",
-  "song_aliases.csv",
-  "karaoke_entries.csv"
-] as const;
+const tempSeedDirs: string[] = [];
+
+afterEach(() => {
+  cleanupSeedDirs(tempSeedDirs);
+});
 
 describe("importSeedDirectory", () => {
   it("plans dry-run operations without changing the database", async () => {
@@ -141,11 +139,11 @@ describe("importSeedDirectory", () => {
 
   it("rejects non-plain integer values while reading import rows", () => {
     for (const displayOrder of ["", "1e2", "1.5"]) {
-      const seedDir = makeSeedDir({
-        "karaoke_providers.csv": readFixture("karaoke_providers.csv").replace(
-          ",10,",
-          `,${displayOrder},`
-        )
+      const seedDir = makeTempSeedDir({
+        "karaoke_providers.csv": readFixture(
+          VALID_DIR,
+          "karaoke_providers.csv"
+        ).replace(",10,", `,${displayOrder},`)
       });
 
       expect(() => readSeedImportTables(seedDir)).toThrow(
@@ -155,11 +153,11 @@ describe("importSeedDirectory", () => {
   });
 
   it("rejects normalized or invalid date-only values while reading import rows", () => {
-    const seedDir = makeSeedDir({
-      "karaoke_entries.csv": readFixture("karaoke_entries.csv").replace(
-        "2026-06-25",
-        "2026-02-30"
-      )
+    const seedDir = makeTempSeedDir({
+      "karaoke_entries.csv": readFixture(
+        VALID_DIR,
+        "karaoke_entries.csv"
+      ).replace("2026-06-25", "2026-02-30")
     });
 
     expect(() => readSeedImportTables(seedDir)).toThrow(
@@ -310,22 +308,8 @@ function reverseObject<TData extends object>(value: TData): TData {
   ) as unknown as TData;
 }
 
-function makeSeedDir(
-  overrides: Partial<Record<(typeof SEED_FILES)[number], string>>
-): string {
-  const seedDir = mkdtempSync(path.join(tmpdir(), "seed-import-test-"));
-
-  for (const file of SEED_FILES) {
-    writeFileSync(
-      path.join(seedDir, file),
-      overrides[file] ?? readFixture(file),
-      "utf8"
-    );
-  }
-
+function makeTempSeedDir(overrides: Parameters<typeof makeSeedDir>[2]): string {
+  const seedDir = makeSeedDir(VALID_DIR, "seed-import-test-", overrides);
+  tempSeedDirs.push(seedDir);
   return seedDir;
-}
-
-function readFixture(file: (typeof SEED_FILES)[number]): string {
-  return readFileSync(path.join(VALID_DIR, file), "utf8");
 }

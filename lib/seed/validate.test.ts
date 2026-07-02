@@ -1,23 +1,22 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { formatSeedValidationIssue, validateSeedDirectory } from "./validate";
+import { cleanupSeedDirs, makeSeedDir, readFixture } from "./test-utils";
 
 const FIXTURES_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   "__fixtures__"
 );
 const NOW = new Date("2026-07-01T00:00:00.000Z");
-const SEED_FILES = [
-  "karaoke_providers.csv",
-  "songs.csv",
-  "song_aliases.csv",
-  "karaoke_entries.csv"
-] as const;
+const VALID_DIR = path.join(FIXTURES_DIR, "valid");
+const tempSeedDirs: string[] = [];
+
+afterEach(() => {
+  cleanupSeedDirs(tempSeedDirs);
+});
 
 describe("validateSeedDirectory", () => {
   it("accepts a valid seed CSV set", () => {
@@ -98,16 +97,19 @@ describe("validateSeedDirectory", () => {
   });
 
   it("rejects numeric and date values that import parsing would reject", () => {
-    const seedDir = makeSeedDir({
-      "karaoke_providers.csv": readFixture("karaoke_providers.csv").replace(
-        ",10,",
-        ",1e2,"
+    const seedDir = makeTempSeedDir({
+      "karaoke_providers.csv": readFixture(
+        VALID_DIR,
+        "karaoke_providers.csv"
+      ).replace(",10,", ",1e2,"),
+      "songs.csv": readFixture(VALID_DIR, "songs.csv").replace(
+        ",2024,",
+        ",2024.5,"
       ),
-      "songs.csv": readFixture("songs.csv").replace(",2024,", ",2024.5,"),
-      "karaoke_entries.csv": readFixture("karaoke_entries.csv").replace(
-        "2026-06-25",
-        "2026-02-30"
-      )
+      "karaoke_entries.csv": readFixture(
+        VALID_DIR,
+        "karaoke_entries.csv"
+      ).replace("2026-06-25", "2026-02-30")
     });
     const result = validateSeedDirectory(seedDir, { now: NOW });
 
@@ -121,22 +123,8 @@ describe("validateSeedDirectory", () => {
   });
 });
 
-function makeSeedDir(
-  overrides: Partial<Record<(typeof SEED_FILES)[number], string>>
-): string {
-  const seedDir = mkdtempSync(path.join(tmpdir(), "seed-validate-test-"));
-
-  for (const file of SEED_FILES) {
-    writeFileSync(
-      path.join(seedDir, file),
-      overrides[file] ?? readFixture(file),
-      "utf8"
-    );
-  }
-
+function makeTempSeedDir(overrides: Parameters<typeof makeSeedDir>[2]): string {
+  const seedDir = makeSeedDir(VALID_DIR, "seed-validate-test-", overrides);
+  tempSeedDirs.push(seedDir);
   return seedDir;
-}
-
-function readFixture(file: (typeof SEED_FILES)[number]): string {
-  return readFileSync(path.join(FIXTURES_DIR, "valid", file), "utf8");
 }
