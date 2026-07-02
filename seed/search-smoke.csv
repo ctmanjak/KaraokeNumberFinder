@@ -1,0 +1,5 @@
+query,expected_song_id,label
+픽스처 노래,song_fixture_001,hangul display title
+Fixture Song,song_fixture_001,romanized title
+Fixture Series,song_fixture_001,content alias
+ㅍㅅ,song_fixture_001,hangul chosung
