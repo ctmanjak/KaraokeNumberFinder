@@ -462,6 +462,36 @@ describe("searchSongs", () => {
       searchSongs(db, parsedQuery("q=fixture&provider_id=provider_inactive"))
     ).rejects.toBeInstanceOf(InvalidProviderError);
   });
+
+  it("returns up to five alias suggestions when no songs match", async () => {
+    const db = new FakeSearchDb({
+      songs: Array.from({ length: 6 }, (_, index) => {
+        const sequence = (index + 1).toString().padStart(3, "0");
+
+        return song({
+          id: `song_fixture_suggestion_${sequence}`,
+          aliases: [
+            alias({
+              id: `alias_fixture_suggestion_${sequence}`,
+              alias: `Fixture Suggestion ${sequence}`,
+              normalizedAlias: `fixturesuggestion${sequence}`
+            })
+          ]
+        });
+      })
+    });
+
+    const result = await searchSongs(db, parsedQuery("q=fixzz"));
+
+    expect(result.items).toEqual([]);
+    expect(result.suggestions).toEqual([
+      "Fixture Suggestion 001",
+      "Fixture Suggestion 002",
+      "Fixture Suggestion 003",
+      "Fixture Suggestion 004",
+      "Fixture Suggestion 005"
+    ]);
+  });
 });
 
 type ProviderRecord = Awaited<
@@ -474,6 +504,10 @@ type AliasRecord = Extract<
 type AliasIdRecord = Extract<
   Awaited<ReturnType<SearchDbClient["songAlias"]["findMany"]>>[number],
   { id: string }
+>;
+type AliasSuggestionRecord = Extract<
+  Awaited<ReturnType<SearchDbClient["songAlias"]["findMany"]>>[number],
+  { alias: string; normalizedAlias: string }
 >;
 type SongRecord = AliasRecord["song"];
 type TestSongRecord = SongRecord & { aliases: AliasRecord[] };
@@ -529,7 +563,15 @@ class FakeSearchDb implements SearchDbClient {
 function selectAliasFields(
   aliases: AliasRecord[],
   select: FindManyArgs["select"]
-): Array<AliasIdRecord | AliasRecord> {
+): Array<AliasIdRecord | AliasSuggestionRecord | AliasRecord> {
+  if ("alias" in select && !("song" in select)) {
+    return aliases.map((item) => ({
+      id: item.id,
+      alias: item.alias,
+      normalizedAlias: item.normalizedAlias
+    }));
+  }
+
   if (!("song" in select)) {
     return aliases.map((item) => ({ id: item.id }));
   }
