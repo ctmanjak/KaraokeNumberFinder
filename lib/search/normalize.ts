@@ -36,13 +36,7 @@ export type AliasSearchFields = {
 export const MIN_CHOSUNG_SEARCH_LENGTH = 2;
 
 export function normalizeSearchText(input: string): string {
-  return input
-    .trim()
-    .normalize("NFKC")
-    .toLowerCase()
-    .replace(BRACKET_SYMBOL_PATTERN, "")
-    .replace(SEARCH_WEAK_SYMBOL_PATTERN, "")
-    .replace(WHITESPACE_PATTERN, "");
+  return normalizeSearchComparableText(input, "NFKC");
 }
 
 export function extractHangulChosung(input: string): string {
@@ -75,6 +69,25 @@ export function buildAliasSearchFields(alias: string): AliasSearchFields {
     normalizedAlias: normalizeSearchText(alias),
     chosungAlias: extractHangulChosung(alias)
   };
+}
+
+export function normalizeChosungQuery(input: string): string {
+  // Keep NFC here: NFKC rewrites Hangul compatibility jamo such as "ㅍㅅ",
+  // which must stay byte-compatible with stored chosung_alias values.
+  return normalizeSearchComparableText(input, "NFC");
+}
+
+function normalizeSearchComparableText(
+  input: string,
+  normalizationForm: "NFC" | "NFKC"
+): string {
+  return input
+    .trim()
+    .normalize(normalizationForm)
+    .toLowerCase()
+    .replace(BRACKET_SYMBOL_PATTERN, "")
+    .replace(SEARCH_WEAK_SYMBOL_PATTERN, "")
+    .replace(WHITESPACE_PATTERN, "");
 }
 
 export function canUseHangulChosungSearch(chosung: string): boolean {

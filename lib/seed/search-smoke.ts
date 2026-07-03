@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 
 import {
   canUseHangulChosungSearch,
+  normalizeChosungQuery,
   normalizeSearchText
 } from "../search/normalize";
 import { parseCsv, recordsFromCsvRows, type CsvRecord } from "./csv";
@@ -80,9 +81,6 @@ export type SearchSmokeAliasRow = {
 const DEFAULT_TAKE = 50;
 const EXPECTED_MATCH_TAKE = 1;
 const SEARCH_SMOKE_HEADERS = ["query", "expected_song_id", "label"] as const;
-const SEARCH_WEAK_SYMBOL_PATTERN = /[-_・.'!?]/gu;
-const BRACKET_SYMBOL_PATTERN = /[()[\]{}]/gu;
-const WHITESPACE_PATTERN = /\s+/gu;
 
 export function readSearchSmokeCases(fixturePath: string): SearchSmokeCase[] {
   if (!existsSync(fixturePath)) {
@@ -278,18 +276,6 @@ function uniqueSongIds(songIds: readonly string[]): string[] {
 function nullableString(value: string): string | null {
   const trimmed = value.trim();
   return trimmed === "" ? null : trimmed;
-}
-
-function normalizeChosungQuery(input: string): string {
-  // Keep NFC here: NFKC rewrites Hangul compatibility jamo such as "ㅍㅅ",
-  // which must stay byte-compatible with stored chosung_alias values.
-  return input
-    .trim()
-    .normalize("NFC")
-    .toLowerCase()
-    .replace(BRACKET_SYMBOL_PATTERN, "")
-    .replace(SEARCH_WEAK_SYMBOL_PATTERN, "")
-    .replace(WHITESPACE_PATTERN, "");
 }
 
 function sameHeader(
