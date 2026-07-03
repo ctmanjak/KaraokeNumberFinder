@@ -21,6 +21,33 @@ const providers = [
     last_catalog_updated_at: null
   },
   {
+    id: "provider_tertiary",
+    name: "Generic Provider Tertiary",
+    country: "KR",
+    is_active: true,
+    display_order: 30,
+    is_default: false,
+    last_catalog_updated_at: null
+  },
+  {
+    id: "provider_quaternary",
+    name: "Generic Provider Quaternary",
+    country: "KR",
+    is_active: true,
+    display_order: 40,
+    is_default: false,
+    last_catalog_updated_at: null
+  },
+  {
+    id: "provider_without_entry",
+    name: "Generic Provider Without Entry",
+    country: "KR",
+    is_active: true,
+    display_order: 50,
+    is_default: false,
+    last_catalog_updated_at: null
+  },
+  {
     id: "provider_default",
     name: "Generic Provider Default",
     country: "KR",
@@ -53,7 +80,53 @@ const searchResponse = {
           }
         ]
       },
-      karaoke_entries: [],
+      karaoke_entries: [
+        {
+          id: "entry_default_available",
+          provider_id: "provider_default",
+          karaoke_number: "12345",
+          version_info: "Sample Original Version",
+          availability_status: "available",
+          last_verified_at: "2026-01-02",
+          is_stale: false
+        },
+        {
+          id: "entry_secondary_not_available",
+          provider_id: "provider_secondary",
+          karaoke_number: "",
+          version_info: "Sample Alternate Version",
+          availability_status: "not_available",
+          last_verified_at: null,
+          is_stale: false
+        },
+        {
+          id: "entry_default_available_variant",
+          provider_id: "provider_default",
+          karaoke_number: "67890",
+          version_info: "Sample Variant Version",
+          availability_status: "available",
+          last_verified_at: "2026-01-03",
+          is_stale: false
+        },
+        {
+          id: "entry_tertiary_temporarily_unavailable",
+          provider_id: "provider_tertiary",
+          karaoke_number: "",
+          version_info: "Sample Live Version",
+          availability_status: "temporarily_unavailable",
+          last_verified_at: "2025-01-01",
+          is_stale: true
+        },
+        {
+          id: "entry_quaternary_unknown",
+          provider_id: "provider_quaternary",
+          karaoke_number: "",
+          version_info: "",
+          availability_status: "unknown",
+          last_verified_at: null,
+          is_stale: false
+        }
+      ],
       distinguishing_labels: ["Sample Artist", "Sample Tie In", "2026"],
       relevance_score: 100
     }
@@ -294,8 +367,185 @@ describe("MobileSearchPage", () => {
     expect(await screen.findByText("Sample Display Title")).toBeTruthy();
     expect(screen.getByText("Sample Canonical Title")).toBeTruthy();
     expect(screen.getAllByText("Sample Artist").length).toBeGreaterThan(0);
+    expect(screen.getByText("언어: 일본어")).toBeTruthy();
     expect(screen.getByText("일치한 별칭: Sample Matched Alias")).toBeTruthy();
     expect(screen.getByText("관련도 100")).toBeTruthy();
+  });
+
+  it("prioritizes the selected provider available number in the card default state", async () => {
+    mockFetch([
+      { ok: true, body: { items: providers } },
+      { ok: true, body: searchResponse }
+    ]);
+
+    render(<MobileSearchPage />);
+
+    await screen.findByLabelText("제공사");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "sample title" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "검색" }));
+
+    expect(await screen.findByText("12345")).toBeTruthy();
+    expect(
+      screen.getAllByText("Generic Provider Default").length
+    ).toBeGreaterThan(0);
+    expect(screen.getByText("Sample Original Version")).toBeTruthy();
+    expect(screen.getByText("확인일 2026-01-02")).toBeTruthy();
+  });
+
+  it("falls back to a status label when an available selected-provider entry has no number", async () => {
+    mockFetch([
+      { ok: true, body: { items: providers } },
+      {
+        ok: true,
+        body: searchResponseWithEntries([
+          {
+            id: "entry_secondary_available_without_number",
+            provider_id: "provider_secondary",
+            karaoke_number: "",
+            version_info: "Sample Missing Number Version",
+            availability_status: "available",
+            last_verified_at: "2026-01-04",
+            is_stale: false
+          },
+          {
+            id: "entry_default_available_for_badge",
+            provider_id: "provider_default",
+            karaoke_number: "12345",
+            version_info: "Sample Original Version",
+            availability_status: "available",
+            last_verified_at: "2026-01-02",
+            is_stale: false
+          }
+        ])
+      }
+    ]);
+
+    render(<MobileSearchPage />);
+
+    const select = await screen.findByLabelText("제공사");
+    fireEvent.change(select, { target: { value: "provider_secondary" } });
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "sample title" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "검색" }));
+
+    expect(await screen.findByText("확인 필요")).toBeTruthy();
+    expect(screen.getByText("Sample Missing Number Version")).toBeTruthy();
+    expect(screen.getByText("다른 제공사 번호 있음")).toBeTruthy();
+  });
+
+  it("shows another-provider badge when the selected provider has no available number", async () => {
+    mockFetch([
+      { ok: true, body: { items: providers } },
+      { ok: true, body: searchResponse }
+    ]);
+
+    render(<MobileSearchPage />);
+
+    const select = await screen.findByLabelText("제공사");
+    fireEvent.change(select, { target: { value: "provider_secondary" } });
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "sample title" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "검색" }));
+
+    expect(await screen.findByText("미수록")).toBeTruthy();
+    expect(screen.getByText("다른 제공사 번호 있음")).toBeTruthy();
+  });
+
+  it("toggles provider comparison with status, verification, and stale labels", async () => {
+    mockFetch([
+      { ok: true, body: { items: providers } },
+      { ok: true, body: searchResponse }
+    ]);
+
+    render(<MobileSearchPage />);
+
+    await screen.findByLabelText("제공사");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "sample title" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "검색" }));
+
+    const expandButton = await screen.findByRole("button", {
+      name: "제공사별 비교"
+    });
+    fireEvent.click(expandButton);
+
+    expect(screen.getByLabelText("제공사별 번호 비교")).toBeTruthy();
+    expect(
+      screen.getAllByText("Generic Provider Secondary").length
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText("사용 가능").length).toBeGreaterThan(0);
+    expect(screen.getByText("67890")).toBeTruthy();
+    expect(screen.getByText("Sample Variant Version")).toBeTruthy();
+    expect(screen.getAllByText("미수록").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("일시 이용 불가").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("확인 필요").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("확인일 2026-01-02").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("확인일 정보 없음").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("오래된 정보").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("Generic Provider Without Entry").length
+    ).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "접기" }));
+
+    expect(screen.queryByLabelText("제공사별 번호 비교")).toBeNull();
+  });
+
+  it("resets expanded cards when a new search starts", async () => {
+    const firstSearch = deferred<Response>();
+    const secondSearch = deferred<Response>();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/providers") {
+        return Promise.resolve(jsonResponse({ items: providers }));
+      }
+
+      if (url.startsWith("/api/search?q=first")) {
+        return firstSearch.promise;
+      }
+
+      if (url.startsWith("/api/search?q=second")) {
+        return secondSearch.promise;
+      }
+
+      throw new Error(`Unexpected fetch call: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<MobileSearchPage />);
+
+    await screen.findByLabelText("제공사");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "first" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+    firstSearch.resolve(jsonResponse(searchResponse));
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "제공사별 비교" })
+    );
+    expect(screen.getByLabelText("제공사별 번호 비교")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "second" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+    secondSearch.resolve(jsonResponse(searchResponse));
+
+    await screen.findByText("Sample Display Title");
+
+    expect(screen.queryByLabelText("제공사별 번호 비교")).toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: "제공사별 비교" })
+        .getAttribute("aria-expanded")
+    ).toBe("false");
   });
 
   it("renders an error state after a failed search", async () => {
@@ -409,6 +659,20 @@ function searchResponseWithSong({
           display_title: displayTitle,
           id
         }
+      }
+    ]
+  };
+}
+
+function searchResponseWithEntries(
+  entries: (typeof searchResponse.items)[number]["karaoke_entries"]
+) {
+  return {
+    ...searchResponse,
+    items: [
+      {
+        ...searchResponse.items[0],
+        karaoke_entries: entries
       }
     ]
   };

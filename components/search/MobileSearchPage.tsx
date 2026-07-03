@@ -8,6 +8,7 @@ import {
 } from "@/lib/api/search-ui";
 import type { ProviderListItem } from "@/lib/providers/providers";
 import type { SearchResponse, SearchResultItem } from "@/lib/search/search";
+import { SearchResultCard } from "./SearchResultCard";
 
 type RequestState = "idle" | "loading" | "success" | "error";
 
@@ -30,6 +31,9 @@ export function MobileSearchPage() {
   const [searchStatus, setSearchStatus] = useState<RequestState>("idle");
   const [searchError, setSearchError] = useState<string | null>(null);
   const [results, setResults] = useState<SearchResultItem[]>([]);
+  const [expandedSongIds, setExpandedSongIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const latestSearchRequestId = useRef(0);
 
   useEffect(() => {
@@ -84,6 +88,7 @@ export function MobileSearchPage() {
     setSubmittedProviderName(
       providers.find((provider) => provider.id === providerId)?.name
     );
+    setExpandedSongIds(new Set());
     setSearchStatus("loading");
     setSearchError(null);
 
@@ -190,9 +195,25 @@ export function MobileSearchPage() {
           <SearchState
             status={searchStatus}
             submittedQuery={submittedQuery}
+            submittedProviderId={submittedProviderId}
             selectedProviderName={submittedProviderName}
+            providers={providers}
             results={results}
+            expandedSongIds={expandedSongIds}
             error={searchError}
+            onToggleExpanded={(songId) =>
+              setExpandedSongIds((current) => {
+                const next = new Set(current);
+
+                if (next.has(songId)) {
+                  next.delete(songId);
+                } else {
+                  next.add(songId);
+                }
+
+                return next;
+              })
+            }
             onRetry={() => void runSearch(submittedQuery, submittedProviderId)}
           />
         </section>
@@ -204,16 +225,24 @@ export function MobileSearchPage() {
 function SearchState({
   status,
   submittedQuery,
+  submittedProviderId,
   selectedProviderName,
+  providers,
   results,
+  expandedSongIds,
   error,
+  onToggleExpanded,
   onRetry
 }: {
   status: RequestState;
   submittedQuery: string;
+  submittedProviderId: string | undefined;
   selectedProviderName: string | undefined;
+  providers: ProviderListItem[];
   results: SearchResultItem[];
+  expandedSongIds: Set<string>;
   error: string | null;
+  onToggleExpanded: (songId: string) => void;
   onRetry: () => void;
 }) {
   if (status === "idle") {
@@ -268,36 +297,16 @@ function SearchState({
       </div>
       <ul className="result-list">
         {results.map((item) => (
-          <ResultShell key={item.song.id} item={item} />
+          <SearchResultCard
+            key={item.song.id}
+            item={item}
+            providers={providers}
+            selectedProviderId={submittedProviderId}
+            isExpanded={expandedSongIds.has(item.song.id)}
+            onToggleExpanded={() => onToggleExpanded(item.song.id)}
+          />
         ))}
       </ul>
     </>
-  );
-}
-
-function ResultShell({ item }: { item: SearchResultItem }) {
-  const matchedAlias = item.song.matched_aliases[0]?.alias;
-
-  return (
-    <li className="result-card">
-      <div className="result-heading">
-        <h2>{item.song.display_title}</h2>
-        <span className="score-label">관련도 {item.relevance_score}</span>
-      </div>
-      <p className="canonical-title">{item.song.canonical_title}</p>
-      <p className="artist-name">{item.song.canonical_artist}</p>
-      {item.distinguishing_labels.length > 0 ? (
-        <div className="label-row" aria-label="구분 라벨">
-          {item.distinguishing_labels.map((label) => (
-            <span className="pill" key={label}>
-              {label}
-            </span>
-          ))}
-        </div>
-      ) : null}
-      {matchedAlias === undefined ? null : (
-        <p className="matched-alias">일치한 별칭: {matchedAlias}</p>
-      )}
-    </li>
   );
 }
