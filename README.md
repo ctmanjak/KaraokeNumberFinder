@@ -49,6 +49,12 @@ npm run dev
 
 브라우저에서 `http://localhost:3000`을 엽니다.
 
+홈 화면은 모바일 폭 1열 검색 화면입니다. 제공사 목록은
+`GET /api/providers`에서 로드하고, 운영 기본 제공사가 있으면 기본 선택합니다.
+검색어 입력 중에는 결과를 갱신하지 않으며 Enter 또는 검색 버튼 제출 시에만
+`GET /api/search?q=...`를 호출합니다. 제공사를 선택한 상태에서는
+`provider_id` query parameter를 함께 보냅니다.
+
 로컬 환경변수는 `.env.example`을 기준으로 설정합니다. PostgreSQL 연결 문자열은 `DATABASE_URL`에 둡니다. Prisma 7에서는 이 값을 `prisma/schema.prisma`가 아니라 루트 `prisma.config.ts`에서 읽습니다.
 
 ```dotenv
