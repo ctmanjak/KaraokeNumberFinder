@@ -309,7 +309,7 @@ function SearchState({
     return (
       <div className="empty-state">
         <p className="empty-title">
-          &quot;{submittedQuery}&quot; 검색 결과가 없습니다.
+          &quot;{successfulQuery}&quot; 검색 결과가 없습니다.
         </p>
         <p className="empty-copy">
           다른 표기나 더 긴 검색어로 다시 검색하세요.

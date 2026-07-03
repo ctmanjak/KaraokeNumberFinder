@@ -378,7 +378,10 @@ describe("MobileSearchPage", () => {
     expect((await screen.findByRole("status")).textContent).toContain(
       "sample title 검색 결과를 불러오는 중입니다."
     );
-    expect(screen.getByRole("search")).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "검색" }) as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
 
     pendingSearch.resolve(jsonResponse(searchResponse));
     await screen.findByText("Sample Display Title");
@@ -754,7 +757,15 @@ describe("MobileSearchPage", () => {
   it("renders the submitted query in the empty result state", async () => {
     mockFetch([
       { ok: true, body: { items: providers } },
-      { ok: true, body: { ...searchResponse, items: [], suggestions: [] } }
+      {
+        ok: true,
+        body: {
+          ...searchResponse,
+          query: "confirmed missing title",
+          items: [],
+          suggestions: []
+        }
+      }
     ]);
 
     render(<MobileSearchPage />);
@@ -766,7 +777,7 @@ describe("MobileSearchPage", () => {
     fireEvent.submit(screen.getByRole("search"));
 
     expect(
-      await screen.findByText('"missing title" 검색 결과가 없습니다.')
+      await screen.findByText('"confirmed missing title" 검색 결과가 없습니다.')
     ).toBeTruthy();
     expect(screen.queryByLabelText("유사 검색어")).toBeNull();
   });
