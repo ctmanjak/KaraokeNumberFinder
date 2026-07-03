@@ -25,12 +25,17 @@ export function MobileSearchPage() {
   const [submittedProviderId, setSubmittedProviderId] = useState<
     string | undefined
   >();
-  const [submittedProviderName, setSubmittedProviderName] = useState<
+  const [successfulQuery, setSuccessfulQuery] = useState("");
+  const [successfulProviderId, setSuccessfulProviderId] = useState<
+    string | undefined
+  >();
+  const [successfulProviderName, setSuccessfulProviderName] = useState<
     string | undefined
   >();
   const [searchStatus, setSearchStatus] = useState<RequestState>("idle");
   const [searchError, setSearchError] = useState<string | null>(null);
   const [results, setResults] = useState<SearchResultItem[]>([]);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [expandedSongIds, setExpandedSongIds] = useState<Set<string>>(
     () => new Set()
   );
@@ -85,9 +90,10 @@ export function MobileSearchPage() {
 
     setSubmittedQuery(trimmedQuery);
     setSubmittedProviderId(providerId);
-    setSubmittedProviderName(
-      providers.find((provider) => provider.id === providerId)?.name
-    );
+    const providerName = providers.find(
+      (provider) => provider.id === providerId
+    )?.name;
+
     setExpandedSongIds(new Set());
     setSearchStatus("loading");
     setSearchError(null);
@@ -103,6 +109,10 @@ export function MobileSearchPage() {
       }
 
       setResults(response.items);
+      setSuggestions(response.suggestions);
+      setSuccessfulQuery(response.query);
+      setSuccessfulProviderId(providerId);
+      setSuccessfulProviderName(providerName);
       setSearchStatus("success");
     } catch (error) {
       if (latestSearchRequestId.current !== requestId) {
@@ -119,6 +129,11 @@ export function MobileSearchPage() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void runSearch(query);
+  }
+
+  function handleSuggestionSearch(suggestion: string) {
+    setQuery(suggestion);
+    void runSearch(suggestion);
   }
 
   const canSubmit = query.trim().length > 0 && searchStatus !== "loading";
@@ -195,10 +210,12 @@ export function MobileSearchPage() {
           <SearchState
             status={searchStatus}
             submittedQuery={submittedQuery}
-            submittedProviderId={submittedProviderId}
-            selectedProviderName={submittedProviderName}
+            successfulQuery={successfulQuery}
+            successfulProviderId={successfulProviderId}
+            successfulProviderName={successfulProviderName}
             providers={providers}
             results={results}
+            suggestions={suggestions}
             expandedSongIds={expandedSongIds}
             error={searchError}
             onToggleExpanded={(songId) =>
@@ -215,6 +232,7 @@ export function MobileSearchPage() {
               })
             }
             onRetry={() => void runSearch(submittedQuery, submittedProviderId)}
+            onSearchSuggestion={handleSuggestionSearch}
           />
         </section>
       </div>
@@ -225,26 +243,34 @@ export function MobileSearchPage() {
 function SearchState({
   status,
   submittedQuery,
-  submittedProviderId,
-  selectedProviderName,
+  successfulQuery,
+  successfulProviderId,
+  successfulProviderName,
   providers,
   results,
+  suggestions,
   expandedSongIds,
   error,
   onToggleExpanded,
-  onRetry
+  onRetry,
+  onSearchSuggestion
 }: {
   status: RequestState;
   submittedQuery: string;
-  submittedProviderId: string | undefined;
-  selectedProviderName: string | undefined;
+  successfulQuery: string;
+  successfulProviderId: string | undefined;
+  successfulProviderName: string | undefined;
   providers: ProviderListItem[];
   results: SearchResultItem[];
+  suggestions: string[];
   expandedSongIds: Set<string>;
   error: string | null;
   onToggleExpanded: (songId: string) => void;
   onRetry: () => void;
+  onSearchSuggestion: (suggestion: string) => void;
 }) {
+  const hasResults = results.length > 0;
+
   if (status === "idle") {
     return (
       <div className="empty-state">
@@ -256,15 +282,17 @@ function SearchState({
     );
   }
 
-  if (status === "loading") {
+  if (status === "loading" && !hasResults) {
     return (
       <div className="status-box" role="status">
-        검색 결과를 불러오는 중입니다.
+        <p>
+          <strong>{submittedQuery}</strong> 검색 결과를 불러오는 중입니다.
+        </p>
       </div>
     );
   }
 
-  if (status === "error") {
+  if (status === "error" && !hasResults) {
     return (
       <div className="status-box status-box-error" role="alert">
         <p>{error ?? "검색 요청에 실패했습니다."}</p>
@@ -275,24 +303,59 @@ function SearchState({
     );
   }
 
-  if (results.length === 0) {
+  if (status === "success" && results.length === 0) {
+    const visibleSuggestions = suggestions.slice(0, 5);
+
     return (
       <div className="empty-state">
-        <p className="empty-title">검색 결과가 없습니다.</p>
+        <p className="empty-title">
+          &quot;{submittedQuery}&quot; 검색 결과가 없습니다.
+        </p>
         <p className="empty-copy">
           다른 표기나 더 긴 검색어로 다시 검색하세요.
         </p>
+        {visibleSuggestions.length > 0 ? (
+          <div className="suggestion-panel" aria-label="유사 검색어">
+            <p className="suggestion-title">유사 검색어</p>
+            <div className="suggestion-list">
+              {visibleSuggestions.map((suggestion) => (
+                <button
+                  className="suggestion-button"
+                  key={suggestion}
+                  type="button"
+                  onClick={() => onSearchSuggestion(suggestion)}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
     );
   }
 
   return (
     <>
+      {status === "loading" ? (
+        <div className="inline-status" role="status">
+          <span>{submittedQuery} 검색 중입니다.</span>
+          <span>기존 결과를 유지합니다.</span>
+        </div>
+      ) : null}
+      {status === "error" ? (
+        <div className="inline-status inline-status-error" role="alert">
+          <span>{error ?? "검색 요청에 실패했습니다."}</span>
+          <button className="link-button" type="button" onClick={onRetry}>
+            다시 시도
+          </button>
+        </div>
+      ) : null}
       <div className="results-summary">
-        <span>{submittedQuery}</span>
+        <span>{successfulQuery}</span>
         <span>{results.length}곡</span>
-        {selectedProviderName === undefined ? null : (
-          <span>{selectedProviderName}</span>
+        {successfulProviderName === undefined ? null : (
+          <span>{successfulProviderName}</span>
         )}
       </div>
       <ul className="result-list">
@@ -301,7 +364,7 @@ function SearchState({
             key={item.song.id}
             item={item}
             providers={providers}
-            selectedProviderId={submittedProviderId}
+            selectedProviderId={successfulProviderId}
             isExpanded={expandedSongIds.has(item.song.id)}
             onToggleExpanded={() => onToggleExpanded(item.song.id)}
           />
