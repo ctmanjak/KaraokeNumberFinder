@@ -350,6 +350,87 @@ describe("MobileSearchPage", () => {
     });
   });
 
+  it("renders a clear loading state during the first search", async () => {
+    const pendingSearch = deferred<Response>();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/providers") {
+        return Promise.resolve(jsonResponse({ items: providers }));
+      }
+
+      if (url.startsWith("/api/search?q=sample")) {
+        return pendingSearch.promise;
+      }
+
+      throw new Error(`Unexpected fetch call: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<MobileSearchPage />);
+
+    await screen.findByLabelText("제공사");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "sample title" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    expect((await screen.findByRole("status")).textContent).toContain(
+      "sample title 검색 결과를 불러오는 중입니다."
+    );
+    expect(
+      (screen.getByRole("button", { name: "검색" }) as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
+
+    pendingSearch.resolve(jsonResponse(searchResponse));
+    await screen.findByText("Sample Display Title");
+  });
+
+  it("keeps existing results and shows a non-blocking loading banner during a new search", async () => {
+    const secondSearch = deferred<Response>();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/providers") {
+        return Promise.resolve(jsonResponse({ items: providers }));
+      }
+
+      if (url.startsWith("/api/search?q=first")) {
+        return Promise.resolve(jsonResponse(searchResponse));
+      }
+
+      if (url.startsWith("/api/search?q=second")) {
+        return secondSearch.promise;
+      }
+
+      throw new Error(`Unexpected fetch call: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<MobileSearchPage />);
+
+    await screen.findByLabelText("제공사");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "first" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+    await screen.findByText("Sample Display Title");
+
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "second" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    expect(screen.getByText("Sample Display Title")).toBeTruthy();
+    expect((await screen.findByRole("status")).textContent).toContain(
+      "기존 결과를 유지합니다."
+    );
+
+    secondSearch.resolve(jsonResponse(searchResponse));
+    await screen.findByText("Sample Display Title");
+  });
+
   it("renders the result list shell after a successful search", async () => {
     mockFetch([
       { ok: true, body: { items: providers } },
@@ -570,6 +651,207 @@ describe("MobileSearchPage", () => {
       "Search failed."
     );
     expect(screen.getByRole("button", { name: "다시 시도" })).toBeTruthy();
+  });
+
+  it("keeps existing results and shows a non-blocking error with retry after a failed re-search", async () => {
+    const fetchMock = mockFetch([
+      { ok: true, body: { items: providers } },
+      { ok: true, body: searchResponse },
+      {
+        ok: false,
+        status: 500,
+        body: { error: { code: "SEARCH_FAILED", message: "Search failed." } }
+      }
+    ]);
+
+    render(<MobileSearchPage />);
+
+    await screen.findByLabelText("제공사");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "first" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+    await screen.findByText("Sample Display Title");
+
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "second" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "Search failed."
+    );
+    expect(screen.getByText("Sample Display Title")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "다시 시도" })).toBeTruthy();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/search?q=second&provider_id=provider_default"
+    );
+  });
+
+  it("retries with the last submitted query and provider_id", async () => {
+    const fetchMock = mockFetch([
+      { ok: true, body: { items: providers } },
+      {
+        ok: false,
+        status: 500,
+        body: { error: { code: "SEARCH_FAILED", message: "Search failed." } }
+      },
+      { ok: true, body: searchResponse }
+    ]);
+
+    render(<MobileSearchPage />);
+
+    const select = await screen.findByLabelText("제공사");
+    fireEvent.change(select, { target: { value: "provider_secondary" } });
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "retry query" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    fireEvent.click(await screen.findByRole("button", { name: "다시 시도" }));
+    await screen.findByText("Sample Display Title");
+
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/search?q=retry+query&provider_id=provider_secondary"
+    );
+  });
+
+  it("clears the previous non-blocking error after a successful new search", async () => {
+    mockFetch([
+      { ok: true, body: { items: providers } },
+      { ok: true, body: searchResponse },
+      {
+        ok: false,
+        status: 500,
+        body: { error: { code: "SEARCH_FAILED", message: "Search failed." } }
+      },
+      { ok: true, body: searchResponse }
+    ]);
+
+    render(<MobileSearchPage />);
+
+    await screen.findByLabelText("제공사");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "first" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+    await screen.findByText("Sample Display Title");
+
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "second" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+    await screen.findByRole("alert");
+
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "third" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Search failed.")).toBeNull();
+    });
+    expect(screen.getByText("Sample Display Title")).toBeTruthy();
+  });
+
+  it("renders the submitted query in the empty result state", async () => {
+    mockFetch([
+      { ok: true, body: { items: providers } },
+      {
+        ok: true,
+        body: {
+          ...searchResponse,
+          query: "confirmed missing title",
+          items: [],
+          suggestions: []
+        }
+      }
+    ]);
+
+    render(<MobileSearchPage />);
+
+    await screen.findByLabelText("제공사");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "missing title" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    expect(
+      await screen.findByText('"confirmed missing title" 검색 결과가 없습니다.')
+    ).toBeTruthy();
+    expect(screen.queryByLabelText("유사 검색어")).toBeNull();
+  });
+
+  it("shows up to five suggestions in the empty result state", async () => {
+    mockFetch([
+      { ok: true, body: { items: providers } },
+      {
+        ok: true,
+        body: {
+          ...searchResponse,
+          items: [],
+          suggestions: [
+            "Suggestion One",
+            "Suggestion Two",
+            "Suggestion Three",
+            "Suggestion Four",
+            "Suggestion Five",
+            "Suggestion Six"
+          ]
+        }
+      }
+    ]);
+
+    render(<MobileSearchPage />);
+
+    await screen.findByLabelText("제공사");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "missing title" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    await screen.findByLabelText("유사 검색어");
+
+    expect(screen.getByRole("button", { name: "Suggestion One" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Suggestion Five" })
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Suggestion Six" })).toBeNull();
+  });
+
+  it("updates input and explicitly searches when a suggestion is clicked", async () => {
+    const fetchMock = mockFetch([
+      { ok: true, body: { items: providers } },
+      {
+        ok: true,
+        body: {
+          ...searchResponse,
+          items: [],
+          suggestions: ["Suggestion One"]
+        }
+      },
+      { ok: true, body: searchResponse }
+    ]);
+
+    render(<MobileSearchPage />);
+
+    await screen.findByLabelText("제공사");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "missing title" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Suggestion One" })
+    );
+
+    expect((screen.getByLabelText("검색어") as HTMLInputElement).value).toBe(
+      "Suggestion One"
+    );
+    await screen.findByText("Sample Display Title");
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/search?q=Suggestion+One&provider_id=provider_default"
+    );
   });
 
   it("keeps search available when provider loading fails", async () => {
