@@ -113,6 +113,12 @@ type AliasIdRecord = {
   id: string;
 };
 
+type AliasSuggestionRecord = {
+  id: string;
+  alias: string;
+  normalizedAlias: string;
+};
+
 export type SearchAliasCondition =
   | { normalizedAlias: { equals: string; mode: "insensitive" } }
   | { normalizedAlias: { startsWith: string; mode: "insensitive" } }
@@ -123,6 +129,7 @@ type SearchAliasWhere = SearchAliasCondition | { OR: SearchAliasCondition[] };
 type SearchAliasIdWhere = SearchAliasWhere | { id: { in: string[] } };
 type SearchAliasSelect =
   | { id: true }
+  | { id: true; alias: true; normalizedAlias: true }
   | {
       id: true;
       songId: true;
@@ -181,7 +188,7 @@ export type SearchDbClient = {
       select: SearchAliasSelect;
       orderBy: SearchAliasOrderBy;
       take?: number;
-    }): Promise<Array<AliasIdRecord | AliasRecord>>;
+    }): Promise<Array<AliasIdRecord | AliasSuggestionRecord | AliasRecord>>;
   };
 };
 
@@ -197,6 +204,7 @@ const MIN_PREFIX_CANDIDATE_TAKE = 100;
 const MIN_CHOSUNG_CANDIDATE_TAKE = 100;
 const MIN_PARTIAL_CANDIDATE_TAKE = 200;
 const MAX_PARTIAL_CANDIDATE_TAKE = 500;
+const SUGGESTION_CANDIDATE_TAKE = 25;
 const AVAILABLE_STATUS = "available";
 
 export function parseSearchQuery(
@@ -286,17 +294,19 @@ export async function searchSongs(
     defaultProviderId: defaultProvider?.id,
     now: options.now ?? new Date()
   });
+  const items = rankedSongs.slice(0, query.limit).map((ranked) =>
+    toSearchResultItem(ranked, {
+      now: options.now ?? new Date()
+    })
+  );
 
   return {
     query: query.query,
     normalized_query: query.normalizedQuery,
-    items: rankedSongs.slice(0, query.limit).map((ranked) =>
-      toSearchResultItem(ranked, {
-        now: options.now ?? new Date()
-      })
-    ),
+    items,
     next_cursor: null,
-    suggestions: []
+    suggestions:
+      items.length === 0 ? await findSearchSuggestions(db, query) : []
   };
 }
 
@@ -373,43 +383,7 @@ async function findTieredAliasCandidates(
 
   return (await db.songAlias.findMany({
     where: { id: { in: aliasIds } },
-    select: {
-      id: true,
-      songId: true,
-      alias: true,
-      language: true,
-      aliasType: true,
-      normalizedAlias: true,
-      chosungAlias: true,
-      song: {
-        select: {
-          id: true,
-          originalLanguage: true,
-          canonicalTitle: true,
-          displayTitle: true,
-          canonicalArtist: true,
-          releaseYear: true,
-          tieIn: true,
-          karaokeEntries: {
-            select: {
-              id: true,
-              providerId: true,
-              karaokeNumber: true,
-              versionInfo: true,
-              availabilityStatus: true,
-              lastVerifiedAt: true
-            },
-            orderBy: [
-              { providerId: "asc" },
-              { availabilityStatus: "asc" },
-              { versionInfo: "asc" },
-              { karaokeNumber: "asc" },
-              { id: "asc" }
-            ]
-          }
-        }
-      }
-    },
+    select: aliasRecordSelect(),
     orderBy: aliasCandidateOrderBy()
   })) as AliasRecord[];
 }
@@ -453,6 +427,130 @@ function uniqueAliasIds(aliases: AliasIdRecord[]): string[] {
   }
 
   return Array.from(aliasIds.values());
+}
+
+async function findSearchSuggestions(
+  db: SearchDbClient,
+  query: SearchQuery
+): Promise<string[]> {
+  const conditions = buildSuggestionConditions(query);
+
+  if (conditions.length === 0) {
+    return [];
+  }
+
+  const aliases = (await db.songAlias.findMany({
+    where: { OR: conditions },
+    select: aliasSuggestionSelect(),
+    orderBy: aliasCandidateOrderBy(),
+    take: SUGGESTION_CANDIDATE_TAKE
+  })) as AliasSuggestionRecord[];
+
+  return uniqueSuggestions(aliases, query).slice(0, 5);
+}
+
+function buildSuggestionConditions(query: SearchQuery): SearchAliasCondition[] {
+  const conditions: SearchAliasCondition[] = [];
+  const normalizedPrefix = suggestionPrefix(query.normalizedQuery);
+
+  if (normalizedPrefix !== null) {
+    conditions.push({
+      normalizedAlias: {
+        startsWith: normalizedPrefix,
+        mode: "insensitive"
+      }
+    });
+  }
+
+  if (canUseHangulChosungSearch(query.chosungQuery)) {
+    conditions.push({
+      chosungAlias: {
+        startsWith: query.chosungQuery.slice(0, 2),
+        mode: "insensitive"
+      }
+    });
+  }
+
+  return conditions;
+}
+
+function suggestionPrefix(normalizedQuery: string): string | null {
+  if (normalizedQuery.length < 2) {
+    return null;
+  }
+
+  return normalizedQuery.slice(0, Math.min(3, normalizedQuery.length));
+}
+
+function uniqueSuggestions(
+  aliases: AliasSuggestionRecord[],
+  query: SearchQuery
+): string[] {
+  const suggestions = new Set<string>();
+
+  for (const alias of aliases) {
+    if (
+      alias.normalizedAlias === query.normalizedQuery ||
+      alias.alias.trim() === ""
+    ) {
+      continue;
+    }
+
+    suggestions.add(alias.alias);
+  }
+
+  return Array.from(suggestions.values());
+}
+
+function aliasSuggestionSelect(): Extract<
+  SearchAliasSelect,
+  { alias: true; normalizedAlias: true }
+> {
+  return {
+    id: true,
+    alias: true,
+    normalizedAlias: true
+  };
+}
+
+function aliasRecordSelect(): Extract<SearchAliasSelect, { song: unknown }> {
+  return {
+    id: true,
+    songId: true,
+    alias: true,
+    language: true,
+    aliasType: true,
+    normalizedAlias: true,
+    chosungAlias: true,
+    song: {
+      select: {
+        id: true,
+        originalLanguage: true,
+        canonicalTitle: true,
+        displayTitle: true,
+        canonicalArtist: true,
+        releaseYear: true,
+        tieIn: true,
+        karaokeEntries: {
+          select: {
+            id: true,
+            providerId: true,
+            karaokeNumber: true,
+            versionInfo: true,
+            availabilityStatus: true,
+            lastVerifiedAt: true
+          },
+          orderBy: [
+            { providerId: "asc" },
+            { availabilityStatus: "asc" },
+            { versionInfo: "asc" },
+            { karaokeNumber: "asc" },
+            { id: "asc" }
+          ]
+        }
+      }
+    }
+  };
 }
 
 function rankSongs(
