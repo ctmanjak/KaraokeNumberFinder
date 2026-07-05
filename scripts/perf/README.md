@@ -44,3 +44,61 @@ inspection.
 The output always marks `dataset.scale_scenario` as `current_seed`. Future
 synthetic scale runs should use a distinct `--dataset-label` and update the
 scale scenario contract before comparing those numbers with current seed results.
+
+## EXPLAIN ANALYZE
+
+`perf:explain` runs the `[M2-Perf-02]` read-only PostgreSQL plan inspection for
+representative search cases selected from the same search smoke fixture. It does
+not change DB rows, Prisma schema, migrations, indexes, `.env`, or generated
+Prisma Client files.
+The script sets a 30s PostgreSQL `statement_timeout` and a 35s client
+`query_timeout` on its `pg` Pool so a single EXPLAIN cannot hold a connection
+indefinitely.
+
+```sh
+npm run perf:explain
+npm run perf:explain -- --db-label local --dataset-label current-seed
+npm run perf:explain -- --db-label neon --dataset-label current-seed --case-limit 2
+npm run perf:explain -- --output perf-results/local-current-seed-explain.json
+```
+
+Options:
+
+- `--db-label <label>` records the DB target, for example `local` or `neon`.
+- `--dataset-label <label>` records the dataset, defaulting to `current-seed`.
+- `--fixture <path>` reads representative search terms from `seed/search-smoke.csv` by default.
+- `--case-limit <n>` limits representative cases. Use this for Neon or shared DBs.
+- `--output <path>` writes the same JSON report printed to stdout.
+
+The script emits JSON with `schema_version: 1`, run metadata, current seed row
+counts, selected representative cases, and one row per query plan. Each plan row
+records:
+
+- query shape and parameterized SQL
+- params used for the representative case
+- rows planned, rows scanned/filtered, rows returned
+- sort occurrence and sort methods
+- index usage and index names
+- sequential scan occurrence and relation names
+- planning/execution time and raw PostgreSQL JSON plan
+
+Search candidate SQL mirrors the current `searchSongs()` candidate `where`,
+`orderBy`, and `take` structure:
+
+- `normalized_alias ILIKE $1` for Prisma case-insensitive equals approximation
+- `normalized_alias ILIKE ($1 || '%')` for startsWith
+- `normalized_alias ILIKE ('%' || $1 || '%')` for contains
+- `chosung_alias ILIKE ($1 || '%')` for Korean chosung startsWith
+- `song_aliases.id = ANY($1::varchar[])` for detail lookup
+- detail lookup joined with `songs` and `karaoke_entries` as an approximation of `aliasRecordSelect()`
+- active provider lookup used by `searchSongs()`
+- active/default provider lookup for index inspection
+- `GET /api/providers` country/active/order lookup
+
+The relation detail SQL is intentionally documented as an approximation:
+Prisma may load selected relations with internal SQL that differs from the
+single JOIN used here. This ticket records the DB plan shape without rewriting
+application queries.
+
+For Neon or production-like databases, use a small `--case-limit` and keep the
+default one-pass execution. Do not use this script as a load test.
