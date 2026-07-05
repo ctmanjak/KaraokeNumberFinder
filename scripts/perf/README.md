@@ -51,6 +51,9 @@ scale scenario contract before comparing those numbers with current seed results
 representative search cases selected from the same search smoke fixture. It does
 not change DB rows, Prisma schema, migrations, indexes, `.env`, or generated
 Prisma Client files.
+The script sets a 30s PostgreSQL `statement_timeout` and a 35s client
+`query_timeout` on its `pg` Pool so a single EXPLAIN cannot hold a connection
+indefinitely.
 
 ```sh
 npm run perf:explain

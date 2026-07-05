@@ -20,6 +20,9 @@ type ParsedArgs = {
   outputPath: string | null;
 };
 
+const PERF_EXPLAIN_STATEMENT_TIMEOUT_MS = 30_000;
+const PERF_EXPLAIN_QUERY_TIMEOUT_MS = 35_000;
+
 const args = parseCliArgs(process.argv.slice(2));
 const pool = new Pool(createPgPoolConfig());
 
@@ -155,7 +158,11 @@ function parsePositiveInteger(value: string, option: string): number {
 
 function createPgPoolConfig() {
   try {
-    return createSeedPgPoolConfig("perf:explain");
+    return {
+      ...createSeedPgPoolConfig("perf:explain"),
+      statement_timeout: PERF_EXPLAIN_STATEMENT_TIMEOUT_MS,
+      query_timeout: PERF_EXPLAIN_QUERY_TIMEOUT_MS
+    };
   } catch (error) {
     console.error(`error: ${errorMessage(error)}`);
     process.exit(1);
