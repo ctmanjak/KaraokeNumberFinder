@@ -102,3 +102,69 @@ application queries.
 
 For Neon or production-like databases, use a small `--case-limit` and keep the
 default one-pass execution. Do not use this script as a load test.
+
+## Prisma Query Shape
+
+`perf:query-shape` runs the `[M2-Perf-03]` read-only Prisma query-shape and
+N+1 inspection. It reuses representative search cases from `seed/search-smoke.csv`
+and keeps the result separate from the baseline latency and EXPLAIN plan
+reports.
+
+```sh
+npm run perf:query-shape
+npm run perf:query-shape -- --db-label local --dataset-label current-seed
+npm run perf:query-shape -- --db-label neon --dataset-label current-seed --case-limit 2
+npm run perf:query-shape -- --output perf-results/local-current-seed-query-shape.json
+npm run perf:query-shape -- --no-sql-events
+```
+
+Options:
+
+- `--db-label <label>` records the DB target, for example `local` or `neon`.
+- `--dataset-label <label>` records the dataset, defaulting to `current-seed`.
+- `--fixture <path>` reads representative search terms from `seed/search-smoke.csv` by default.
+- `--case-limit <n>` limits representative search cases. Use a small value for Neon.
+- `--output <path>` writes the same JSON report printed to stdout.
+- `--no-sql-events` disables Prisma query event logging and records only client method counts.
+
+The report emits JSON with `schema_version: 1`, run metadata, current seed row
+counts, and scenario rows for:
+
+- direct `searchSongs()`
+- in-process `GET /api/search`
+- direct `listProviders()`
+- in-process `GET /api/providers`
+- valid provider filter, invalid provider, and no-result suggestions paths
+
+Each scenario separates wrapper-level Prisma client method counts from actual
+SQL query event counts:
+
+- `client_method_count` counts service-facing Prisma method calls, grouped by model method and query shape.
+- `actual_sql_query_count` counts Prisma `$on("query")` events when SQL events are enabled.
+- `candidate_alias_id_groups` records the `Promise.all` candidate query group count, condition shape, `take`, and returned IDs. Per-candidate SQL event counts are left `null` because concurrent spans can overlap; use scenario-level `sql_events` to inspect the emitted candidate SQL.
+- `unique_alias_id_count` and `alias_detail_lookup.id_in_count` record the deduped alias IDs used by the detail `song_aliases.id IN (...)` lookup.
+- `alias_detail_lookup.sql` records the actual SQL emitted for the detail lookup span.
+- `relation_load_observation` classifies `aliasRecordSelect()` relation loading as single join, batched relation load, possible N+1, no candidates, or unavailable.
+
+The expected current Prisma search shapes are:
+
+- active provider lookup before each `searchSongs()` call
+- `normalized_alias` equals candidate lookup
+- `normalized_alias` startsWith candidate lookup
+- `normalized_alias` contains candidate lookup
+- `chosung_alias` startsWith candidate lookup when the query has usable two-or-more Korean initials
+- deduped `song_aliases.id IN (...)` alias detail lookup with selected `song` and `karaokeEntries`
+- suggestions lookup only when no search items are returned
+- provider list lookup for `GET /api/providers` and direct `listProviders()`
+
+Prisma query event logging is intentionally limited to this diagnostic script.
+It can add observer overhead, allocate extra event objects, and distort latency,
+so use `perf:baseline` for timing and `perf:query-shape` for query count/shape.
+If Prisma event logging or an adapter version does not emit usable query events,
+the report still records client method counts and marks `actual_sql_query_count.available`
+as `false` when run with `--no-sql-events`.
+
+For Neon or production-like databases, keep `--case-limit` low and avoid repeated
+runs. This script does not import seed data, mutate DB rows, change Prisma schema,
+create migrations, add indexes, update `.env`, or modify generated Prisma Client
+files.

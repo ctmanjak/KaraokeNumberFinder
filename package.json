@@ -20,6 +20,7 @@
     "seed:add-entry": "vite-node scripts/seed/add-entry.ts",
     "perf:baseline": "vite-node scripts/perf/baseline.ts",
     "perf:explain": "vite-node scripts/perf/explain.ts",
+    "perf:query-shape": "vite-node scripts/perf/query-shape.ts",
     "db:validate": "prisma validate",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio"
