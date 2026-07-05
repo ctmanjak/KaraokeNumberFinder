@@ -1,7 +1,4 @@
 id,song_id,alias,language,alias_type,normalized_alias,chosung_alias,source_url,source_name,verified_by,verification_note
-alias_fixture_001_ko,song_fixture_001,픽스처 노래,ko,display_title,픽스처노래,ㅍㅅㅊㄴㄹ,https://example.com/song-fixture-001,Generic song source,ops_fixture,Hangul display title smoke case
-alias_fixture_001_ro,song_fixture_001,Fixture Song,ro,romanized_title,fixturesong,,https://example.com/song-fixture-001,Generic song source,ops_fixture,Romanized title smoke case
-alias_fixture_001_content,song_fixture_001,Fixture Series OP,en,content,fixtureseriesop,,https://example.com/song-fixture-001,Generic song source,ops_fixture,Content alias smoke case
 alias_song_ja_0001_001,song_ja_0001,잔혹한 천사의 테제,ko,display_title,잔혹한천사의테제,ㅈㅎㅎㅊㅅㅇㅌㅈ,,user_input,manjak,Staging metadata source; review before production use
 alias_song_ja_0001_002,song_ja_0001,残酷な天使のテーゼ,ja,canonical_title,残酷な天使のテーゼ,,https://en.wikipedia.org/wiki/Music_of_Neon_Genesis_Evangelion,Wikipedia,manjak,Staging metadata source; review before production use
 alias_song_ja_0001_003,song_ja_0001,Zankoku na Tenshi no Thesis,ro,romanized_title,zankokunatenshinothesis,,https://en.wikipedia.org/wiki/Music_of_Neon_Genesis_Evangelion,Wikipedia,manjak,Staging metadata source; review before production use
