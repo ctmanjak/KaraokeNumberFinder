@@ -1,0 +1,3 @@
+query,expected_song_id,label
+픽스처 노래,song_fixture_001,duplicate label
+Fixture Song,song_fixture_001,duplicate-label
