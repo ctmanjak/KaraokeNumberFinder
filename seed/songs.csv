@@ -1,5 +1,4 @@
 id,original_language,canonical_title,display_title,canonical_artist,release_year,tie_in,source_url,source_name,verified_by,verification_note
-song_fixture_001,ja,Fixture Original Title,픽스처 노래,Fixture Artist,2024,Fixture Series OP,https://example.com/song-fixture-001,Generic song source,ops_fixture,Search smoke fixture song
 song_ja_0001,ja,残酷な天使のテーゼ,잔혹한 천사의 테제,高橋洋子,1995,新世紀エヴァンゲリオン OP,https://en.wikipedia.org/wiki/Music_of_Neon_Genesis_Evangelion,Wikipedia,manjak,Staging metadata source; review before production use
 song_ja_0002,ja,君の知らない物語,네가 모르는 이야기,supercell,2009,化物語 ED,https://en.wikipedia.org/wiki/Supercell_(band),Wikipedia,manjak,Staging metadata source; review before production use
 song_ja_0003,ja,irony,아이러니,ClariS,2010,俺の妹がこんなに可愛いわけがない OP,https://en.wikipedia.org/wiki/Irony_(ClariS_song),Wikipedia,manjak,Staging metadata source; review before production use

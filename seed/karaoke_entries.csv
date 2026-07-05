@@ -1,5 +1,4 @@
 id,song_id,provider_id,karaoke_number,version_info,availability_status,last_verified_at,source_url,source_name,verified_by,verification_note
-entry_fixture_001_tj_unknown,song_fixture_001,provider_tj,,Original,unknown,,https://www.tjmedia.com/,TJ미디어 공식 홈페이지,,Search smoke fixture entry; karaoke number intentionally unverified
 entry_song_ja_0001_provider_tj_original,song_ja_0001,provider_tj,25246,Original,available,2026-07-04,https://www.tjmedia.com/,TJ미디어 공식 노래 검색,manjak,TJ number manually entered in staging
 entry_song_ja_0002_provider_tj_original,song_ja_0002,provider_tj,26959,Original,available,2026-07-04,https://www.tjmedia.com/,TJ미디어 공식 노래 검색,manjak,TJ number manually entered in staging
 entry_song_ja_0003_provider_tj_original,song_ja_0003,provider_tj,27564,Original,available,2026-07-04,https://www.tjmedia.com/,TJ미디어 공식 노래 검색,manjak,TJ number manually entered in staging

@@ -144,7 +144,9 @@ function toSeedImportDbClient(prisma: PrismaClient): SeedImportDbClient {
         })
     },
     $transaction: (run) =>
-      prisma.$transaction((tx) => run(toSeedImportTransactionClient(tx)))
+      prisma.$transaction((tx) => run(toSeedImportTransactionClient(tx)), {
+        timeout: 30_000
+      })
   };
 }
 
