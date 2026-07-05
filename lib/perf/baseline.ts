@@ -118,6 +118,8 @@ export async function runPerfBaseline(
   db: PerfBaselineDbClient,
   options: PerfBaselineOptions
 ): Promise<PerfBaselineReport> {
+  const iterations = validateIterations(options.iterations);
+  const validatedOptions = { ...options, iterations };
   const smokeCases = readSearchSmokeCases(options.fixturePath);
   const providers = await listProviders(asProviderDbClient(db), {
     activeOnly: true
@@ -133,7 +135,7 @@ export async function runPerfBaseline(
   const reports: PerfScenarioReport[] = [];
 
   for (const scenario of scenarios) {
-    reports.push(await runScenario(db, scenario, options));
+    reports.push(await runScenario(db, scenario, validatedOptions));
   }
 
   return {
@@ -145,7 +147,7 @@ export async function runPerfBaseline(
       db_label: options.dbLabel,
       dataset_label: options.datasetLabel,
       fixture_path: options.fixturePath,
-      iterations: options.iterations,
+      iterations,
       warmup: options.warmup,
       node_version: process.version
     },
@@ -163,6 +165,14 @@ export async function runPerfBaseline(
     ],
     scenarios: reports
   };
+}
+
+function validateIterations(iterations: number): number {
+  if (!Number.isInteger(iterations) || iterations < 1) {
+    throw new Error("iterations must be a positive integer.");
+  }
+
+  return iterations;
 }
 
 async function readDatasetCounts(db: PerfBaselineDbClient) {
@@ -217,18 +227,19 @@ function buildSearchScenarios(
   const representativeCases = dedupeSmokeCasesByLabel(smokeCases);
   const scenarios: PerfScenario[] = [];
 
-  for (const smokeCase of representativeCases) {
+  for (const [index, smokeCase] of representativeCases.entries()) {
     const params = new URLSearchParams({ q: smokeCase.query });
+    const scenarioId = stableSmokeScenarioId(smokeCase, index);
 
     scenarios.push({
-      id: `service.search.${slug(smokeCase.label ?? smokeCase.query)}`,
+      id: `service.search.${scenarioId}`,
       target: "service",
       endpoint: "searchSongs",
       smokeCase,
       params
     });
     scenarios.push({
-      id: `api.search.${slug(smokeCase.label ?? smokeCase.query)}`,
+      id: `api.search.${scenarioId}`,
       target: "api",
       endpoint: "GET /api/search",
       smokeCase,
@@ -275,6 +286,16 @@ function buildSearchScenarios(
   }
 
   return scenarios;
+}
+
+function stableSmokeScenarioId(
+  smokeCase: SearchSmokeCase,
+  index: number
+): string {
+  const labelSlug = slug(smokeCase.label ?? smokeCase.query) || "case";
+  const suffix = String(index + 1).padStart(2, "0");
+
+  return `${labelSlug}-${suffix}`;
 }
 
 function buildProviderScenarios(country: string | undefined): PerfScenario[] {

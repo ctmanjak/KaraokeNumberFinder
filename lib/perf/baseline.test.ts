@@ -66,6 +66,42 @@ describe("runPerfBaseline", () => {
       ])
     );
   });
+
+  it("rejects invalid iteration counts before measuring scenarios", async () => {
+    await expect(
+      runPerfBaseline(fakeDb(), {
+        dbLabel: "test-local",
+        datasetLabel: "current-seed-test",
+        fixturePath: path.join(FIXTURES_DIR, "valid.csv"),
+        iterations: 0,
+        warmup: 1,
+        commit: "commit-sha",
+        branch: "develop",
+        runStartedAt: "2026-07-06T00:00:00.000Z"
+      })
+    ).rejects.toThrow("iterations must be a positive integer.");
+  });
+
+  it("keeps search scenario IDs distinct when labels share a slug", async () => {
+    const report = await runPerfBaseline(fakeDb(), {
+      dbLabel: "test-local",
+      datasetLabel: "current-seed-test",
+      fixturePath: path.join(FIXTURES_DIR, "duplicate-slugs.csv"),
+      iterations: 1,
+      warmup: 0,
+      commit: "commit-sha",
+      branch: "develop",
+      runStartedAt: "2026-07-06T00:00:00.000Z"
+    });
+    const searchScenarioIds = report.scenarios
+      .filter((scenario) => scenario.id.startsWith("service.search.duplicate"))
+      .map((scenario) => scenario.id);
+
+    expect(searchScenarioIds).toEqual([
+      "service.search.duplicate-label-01",
+      "service.search.duplicate-label-02"
+    ]);
+  });
 });
 
 function fakeDb(): PerfBaselineDbClient {
@@ -207,20 +243,19 @@ function matches(
   return false;
 }
 
-function hasIdWhere(
-  where:
-    | { id: { in: string[] } }
-    | { OR: SearchAliasCondition[] }
-    | SearchAliasCondition
-): where is { id: { in: string[] } } {
+type FakeSearchAliasWhere =
+  | { id: { in: string[] } }
+  | { OR: SearchAliasCondition[] }
+  | SearchAliasCondition;
+
+function hasIdWhere(where: FakeSearchAliasWhere): where is {
+  id: { in: string[] };
+} {
   return "id" in where;
 }
 
-function hasOrWhere(
-  where:
-    | { id: { in: string[] } }
-    | { OR: SearchAliasCondition[] }
-    | SearchAliasCondition
-): where is { OR: SearchAliasCondition[] } {
+function hasOrWhere(where: FakeSearchAliasWhere): where is {
+  OR: SearchAliasCondition[];
+} {
   return "OR" in where;
 }

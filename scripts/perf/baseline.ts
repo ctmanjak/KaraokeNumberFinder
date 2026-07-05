@@ -64,54 +64,43 @@ function parseArgs(args: string[]): ParsedArgs {
     warmup: 3,
     outputPath: null
   };
+  const optionHandlers: Record<
+    string,
+    (value: string, option: string) => void
+  > = {
+    "--db-label": (value) => {
+      parsed.dbLabel = value;
+    },
+    "--dataset-label": (value) => {
+      parsed.datasetLabel = value;
+    },
+    "--fixture": (value) => {
+      parsed.fixturePath = value;
+    },
+    "--iterations": (value, option) => {
+      parsed.iterations = parsePositiveInteger(value, option);
+    },
+    "--warmup": (value, option) => {
+      parsed.warmup = parseNonNegativeInteger(value, option);
+    },
+    "--output": (value) => {
+      parsed.outputPath = path.resolve(value);
+    }
+  };
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
 
-    if (arg === "--db-label") {
-      parsed.dbLabel = readOptionValue(args, index, arg);
-      index += 1;
-      continue;
-    }
-
-    if (arg === "--dataset-label") {
-      parsed.datasetLabel = readOptionValue(args, index, arg);
-      index += 1;
-      continue;
-    }
-
-    if (arg === "--fixture") {
-      parsed.fixturePath = readOptionValue(args, index, arg);
-      index += 1;
-      continue;
-    }
-
-    if (arg === "--iterations") {
-      parsed.iterations = parsePositiveInteger(
-        readOptionValue(args, index, arg),
-        arg
-      );
-      index += 1;
-      continue;
-    }
-
-    if (arg === "--warmup") {
-      parsed.warmup = parseNonNegativeInteger(
-        readOptionValue(args, index, arg),
-        arg
-      );
-      index += 1;
-      continue;
-    }
-
-    if (arg === "--output") {
-      parsed.outputPath = path.resolve(readOptionValue(args, index, arg));
-      index += 1;
-      continue;
-    }
-
     if (arg === "--help") {
       printHelpAndExit();
+    }
+
+    const handler = optionHandlers[arg];
+
+    if (handler !== undefined) {
+      handler(readOptionValue(args, index, arg), arg);
+      index += 1;
+      continue;
     }
 
     throw new Error(`unexpected argument ${arg}`);
