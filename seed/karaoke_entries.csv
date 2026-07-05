@@ -1,3 +1,16 @@
 id,song_id,provider_id,karaoke_number,version_info,availability_status,last_verified_at,source_url,source_name,verified_by,verification_note
-entry_fixture_001_alpha,song_fixture_001,provider_alpha,10001,Original,available,2026-07-02,https://example.com/provider-alpha/search,Generic provider source,ops_fixture,Search smoke fixture entry
-entry_fixture_001_beta,song_fixture_001,provider_beta,20002,Original,available,2026-07-02,https://example.com/provider-beta/search,Generic provider source,ops_fixture,Search smoke fixture entry
+entry_fixture_001_tj_unknown,song_fixture_001,provider_tj,,Original,unknown,,https://www.tjmedia.com/,TJ미디어 공식 홈페이지,,Search smoke fixture entry; karaoke number intentionally unverified
+entry_song_ja_0001_provider_tj_original,song_ja_0001,provider_tj,25246,Original,available,2026-07-04,https://www.tjmedia.com/,TJ미디어 공식 노래 검색,manjak,TJ number manually entered in staging
+entry_song_ja_0002_provider_tj_original,song_ja_0002,provider_tj,26959,Original,available,2026-07-04,https://www.tjmedia.com/,TJ미디어 공식 노래 검색,manjak,TJ number manually entered in staging
+entry_song_ja_0003_provider_tj_original,song_ja_0003,provider_tj,27564,Original,available,2026-07-04,https://www.tjmedia.com/,TJ미디어 공식 노래 검색,manjak,TJ number manually entered in staging
+entry_song_ja_0004_provider_tj_original,song_ja_0004,provider_tj,28053,Original,available,2026-07-04,https://www.tjmedia.com/,TJ미디어 공식 노래 검색,manjak,TJ number manually entered in staging
+entry_song_ja_0005_provider_tj_original,song_ja_0005,provider_tj,68553,Original,available,2026-07-04,https://www.tjmedia.com/,TJ미디어 공식 노래 검색,manjak,TJ number manually entered in staging
+entry_song_ja_0006_provider_tj_original,song_ja_0006,provider_tj,28822,Original,available,2026-07-04,https://www.tjmedia.com/,TJ미디어 공식 노래 검색,manjak,TJ number manually entered in staging
+entry_song_ja_0007_provider_tj_original,song_ja_0007,provider_tj,26749,Original,available,2026-07-04,https://www.tjmedia.com/,TJ미디어 공식 노래 검색,manjak,TJ number manually entered in staging
+entry_song_ja_0008_provider_tj_original,song_ja_0008,provider_tj,27984,Original,available,2026-07-04,https://www.tjmedia.com/,TJ미디어 공식 노래 검색,manjak,TJ number manually entered in staging
+entry_song_ja_0009_provider_tj_original,song_ja_0009,provider_tj,27851,Original,available,2026-07-04,https://www.tjmedia.com/,TJ미디어 공식 노래 검색,manjak,TJ number manually entered in staging
+entry_song_ja_0010_provider_tj_original,song_ja_0010,provider_tj,27762,Original,available,2026-07-04,https://www.tjmedia.com/,TJ미디어 공식 노래 검색,manjak,TJ number manually entered in staging
+entry_song_ja_0011_provider_tj_original,song_ja_0011,provider_tj,68446,Original,available,2026-07-04,https://www.tjmedia.com/,TJ미디어 공식 노래 검색,manjak,TJ number manually entered in staging
+entry_song_ja_0012_provider_tj_original,song_ja_0012,provider_tj,52408,Original,available,2026-07-04,https://www.tjmedia.com/,TJ미디어 공식 노래 검색,manjak,TJ number manually entered in staging
+entry_song_ja_0013_provider_tj_original,song_ja_0013,provider_tj,68582,Original,available,2026-07-04,https://www.tjmedia.com/,TJ미디어 공식 노래 검색,manjak,TJ number manually entered in staging
+entry_song_ja_0014_provider_tj_original,song_ja_0014,provider_tj,28789,Original,available,2026-07-04,https://www.tjmedia.com/,TJ미디어 공식 노래 검색,manjak,TJ number manually entered in staging

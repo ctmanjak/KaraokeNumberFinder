@@ -1,2 +1,16 @@
 id,original_language,canonical_title,display_title,canonical_artist,release_year,tie_in,source_url,source_name,verified_by,verification_note
 song_fixture_001,ja,Fixture Original Title,픽스처 노래,Fixture Artist,2024,Fixture Series OP,https://example.com/song-fixture-001,Generic song source,ops_fixture,Search smoke fixture song
+song_ja_0001,ja,残酷な天使のテーゼ,잔혹한 천사의 테제,高橋洋子,1995,新世紀エヴァンゲリオン OP,https://en.wikipedia.org/wiki/Music_of_Neon_Genesis_Evangelion,Wikipedia,manjak,Staging metadata source; review before production use
+song_ja_0002,ja,君の知らない物語,네가 모르는 이야기,supercell,2009,化物語 ED,https://en.wikipedia.org/wiki/Supercell_(band),Wikipedia,manjak,Staging metadata source; review before production use
+song_ja_0003,ja,irony,아이러니,ClariS,2010,俺の妹がこんなに可愛いわけがない OP,https://en.wikipedia.org/wiki/Irony_(ClariS_song),Wikipedia,manjak,Staging metadata source; review before production use
+song_ja_0004,ja,First kiss,퍼스트 키스,ICHIKO,2006,ゼロの使い魔 OP,https://zh.wikipedia.org/wiki/FIRST_KISS_(%E6%AD%8C%E6%9B%B2),Wikipedia,manjak,Staging metadata source; review before production use
+song_ja_0005,ja,ベテルギウス,베텔기우스,優里,2021,SUPER RICH 主題歌,https://zh.wikipedia.org/wiki/%E5%84%AA%E9%87%8C,Wikipedia,manjak,Staging metadata source; review before production use
+song_ja_0006,ja,Lemon,레몬,米津玄師,2018,アンナチュラル 主題歌,https://en.wikipedia.org/wiki/Lemon_(Kenshi_Yonezu_song),Wikipedia,manjak,Staging metadata source; review before production use
+song_ja_0007,ja,メルト,멜트,ryo feat. 初音ミク,2007,VOCALOID original song,https://zh.wikipedia.org/wiki/Melt,Wikipedia,manjak,Staging metadata source; review before production use
+song_ja_0008,ja,アスノヨゾラ哨戒班,내일의 밤하늘 초계반,Orangestar feat. IA,2014,VOCALOID original song,https://en.wikipedia.org/wiki/Orangestar,Wikipedia,manjak,Staging metadata source; review before production use
+song_ja_0009,ja,時ノ雨、最終戦争,"시간의 비, 최종 전쟁",Orangestar feat. IA,2015,VOCALOID original song,https://en.wikipedia.org/wiki/Orangestar,Wikipedia,manjak,Staging metadata source; exact song source and release date need review before production use
+song_ja_0010,ja,ヒロイン,히로인,back number,2015,JR SKISKI CM song,https://zh.wikipedia.org/wiki/Back_number,Wikipedia,manjak,Staging metadata source; review before production use
+song_ja_0011,ja,水平線,수평선,back number,2020,2020 Inter-High support song,https://zh.wikipedia.org/wiki/Back_number,Wikipedia,manjak,Staging metadata source; exact tie-in/source detail needs review before production use
+song_ja_0012,ja,ツキミソウ,달맞이 꽃,Novelbright,2020,Digital single,https://en.wikipedia.org/wiki/Novelbright,Wikipedia,manjak,Staging metadata source; review before production use
+song_ja_0013,ja,ただ声一つ,그저 목소리 하나,ロクデナシ,2021,Digital single,,staging candidate source,manjak,Needs reliable song metadata source before production use
+song_ja_0014,ja,灰色と青,잿빛과 푸름,米津玄師 + 菅田将暉,2017,BOOTLEG pre-release track,https://zh.wikipedia.org/wiki/%E7%81%B0%E8%89%B2%E4%B8%8E%E9%9D%92,Wikipedia,manjak,Staging metadata source; review before production use

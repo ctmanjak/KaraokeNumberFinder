@@ -11,10 +11,22 @@ import scripts.
 - `song_aliases.csv`: searchable aliases for titles, artists, romanization, translations, content names, abbreviations, and common names.
 - `karaoke_entries.csv`: provider-specific karaoke numbers, versions, availability, and verification metadata.
 
-Each CSV is UTF-8, comma-separated, and currently contains only the header row.
-No example rows are committed here because downstream seed tools must be able to
-trust this directory as the real input shape without carrying placeholder
-providers, placeholder songs, or sample karaoke numbers.
+Each CSV is UTF-8 and comma-separated. Rows in these four files are treated as
+real seed inputs by downstream seed tools, so do not add unverified placeholder
+providers, placeholder songs, or sample karaoke numbers here.
+
+## Staging Data
+
+`seed/staging/initial_songs.csv` is an optional working file for drafting the
+initial real seed candidate set in one row per song. It is a review aid only and
+is not read by `seed:validate`, `seed:import`, or `seed:search-smoke`.
+
+AI may help prepare that staging CSV, but AI-generated karaoke numbers,
+availability statuses, sources, and verification fields are not trusted data.
+Only rows checked by a person, with source and reviewer metadata recorded, may be
+converted into the normalized import CSVs above. See
+`seed/staging/README.md` for the column contract and manual conversion
+procedure.
 
 ## Header Contract
 
