@@ -125,6 +125,11 @@ describe("looksProductionLikeDatabaseUrl", () => {
     ).toBe(true);
     expect(
       looksProductionLikeDatabaseUrl(
+        "postgresql://user:pass@staging.internal:5432/karaoke"
+      )
+    ).toBe(false);
+    expect(
+      looksProductionLikeDatabaseUrl(
         "postgresql://user:pass@ep-test.neon.tech/karaoke"
       )
     ).toBe(true);

@@ -160,40 +160,7 @@ function createPgPoolConfig() {
 
 function toSeedImportDbClient(prisma: PrismaClient): SeedImportDbClient {
   return {
-    karaokeProvider: {
-      findMany: (args) => prisma.karaokeProvider.findMany(args),
-      upsert: (args) => prisma.karaokeProvider.upsert(args)
-    },
-    song: {
-      findMany: (args) => prisma.song.findMany(args),
-      upsert: (args) => prisma.song.upsert(args)
-    },
-    songAlias: {
-      findMany: (args) => prisma.songAlias.findMany(args),
-      upsert: (args) =>
-        prisma.songAlias.upsert({
-          ...args,
-          create: args.create as Parameters<
-            typeof prisma.songAlias.upsert
-          >[0]["create"],
-          update: args.update as Parameters<
-            typeof prisma.songAlias.upsert
-          >[0]["update"]
-        })
-    },
-    karaokeEntry: {
-      findMany: (args) => prisma.karaokeEntry.findMany(args),
-      upsert: (args) =>
-        prisma.karaokeEntry.upsert({
-          ...args,
-          create: args.create as Parameters<
-            typeof prisma.karaokeEntry.upsert
-          >[0]["create"],
-          update: args.update as Parameters<
-            typeof prisma.karaokeEntry.upsert
-          >[0]["update"]
-        })
-    },
+    ...seedImportDelegates(prisma),
     $transaction: (run) =>
       prisma.$transaction((tx) => run(toSeedImportTransactionClient(tx)), {
         timeout: 30_000
@@ -202,6 +169,12 @@ function toSeedImportDbClient(prisma: PrismaClient): SeedImportDbClient {
 }
 
 function toSeedImportTransactionClient(
+  prisma: SeedPrismaClient
+): Omit<SeedImportDbClient, "$transaction"> {
+  return seedImportDelegates(prisma);
+}
+
+function seedImportDelegates(
   prisma: SeedPrismaClient
 ): Omit<SeedImportDbClient, "$transaction"> {
   return {

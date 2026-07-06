@@ -8,11 +8,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import { readCsvRows } from "../seed/csv";
 import { validateSeedDirectory } from "../seed/validate";
 import {
+  expectedSyntheticAliasCount,
+  expectedSyntheticKaraokeEntryCount,
   generateSyntheticDataset,
   REQUIRED_SYNTHETIC_CASE_IDS,
   SYNTHETIC_GENERATOR_VERSION,
   SYNTHETIC_METADATA_FILE,
   SYNTHETIC_SEARCH_FIXTURE_FILE,
+  syntheticDatasetConfigFor,
   type SyntheticDatasetLabel
 } from "./synthetic-dataset";
 
@@ -26,6 +29,7 @@ afterEach(() => {
 
 describe("generateSyntheticDataset", () => {
   it("generates deterministic 1k dataset rows, fixture cases, and metadata", async () => {
+    const config = syntheticDatasetConfigFor("synthetic-1k-songs-10k-aliases");
     const firstRoot = makeTempRoot();
     const secondRoot = makeTempRoot();
 
@@ -44,24 +48,12 @@ describe("generateSyntheticDataset", () => {
     expect(first.metadata.random_seed).toBe(1009);
     expect(first.metadata.row_counts).toMatchObject({
       songs: 1_000,
-      song_aliases: 10_000,
+      song_aliases: expectedSyntheticAliasCount(config),
+      karaoke_entries: expectedSyntheticKaraokeEntryCount(config),
       karaoke_providers: 6
     });
-    expect(first.metadata.row_counts.karaoke_entries).toBeGreaterThanOrEqual(
-      2_000
-    );
-    expect(first.metadata.row_counts.karaoke_entries).toBeLessThanOrEqual(
-      5_000
-    );
 
-    await expectSameFile(
-      path.join(first.outputDir, "songs.csv"),
-      path.join(second.outputDir, "songs.csv")
-    );
-    await expectSameFile(
-      path.join(first.outputDir, "song_aliases.csv"),
-      path.join(second.outputDir, "song_aliases.csv")
-    );
+    await expectSameGeneratedFiles(first.outputDir, second.outputDir);
     expectRequiredFixtureCases(first.outputDir, first.metadata.dataset_label);
 
     const validation = validateSeedDirectory(first.outputDir, {
@@ -71,6 +63,9 @@ describe("generateSyntheticDataset", () => {
   });
 
   it("generates 10k dataset exact song and alias counts within contract ranges", () => {
+    const config = syntheticDatasetConfigFor(
+      "synthetic-10k-songs-100k-aliases"
+    );
     const root = makeTempRoot();
     const result = generateSyntheticDataset({
       datasetLabel: "synthetic-10k-songs-100k-aliases",
@@ -79,18 +74,17 @@ describe("generateSyntheticDataset", () => {
 
     expect(result.metadata.random_seed).toBe(10009);
     expect(result.metadata.row_counts.songs).toBe(10_000);
-    expect(result.metadata.row_counts.song_aliases).toBe(100_000);
+    expect(result.metadata.row_counts.song_aliases).toBe(
+      expectedSyntheticAliasCount(config)
+    );
     expect(result.metadata.row_counts.karaoke_providers).toBeGreaterThanOrEqual(
       4
     );
     expect(result.metadata.row_counts.karaoke_providers).toBeLessThanOrEqual(
       20
     );
-    expect(result.metadata.row_counts.karaoke_entries).toBeGreaterThanOrEqual(
-      20_000
-    );
-    expect(result.metadata.row_counts.karaoke_entries).toBeLessThanOrEqual(
-      50_000
+    expect(result.metadata.row_counts.karaoke_entries).toBe(
+      expectedSyntheticKaraokeEntryCount(config)
     );
     expectRequiredFixtureCases(result.outputDir, result.metadata.dataset_label);
   });
@@ -105,6 +99,25 @@ function makeTempRoot(): string {
 async function expectSameFile(left: string, right: string): Promise<void> {
   const rightText = await readFile(right, "utf8");
   await expect(readFile(left, "utf8")).resolves.toBe(rightText);
+}
+
+async function expectSameGeneratedFiles(
+  leftOutputDir: string,
+  rightOutputDir: string
+): Promise<void> {
+  for (const file of [
+    "karaoke_providers.csv",
+    "songs.csv",
+    "song_aliases.csv",
+    "karaoke_entries.csv",
+    SYNTHETIC_SEARCH_FIXTURE_FILE,
+    SYNTHETIC_METADATA_FILE
+  ]) {
+    await expectSameFile(
+      path.join(leftOutputDir, file),
+      path.join(rightOutputDir, file)
+    );
+  }
 }
 
 function expectRequiredFixtureCases(

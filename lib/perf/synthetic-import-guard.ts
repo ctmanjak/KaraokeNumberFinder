@@ -146,10 +146,6 @@ export function looksProductionLikeDatabaseUrl(
     return true;
   }
 
-  if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
-    return false;
-  }
-
   return false;
 }
 

@@ -12,8 +12,9 @@ export type SyntheticDatasetConfig = {
   label: SyntheticDatasetLabel;
   idPrefix: string;
   songCount: number;
-  aliasCount: number;
   providerCount: number;
+  // Contract seed recorded in metadata and embedded in generated karaoke numbers.
+  // Generation is otherwise formula-driven and does not use a PRNG.
   randomSeed: number;
   generatorVersion: "synthetic-search-v1";
   deterministicGeneratedAt: string;
@@ -98,7 +99,6 @@ const SYNTHETIC_DATASET_CONFIGS = {
     label: "synthetic-1k-songs-10k-aliases",
     idPrefix: "synthetic_1k",
     songCount: 1_000,
-    aliasCount: 10_000,
     providerCount: 6,
     randomSeed: 1009,
     generatorVersion: SYNTHETIC_GENERATOR_VERSION,
@@ -108,7 +108,6 @@ const SYNTHETIC_DATASET_CONFIGS = {
     label: "synthetic-10k-songs-100k-aliases",
     idPrefix: "synthetic_10k",
     songCount: 10_000,
-    aliasCount: 100_000,
     providerCount: 12,
     randomSeed: 10009,
     generatorVersion: SYNTHETIC_GENERATOR_VERSION,
@@ -316,13 +315,32 @@ function buildAliases(config: SyntheticDatasetConfig): AliasRow[] {
     }
   }
 
-  if (aliases.length !== config.aliasCount) {
+  const expectedAliasCount = expectedSyntheticAliasCount(config);
+  if (aliases.length !== expectedAliasCount) {
     throw new Error(
-      `${config.label} generated ${aliases.length} aliases, expected ${config.aliasCount}`
+      `${config.label} generated ${aliases.length} aliases, expected ${expectedAliasCount}`
     );
   }
 
   return aliases;
+}
+
+export function expectedSyntheticAliasCount(
+  config: SyntheticDatasetConfig
+): number {
+  return config.songCount * ALIAS_TYPES.length;
+}
+
+export function expectedSyntheticKaraokeEntryCount(
+  config: SyntheticDatasetConfig
+): number {
+  let count = 0;
+
+  for (let songOrdinal = 1; songOrdinal <= config.songCount; songOrdinal += 1) {
+    count += fanoutForSong(config, songOrdinal);
+  }
+
+  return count;
 }
 
 function buildAlias(
@@ -354,17 +372,7 @@ function buildEntries(config: SyntheticDatasetConfig): EntryRow[] {
   const activeProviderCount = config.providerCount - 1;
 
   for (let songOrdinal = 1; songOrdinal <= config.songCount; songOrdinal += 1) {
-    const fanout =
-      songOrdinal === FIXTURE_SONG_INDEX.highEntry
-        ? Math.min(
-            activeProviderCount * 2,
-            config.label.includes("10k") ? 22 : 10
-          )
-        : songOrdinal % 20 === 0
-          ? 4
-          : songOrdinal % 5 === 0
-            ? 3
-            : 2;
+    const fanout = fanoutForSong(config, songOrdinal);
 
     for (let entryOrdinal = 1; entryOrdinal <= fanout; entryOrdinal += 1) {
       const providerOrdinal = ((entryOrdinal - 1) % activeProviderCount) + 1;
@@ -394,6 +402,30 @@ function buildEntries(config: SyntheticDatasetConfig): EntryRow[] {
   }
 
   return entries;
+}
+
+function fanoutForSong(
+  config: SyntheticDatasetConfig,
+  songOrdinal: number
+): number {
+  const activeProviderCount = config.providerCount - 1;
+
+  if (songOrdinal === FIXTURE_SONG_INDEX.highEntry) {
+    return Math.min(
+      activeProviderCount * 2,
+      config.label === "synthetic-10k-songs-100k-aliases" ? 22 : 10
+    );
+  }
+
+  if (songOrdinal % 20 === 0) {
+    return 4;
+  }
+
+  if (songOrdinal % 5 === 0) {
+    return 3;
+  }
+
+  return 2;
 }
 
 function buildSearchFixture(
