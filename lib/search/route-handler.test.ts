@@ -27,6 +27,78 @@ describe("createSearchGetHandler", () => {
     });
   });
 
+  it("emits diagnostic timing headers only when requested", async () => {
+    const GET = createSearchGetHandler(async (query, context) => {
+      context?.timing?.record("test.search", 12.345);
+
+      return {
+        query: query.query,
+        normalized_query: query.normalizedQuery,
+        items: [],
+        next_cursor: null,
+        suggestions: []
+      };
+    });
+
+    const normalResponse = await GET(
+      new Request("http://localhost/api/search?q=Fixture")
+    );
+    const debugResponse = await GET(
+      new Request("http://localhost/api/search?q=Fixture", {
+        headers: { "x-perf-timing": "1" }
+      })
+    );
+
+    expect(normalResponse.headers.has("x-perf-timing")).toBe(false);
+    expect(debugResponse.headers.has("server-timing")).toBe(true);
+
+    const timings = JSON.parse(
+      debugResponse.headers.get("x-perf-timing") ?? "[]"
+    ) as Array<{ name: string; duration_ms: number }>;
+
+    expect(timings.map((timing) => timing.name)).toEqual(
+      expect.arrayContaining([
+        "route.parse",
+        "test.search",
+        "route.search",
+        "route.json",
+        "route.total"
+      ])
+    );
+    expect(
+      timings.find((timing) => timing.name === "test.search")?.duration_ms
+    ).toBe(12.35);
+  });
+
+  it("does not emit diagnostic timing headers in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+
+    try {
+      const GET = createSearchGetHandler(async (query, context) => {
+        context?.timing?.record("test.search", 12.345);
+
+        return {
+          query: query.query,
+          normalized_query: query.normalizedQuery,
+          items: [],
+          next_cursor: null,
+          suggestions: []
+        };
+      });
+
+      const response = await GET(
+        new Request("http://localhost/api/search?q=Fixture&__perf_timing=1", {
+          headers: { "x-perf-timing": "1" }
+        })
+      );
+
+      expect(response.headers.has("x-perf-timing")).toBe(false);
+      expect(response.headers.has("server-timing")).toBe(false);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("returns a 400 error for missing q", async () => {
     const GET = createSearchGetHandler(async () => emptyResponse());
 

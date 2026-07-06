@@ -3,6 +3,7 @@ import {
   normalizeChosungQuery,
   normalizeSearchText
 } from "./normalize";
+import { measureAsync, measureSync, type SearchTimingRecorder } from "./timing";
 
 export const DEFAULT_SEARCH_LIMIT = 20;
 export const MAX_SEARCH_LIMIT = 50;
@@ -260,13 +261,19 @@ export function parseSearchQuery(
 export async function searchSongs(
   db: SearchDbClient,
   query: SearchQuery,
-  options: { now?: Date } = {}
+  options: { now?: Date; timing?: SearchTimingRecorder } = {}
 ): Promise<SearchResponse> {
-  const activeProviders = await db.karaokeProvider.findMany({
-    where: { isActive: true },
-    select: { id: true, isActive: true, isDefault: true },
-    orderBy: [{ displayOrder: "asc" }, { name: "asc" }, { id: "asc" }]
-  });
+  const now = options.now ?? new Date();
+  const activeProviders = await measureAsync(
+    options.timing,
+    "search.providers",
+    () =>
+      db.karaokeProvider.findMany({
+        where: { isActive: true },
+        select: { id: true, isActive: true, isDefault: true },
+        orderBy: [{ displayOrder: "asc" }, { name: "asc" }, { id: "asc" }]
+      })
+  );
   const activeProviderIds = new Set(
     activeProviders.map((provider) => provider.id)
   );
@@ -287,17 +294,25 @@ export async function searchSongs(
     return emptySearchResponse(query);
   }
 
-  const aliases = await findTieredAliasCandidates(db, conditions, query.limit);
+  const aliases = await measureAsync(
+    options.timing,
+    "search.candidates.total",
+    () => findTieredAliasCandidates(db, conditions, query.limit, options.timing)
+  );
 
-  const rankedSongs = rankSongs(aliases, query, {
-    providerId: query.providerId,
-    defaultProviderId: defaultProvider?.id,
-    now: options.now ?? new Date()
-  });
-  const items = rankedSongs.slice(0, query.limit).map((ranked) =>
-    toSearchResultItem(ranked, {
-      now: options.now ?? new Date()
+  const rankedSongs = measureSync(options.timing, "search.rank", () =>
+    rankSongs(aliases, query, {
+      providerId: query.providerId,
+      defaultProviderId: defaultProvider?.id,
+      now
     })
+  );
+  const items = measureSync(options.timing, "search.to_response_items", () =>
+    rankedSongs.slice(0, query.limit).map((ranked) =>
+      toSearchResultItem(ranked, {
+        now
+      })
+    )
   );
 
   return {
@@ -306,7 +321,9 @@ export async function searchSongs(
     items,
     next_cursor: null,
     suggestions:
-      items.length === 0 ? await findSearchSuggestions(db, query) : []
+      items.length === 0
+        ? await findSearchSuggestions(db, query, options.timing)
+        : []
   };
 }
 
@@ -363,16 +380,22 @@ function buildSearchAliasConditions(
 async function findTieredAliasCandidates(
   db: SearchDbClient,
   conditions: SearchAliasCondition[],
-  limit: number
+  limit: number,
+  timing: SearchTimingRecorder | undefined
 ): Promise<AliasRecord[]> {
   const candidateIdGroups = await Promise.all(
     conditions.map((condition) =>
-      db.songAlias.findMany({
-        where: condition,
-        select: { id: true },
-        orderBy: aliasCandidateOrderBy(),
-        take: candidateTakeForCondition(condition, limit)
-      })
+      measureAsync(
+        timing,
+        `search.candidate.${conditionTimingName(condition)}`,
+        () =>
+          db.songAlias.findMany({
+            where: condition,
+            select: { id: true },
+            orderBy: aliasCandidateOrderBy(),
+            take: candidateTakeForCondition(condition, limit)
+          })
+      )
     )
   );
   const aliasIds = uniqueAliasIds(candidateIdGroups.flat());
@@ -381,11 +404,13 @@ async function findTieredAliasCandidates(
     return [];
   }
 
-  return (await db.songAlias.findMany({
-    where: { id: { in: aliasIds } },
-    select: aliasRecordSelect(),
-    orderBy: aliasCandidateOrderBy()
-  })) as AliasRecord[];
+  return (await measureAsync(timing, "search.alias_detail", () =>
+    db.songAlias.findMany({
+      where: { id: { in: aliasIds } },
+      select: aliasRecordSelect(),
+      orderBy: aliasCandidateOrderBy()
+    })
+  )) as AliasRecord[];
 }
 
 function candidateTakeForCondition(
@@ -431,7 +456,8 @@ function uniqueAliasIds(aliases: AliasIdRecord[]): string[] {
 
 async function findSearchSuggestions(
   db: SearchDbClient,
-  query: SearchQuery
+  query: SearchQuery,
+  timing: SearchTimingRecorder | undefined
 ): Promise<string[]> {
   const conditions = buildSuggestionConditions(query);
 
@@ -439,14 +465,32 @@ async function findSearchSuggestions(
     return [];
   }
 
-  const aliases = (await db.songAlias.findMany({
-    where: { OR: conditions },
-    select: aliasSuggestionSelect(),
-    orderBy: aliasCandidateOrderBy(),
-    take: SUGGESTION_CANDIDATE_TAKE
-  })) as AliasSuggestionRecord[];
+  const aliases = (await measureAsync(timing, "search.suggestions", () =>
+    db.songAlias.findMany({
+      where: { OR: conditions },
+      select: aliasSuggestionSelect(),
+      orderBy: aliasCandidateOrderBy(),
+      take: SUGGESTION_CANDIDATE_TAKE
+    })
+  )) as AliasSuggestionRecord[];
 
   return uniqueSuggestions(aliases, query).slice(0, 5);
+}
+
+function conditionTimingName(condition: SearchAliasCondition): string {
+  if ("chosungAlias" in condition) {
+    return "chosung_starts_with";
+  }
+
+  if ("equals" in condition.normalizedAlias) {
+    return "normalized_equals";
+  }
+
+  if ("startsWith" in condition.normalizedAlias) {
+    return "normalized_starts_with";
+  }
+
+  return "normalized_contains";
 }
 
 function buildSuggestionConditions(query: SearchQuery): SearchAliasCondition[] {
