@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   InvalidProviderError,
+  clearActiveProviderCache,
   parseSearchQuery,
   searchSongs,
   type SearchDbClient
@@ -518,6 +519,82 @@ describe("searchSongs", () => {
     ).rejects.toBeInstanceOf(InvalidProviderError);
   });
 
+  it("reuses active providers across repeated calls for the same db client", async () => {
+    const db = new FakeSearchDb({
+      providers: [
+        provider({ id: "provider_alpha", isDefault: true }),
+        provider({ id: "provider_beta", isDefault: false })
+      ],
+      songs: [
+        song({
+          id: "song_fixture_default",
+          displayTitle: "Fixture Default",
+          aliases: [
+            alias({
+              songId: "song_fixture_default",
+              alias: "Fixture Cached",
+              normalizedAlias: "fixturecached"
+            })
+          ],
+          karaokeEntries: [
+            entry({
+              songId: "song_fixture_default",
+              providerId: "provider_alpha"
+            })
+          ]
+        }),
+        song({
+          id: "song_fixture_requested",
+          displayTitle: "Fixture Requested",
+          aliases: [
+            alias({
+              id: "alias_fixture_requested_cached",
+              songId: "song_fixture_requested",
+              alias: "Fixture Cached",
+              normalizedAlias: "fixturecached"
+            })
+          ],
+          karaokeEntries: [
+            entry({
+              id: "entry_fixture_requested_beta",
+              songId: "song_fixture_requested",
+              providerId: "provider_beta"
+            })
+          ]
+        })
+      ]
+    });
+
+    try {
+      await expect(
+        searchSongs(
+          db,
+          parsedQuery("q=Fixture%20Cached&provider_id=provider_beta")
+        )
+      ).resolves.toMatchObject({
+        items: [
+          { song: { id: "song_fixture_requested" } },
+          { song: { id: "song_fixture_default" } }
+        ]
+      });
+      await expect(
+        searchSongs(db, parsedQuery("q=Fixture%20Cached"))
+      ).resolves.toMatchObject({
+        items: [
+          { song: { id: "song_fixture_default" } },
+          { song: { id: "song_fixture_requested" } }
+        ]
+      });
+      await expect(
+        searchSongs(db, parsedQuery("q=fixture&provider_id=provider_missing"))
+      ).rejects.toBeInstanceOf(InvalidProviderError);
+
+      expect(db.providerFindManyCalls).toBe(1);
+    } finally {
+      clearActiveProviderCache(db);
+    }
+  });
+
   it("returns up to five alias suggestions when no songs match", async () => {
     const db = new FakeSearchDb({
       songs: Array.from({ length: 6 }, (_, index) => {
@@ -572,6 +649,7 @@ type FindManyArgs = Parameters<SearchDbClient["songAlias"]["findMany"]>[0];
 class FakeSearchDb implements SearchDbClient {
   private readonly providers: ProviderRecord[];
   private readonly aliases: AliasRecord[];
+  providerFindManyCalls = 0;
 
   constructor(options: {
     providers?: ProviderRecord[];
@@ -591,10 +669,13 @@ class FakeSearchDb implements SearchDbClient {
   }
 
   readonly karaokeProvider = {
-    findMany: async () =>
-      this.providers
+    findMany: async () => {
+      this.providerFindManyCalls += 1;
+
+      return this.providers
         .filter((item) => item.isActive)
-        .sort((left, right) => left.id.localeCompare(right.id))
+        .sort((left, right) => left.id.localeCompare(right.id));
+    }
   };
 
   readonly songAlias = {
