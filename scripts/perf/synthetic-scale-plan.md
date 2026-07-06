@@ -127,7 +127,7 @@ Write reports under `perf-results/` or `/private/tmp/` unless a PR specifically
 requests committed artifacts. Use this filename shape:
 
 ```text
-<tool>-<db-label>-<dataset-label>-<optional-scope>-<YYYYMMDDTHHMMSSZ>.json
+<tool>-<db-label>-<dataset-label>-<optional-scope>-<YYYYMMDDTHHMMSSZ>.<extension>
 ```
 
 Examples:
@@ -135,6 +135,7 @@ Examples:
 - `baseline-local-current-seed-20260706T120000Z.json`
 - `query-shape-local-synthetic-10k-songs-100k-aliases-case-limit-9-20260706T120000Z.json`
 - `explain-neon-current-seed-low-limit-20260706T120000Z.json`
+- `route-timing-neon-current-seed-low-limit-20260706T120000Z.json`
 - `route-timing-neon-current-seed-low-limit-20260706T120000Z.txt`
 
 Each PR summary must record:
