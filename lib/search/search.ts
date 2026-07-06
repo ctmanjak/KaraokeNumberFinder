@@ -448,20 +448,31 @@ async function findTieredAliasCandidates(
   const highPriorityConditions = [exactCondition, prefixCondition].filter(
     isDefined
   );
+  let exactCandidates: AliasIdRecord[] = [];
 
   if (highPriorityConditions.length > 0) {
-    candidateIdGroups.push(
-      ...(await Promise.all(
-        highPriorityConditions.map((condition) =>
-          findAliasCandidateIds(db, condition, limit, timing)
-        )
-      ))
+    const highPriorityCandidateGroups = await Promise.all(
+      highPriorityConditions.map(async (condition) => {
+        const candidates = await findAliasCandidateIds(
+          db,
+          condition,
+          limit,
+          timing
+        );
+
+        if (isNormalizedEqualsCondition(condition)) {
+          exactCandidates = candidates;
+        }
+
+        return candidates;
+      })
     );
+
+    candidateIdGroups.push(...highPriorityCandidateGroups);
   }
 
   const highPriorityAliasIds = uniqueAliasIds(candidateIdGroups.flat());
-  const hasExactCandidates =
-    exactCondition !== undefined && candidateIdGroups[0]?.length > 0;
+  const hasExactCandidates = exactCandidates.length > 0;
   const hasEnoughHigherRankedCandidates =
     highPriorityAliasIds.length >= limit || hasExactCandidates;
 
@@ -629,19 +640,29 @@ async function findSearchSuggestions(
 }
 
 function conditionTimingName(condition: SearchAliasCondition): string {
-  if ("chosungAlias" in condition) {
+  if (isChosungStartsWithCondition(condition)) {
     return "chosung_starts_with";
   }
 
-  if ("equals" in condition.normalizedAlias) {
+  if (isNormalizedEqualsCondition(condition)) {
     return "normalized_equals";
   }
 
-  if ("startsWith" in condition.normalizedAlias) {
+  if (isNormalizedStartsWithCondition(condition)) {
     return "normalized_starts_with";
   }
 
-  return "normalized_contains";
+  if (isNormalizedContainsCondition(condition)) {
+    return "normalized_contains";
+  }
+
+  return unsupportedSearchAliasCondition(condition);
+}
+
+function unsupportedSearchAliasCondition(condition: never): never {
+  throw new Error(
+    `Unsupported search alias condition: ${JSON.stringify(condition)}`
+  );
 }
 
 function buildSuggestionConditions(query: SearchQuery): SearchAliasCondition[] {
