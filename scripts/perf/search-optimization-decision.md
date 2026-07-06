@@ -196,6 +196,9 @@ Current seed action:
 ## Required Additional Measurement
 
 Before applying optimization code, define and run a synthetic dataset plan:
+`scripts/perf/synthetic-scale-plan.md` is the detailed `[M2-Perf-08]`
+measurement standard for dataset labels, case matrix, command usage, Neon load
+limits, result naming, and decision gates.
 
 | Dataset label                      |  Songs | Aliases |       Entries | Providers | Purpose                                                   |
 | ---------------------------------- | -----: | ------: | ------------: | --------: | --------------------------------------------------------- |
