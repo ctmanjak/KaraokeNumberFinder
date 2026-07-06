@@ -228,7 +228,7 @@ export async function runPerfQueryShape(
       "actual_sql_query_count is populated only when the caller provides a Prisma query event log.",
       "Prisma query event logging can distort latency and should be used for minimal query-shape runs, not timing conclusions.",
       "Nested relation SQL is classified from Prisma query events emitted during the alias detail findMany call.",
-      "Candidate lookups run through Promise.all, so per-candidate SQL event spans can overlap; use scenario-level SQL events and candidate client method rows together for candidate SQL shape.",
+      "High-priority exact/prefix candidate lookups can overlap, while lower-priority chosung/contains lookups are staged and may be skipped when higher-ranked candidates are sufficient.",
       "dataset.label and run.db_label separate local DB, Neon DB, current seed, and future synthetic scale outputs."
     ],
     scenarios: reports
