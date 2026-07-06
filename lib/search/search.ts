@@ -8,6 +8,9 @@ import { measureAsync, measureSync, type SearchTimingRecorder } from "./timing";
 export const DEFAULT_SEARCH_LIMIT = 20;
 export const MAX_SEARCH_LIMIT = 50;
 export const STALE_VERIFICATION_DAYS = 180;
+// Best-effort process-local cache for active provider metadata. Provider state
+// changes can be stale for up to this TTL, and serverless instances do not share it.
+export const ACTIVE_PROVIDER_CACHE_TTL_MS = 30_000;
 
 export type SearchQuery = {
   query: string;
@@ -68,6 +71,12 @@ type ProviderRecord = {
   id: string;
   isActive: boolean;
   isDefault: boolean;
+};
+
+type ActiveProviderCacheEntry = {
+  expiresAtMs: number;
+  providers?: ProviderRecord[];
+  pending?: Promise<ProviderRecord[]>;
 };
 
 type AliasRecord = {
@@ -207,6 +216,10 @@ const MIN_PARTIAL_CANDIDATE_TAKE = 200;
 const MAX_PARTIAL_CANDIDATE_TAKE = 500;
 const SUGGESTION_CANDIDATE_TAKE = 25;
 const AVAILABLE_STATUS = "available";
+const activeProviderCache = new WeakMap<
+  SearchDbClient,
+  ActiveProviderCacheEntry
+>();
 
 export function parseSearchQuery(
   searchParams: URLSearchParams
@@ -267,12 +280,7 @@ export async function searchSongs(
   const activeProviders = await measureAsync(
     options.timing,
     "search.providers",
-    () =>
-      db.karaokeProvider.findMany({
-        where: { isActive: true },
-        select: { id: true, isActive: true, isDefault: true },
-        orderBy: [{ displayOrder: "asc" }, { name: "asc" }, { id: "asc" }]
-      })
+    () => getActiveProviders(db)
   );
   const activeProviderIds = new Set(
     activeProviders.map((provider) => provider.id)
@@ -332,6 +340,54 @@ export class InvalidProviderError extends Error {
     super(`Invalid provider_id: ${providerId}`);
     this.name = "InvalidProviderError";
   }
+}
+
+export function clearActiveProviderCache(db: SearchDbClient): void {
+  activeProviderCache.delete(db);
+}
+
+async function getActiveProviders(
+  db: SearchDbClient
+): Promise<ProviderRecord[]> {
+  const nowMs = Date.now();
+  const cached = activeProviderCache.get(db);
+
+  if (cached !== undefined) {
+    if (cached.providers !== undefined && cached.expiresAtMs > nowMs) {
+      return cached.providers;
+    }
+
+    if (cached.pending !== undefined) {
+      return cached.pending;
+    }
+  }
+
+  const pending = fetchActiveProviders(db);
+  activeProviderCache.set(db, {
+    expiresAtMs: nowMs + ACTIVE_PROVIDER_CACHE_TTL_MS,
+    pending
+  });
+
+  try {
+    const providers = await pending;
+    activeProviderCache.set(db, {
+      expiresAtMs: Date.now() + ACTIVE_PROVIDER_CACHE_TTL_MS,
+      providers
+    });
+
+    return providers;
+  } catch (error) {
+    activeProviderCache.delete(db);
+    throw error;
+  }
+}
+
+function fetchActiveProviders(db: SearchDbClient): Promise<ProviderRecord[]> {
+  return db.karaokeProvider.findMany({
+    where: { isActive: true },
+    select: { id: true, isActive: true, isDefault: true },
+    orderBy: [{ displayOrder: "asc" }, { name: "asc" }, { id: "asc" }]
+  });
 }
 
 function parseLimit(value: string | null): number | null {
