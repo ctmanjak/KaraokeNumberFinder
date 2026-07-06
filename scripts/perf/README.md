@@ -18,6 +18,62 @@ Current-seed runs and synthetic-scale runs must be interpreted separately:
 - Synthetic data generation/import must follow the synthetic dataset contract;
   do not load synthetic data into Neon or use broad iterations against Neon.
 
+## Synthetic Dataset Generation and Import
+
+`perf:dataset-generate` creates deterministic synthetic CSV datasets for local
+or sandbox search-scale work. It writes generated output under
+`tmp/synthetic-datasets/<dataset_label>/` by default; this directory is ignored
+by git and the generated CSV files should not be committed.
+
+```sh
+npm run perf:dataset-generate -- --dataset-label synthetic-1k-songs-10k-aliases
+npm run perf:dataset-generate -- --dataset-label synthetic-10k-songs-100k-aliases
+npm run perf:dataset-generate -- --dataset-label synthetic-1k-songs-10k-aliases --output-root /private/tmp/karaoke-synthetic-datasets
+```
+
+Each generated dataset directory contains:
+
+- `karaoke_providers.csv`
+- `songs.csv`
+- `song_aliases.csv`
+- `karaoke_entries.csv`
+- `search-synthetic-scale.csv`
+- `dataset-metadata.json`
+
+Supported dataset labels:
+
+| Dataset label                      |  Songs | Aliases | Providers | Entry target  |
+| ---------------------------------- | -----: | ------: | --------: | ------------- |
+| `synthetic-1k-songs-10k-aliases`   |  1,000 |  10,000 |         6 | 2,000-5,000   |
+| `synthetic-10k-songs-100k-aliases` | 10,000 | 100,000 |        12 | 20,000-50,000 |
+
+`dataset-metadata.json` records `dataset_label`, `generator_version`, fixed
+`random_seed`, deterministic `generated_at`, row counts, fixture path, required
+case IDs, and safety notes. `search-synthetic-scale.csv` includes all required
+case IDs from the contract, including exact, prefix, contains, chosung,
+suggestion, provider-filter, partial-pressure, and payload-fanout cases.
+
+Synthetic import is local/sandbox only. Use the synthetic import wrapper:
+
+```sh
+npm run perf:dataset-import -- \
+  --seed-dir tmp/synthetic-datasets/synthetic-1k-songs-10k-aliases \
+  --db-label local \
+  --dry-run
+
+npm run perf:dataset-import -- \
+  --seed-dir tmp/synthetic-datasets/synthetic-1k-songs-10k-aliases \
+  --db-label local
+```
+
+The wrapper reuses the existing seed import logic after enforcing synthetic
+guards. `--db-label local` or `--db-label sandbox` is required unless
+`--allow-synthetic-import-to-local` is passed. Labels such as `neon`,
+`production`, `prod`, and `live` are rejected, and a `DATABASE_URL` that looks
+like Neon/live/prod-like infrastructure is rejected even when a local label is
+provided. The same guard also runs when `seed:import -- --seed-dir <generated>`
+points at a synthetic dataset directory.
+
 `perf:baseline` runs the `[M2-Perf-01]` read-only baseline harness against the
 database selected by the current environment. It does not import seed data,
 write application rows, create migrations, or change `.env`.
