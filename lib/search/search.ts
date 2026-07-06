@@ -464,7 +464,6 @@ async function findTieredAliasCandidates(
     exactCondition !== undefined && candidateIdGroups[0]?.length > 0;
   const hasEnoughHigherRankedCandidates =
     highPriorityAliasIds.length >= limit || hasExactCandidates;
-  let hasChosungCandidates = false;
 
   if (!hasEnoughHigherRankedCandidates && chosungCondition !== undefined) {
     const chosungCandidates = await findAliasCandidateIds(
@@ -473,7 +472,6 @@ async function findTieredAliasCandidates(
       limit,
       timing
     );
-    hasChosungCandidates = chosungCandidates.length > 0;
     candidateIdGroups.push(chosungCandidates);
   }
 
@@ -482,7 +480,6 @@ async function findTieredAliasCandidates(
   if (
     containsCondition !== undefined &&
     !hasExactCandidates &&
-    !hasChosungCandidates &&
     stagedAliasIds.length < limit
   ) {
     candidateIdGroups.push(

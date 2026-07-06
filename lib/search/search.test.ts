@@ -303,8 +303,54 @@ describe("searchSongs", () => {
       "normalized_equals",
       "normalized_starts_with",
       "chosung_starts_with",
+      "normalized_contains",
       "normalized_equals",
       "normalized_starts_with",
+      "normalized_contains"
+    ]);
+  });
+
+  it("falls back to contains when chosung candidates do not fill the result limit", async () => {
+    const db = new FakeSearchDb({
+      songs: [
+        song({
+          id: "song_fixture_chosung",
+          aliases: [
+            alias({
+              songId: "song_fixture_chosung",
+              alias: "가나다 곡",
+              normalizedAlias: "가나다곡",
+              chosungAlias: "ㄱㄴㄷㄱ"
+            })
+          ]
+        }),
+        song({
+          id: "song_fixture_contains_jamo",
+          displayTitle: "Fixture Contains Jamo",
+          aliases: [
+            alias({
+              id: "alias_fixture_contains_jamo",
+              songId: "song_fixture_contains_jamo",
+              alias: "Contains Jamo",
+              normalizedAlias: "fixtureᄀᄂcenter",
+              chosungAlias: null
+            })
+          ]
+        })
+      ]
+    });
+
+    const result = await searchSongs(db, parsedQuery("q=ㄱㄴ&limit=20"));
+
+    expect(result.items.map((item) => item.song.id)).toEqual([
+      "song_fixture_chosung",
+      "song_fixture_contains_jamo"
+    ]);
+    expect(result.items.map((item) => item.relevance_score)).toEqual([70, 60]);
+    expect(candidateQueryShapes(db)).toEqual([
+      "normalized_equals",
+      "normalized_starts_with",
+      "chosung_starts_with",
       "normalized_contains"
     ]);
   });
