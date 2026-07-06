@@ -137,6 +137,61 @@ describe("searchSongs", () => {
     });
   });
 
+  it("records search timing labels for result and suggestion paths", async () => {
+    const successfulTiming = timingRecorder();
+    const suggestionTiming = timingRecorder();
+    const db = new FakeSearchDb({
+      songs: [
+        song({
+          id: "song_fixture_001",
+          aliases: [
+            alias({
+              id: "alias_fixture_001_ko",
+              songId: "song_fixture_001",
+              alias: "Fixture Alias",
+              normalizedAlias: "fixturealias"
+            })
+          ]
+        }),
+        song({
+          id: "song_fixture_suggestion",
+          aliases: [
+            alias({
+              id: "alias_fixture_suggestion",
+              songId: "song_fixture_suggestion",
+              alias: "Fix Suggestion",
+              normalizedAlias: "fixsuggestion"
+            })
+          ]
+        })
+      ]
+    });
+
+    await searchSongs(db, parsedQuery("q=Fixture%20Alias"), {
+      timing: successfulTiming
+    });
+    await searchSongs(db, parsedQuery("q=fixzz"), {
+      timing: suggestionTiming
+    });
+
+    expect(successfulTiming.labels()).toEqual(
+      expect.arrayContaining([
+        "search.providers",
+        "search.candidates.total",
+        "search.alias_detail",
+        "search.rank",
+        "search.to_response_items"
+      ])
+    );
+    expect(suggestionTiming.labels()).toEqual(
+      expect.arrayContaining([
+        "search.providers",
+        "search.candidates.total",
+        "search.suggestions"
+      ])
+    );
+  });
+
   it("supports prefix and partial matches", async () => {
     const db = new FakeSearchDb({
       songs: [
@@ -630,6 +685,19 @@ function parsedQuery(query: string) {
   }
 
   return parsed.query;
+}
+
+function timingRecorder() {
+  const calls: Array<{ name: string; durationMs: number }> = [];
+
+  return {
+    record(name: string, durationMs: number) {
+      calls.push({ name, durationMs });
+    },
+    labels() {
+      return calls.map((call) => call.name);
+    }
+  };
 }
 
 function provider(overrides: Partial<ProviderRecord> = {}): ProviderRecord {

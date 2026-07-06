@@ -1,5 +1,8 @@
 # Perf Scripts
 
+See `scripts/perf/search-optimization-decision.md` for the `[M2-Perf-04]`
+decision that synthesizes baseline, EXPLAIN, and Prisma query-shape findings.
+
 `perf:baseline` runs the `[M2-Perf-01]` read-only baseline harness against the
 database selected by the current environment. It does not import seed data,
 write application rows, create migrations, or change `.env`.
@@ -168,3 +171,23 @@ For Neon or production-like databases, keep `--case-limit` low and avoid repeate
 runs. This script does not import seed data, mutate DB rows, change Prisma schema,
 create migrations, add indexes, update `.env`, or modify generated Prisma Client
 files.
+
+## API Route Timing
+
+`GET /api/search` can emit diagnostic timing headers when the request includes
+`x-perf-timing: 1` or `__perf_timing=1`. Normal requests do not include these
+headers and the response body shape is unchanged.
+
+Example against a running dev server:
+
+```sh
+curl -sS -D /tmp/search-headers.txt \
+  -H 'x-perf-timing: 1' \
+  'http://127.0.0.1:3000/api/search?q=잔혹한%20천사의%20테제'
+```
+
+The response includes `server-timing` and `x-perf-timing` headers with route
+parse/search/json timings and `searchSongs()` substeps such as provider lookup,
+candidate lookup group, alias detail lookup, ranking, and response item mapping.
+Use this only for diagnostics; it is intended to explain end-to-end API latency
+that is not visible from `perf:baseline` or `perf:query-shape` alone.
