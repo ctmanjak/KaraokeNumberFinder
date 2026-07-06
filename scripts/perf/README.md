@@ -4,6 +4,9 @@ See `scripts/perf/search-optimization-decision.md` for the `[M2-Perf-04]`
 decision that synthesizes baseline, EXPLAIN, and Prisma query-shape findings.
 See `scripts/perf/synthetic-scale-plan.md` for the `[M2-Perf-08]` measurement
 standard before running or interpreting synthetic-scale search perf results.
+See `scripts/perf/synthetic-dataset-contract.md` for the `[M2-Perf-09]`
+synthetic dataset generation/import, fixture, and validation contract that must
+be implemented before synthetic-scale measurements are trusted.
 
 Current-seed runs and synthetic-scale runs must be interpreted separately:
 
@@ -12,8 +15,8 @@ Current-seed runs and synthetic-scale runs must be interpreted separately:
 - `synthetic-1k-songs-10k-aliases` and
   `synthetic-10k-songs-100k-aliases` are future isolated local/sandbox datasets
   for index, trigram, query rewrite, payload trimming, and pagination gates.
-- Synthetic data generation/import is out of scope for the current harness docs;
-  do not load-test Neon or use broad iterations against Neon.
+- Synthetic data generation/import must follow the synthetic dataset contract;
+  do not load synthetic data into Neon or use broad iterations against Neon.
 
 `perf:baseline` runs the `[M2-Perf-01]` read-only baseline harness against the
 database selected by the current environment. It does not import seed data,

@@ -12,6 +12,12 @@ This ticket does not generate or import synthetic data. It does not change
 Prisma schema, migrations, indexes, generated Prisma Client, DB data, `.env`,
 search behavior, or API payloads.
 
+The generation/import, fixture CSV, deterministic seed, and row-count validation
+contract is defined separately in
+`scripts/perf/synthetic-dataset-contract.md`. Synthetic-scale measurements must
+not start until that contract has an implemented local/sandbox dataset and a
+passing validation report.
+
 ## Measurement Split
 
 Current-seed and synthetic-scale runs answer different questions and must not be
@@ -39,9 +45,10 @@ Use the exact dataset label in every perf command and output filename.
 | `synthetic-50k-songs-500k-aliases` | 50,000 | 500,000 |     100k-250k |      4-30 | Future only                      | Placeholder for larger catalog strategy checks           |
 
 Synthetic data generation, import scripts, fixture generation, and load
-validation are explicitly out of scope for this ticket. A later ticket must
-define how each synthetic dataset is produced and how the row counts are
-validated before any measurements are trusted.
+validation are defined by `scripts/perf/synthetic-dataset-contract.md` but are
+not implemented by this measurement-plan ticket. A later implementation ticket
+must produce the local/sandbox dataset and validation report before any
+measurements are trusted.
 
 ## Search Case Matrix
 
