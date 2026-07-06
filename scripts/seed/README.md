@@ -16,6 +16,8 @@ Current state after `[M1-T09]`:
   against another seed directory.
 - `npm run seed:import -- --seed-dir path/to/fixture` imports another seed
   directory.
+- `npm run seed:import -- --seed-dir path/to/generated --db-label local`
+  imports a synthetic dataset only after the local/sandbox safety guard passes.
 - `npm run seed:search-smoke` verifies that imported seed aliases match the
   expected `song_id` values in `seed/search-smoke.csv`.
 - `npm run seed:search-smoke -- --fixture path/to/file` uses another smoke
@@ -75,6 +77,7 @@ npm run seed:import -- --dry-run
 npm run seed:import
 npm run seed:import -- --seed-dir path/to/fixture --dry-run
 npm run seed:import -- --seed-dir path/to/fixture
+npm run seed:import -- --seed-dir tmp/synthetic-datasets/synthetic-1k-songs-10k-aliases --db-label local --dry-run
 ```
 
 Import order is fixed:
@@ -92,6 +95,13 @@ The report includes file-level `create`, `update`, `skip`, `warning`, and
 `error` counts. It also prints a row-level plan so operators can inspect the
 planned operation for each CSV row. `--dry-run` performs the same validation and
 planning queries but does not write to the database.
+
+When `--seed-dir` contains `dataset-metadata.json` for a synthetic dataset,
+`seed:import` requires `--db-label local`, `--db-label sandbox`, or
+`--allow-synthetic-import-to-local`. It rejects `neon`, `production`, `prod`,
+`live`, and production-like `DATABASE_URL` values before opening the Prisma
+client. Prefer `npm run perf:dataset-import` for synthetic datasets because its
+CLI requires an explicit generated dataset directory.
 
 ## Add CLI usage
 
