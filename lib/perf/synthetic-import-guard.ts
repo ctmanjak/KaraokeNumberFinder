@@ -8,6 +8,7 @@ import {
 } from "./synthetic-dataset";
 
 export type SyntheticImportDbLabel = "local" | "sandbox";
+export type SyntheticSafeDbLabel = SyntheticImportDbLabel;
 
 export type SyntheticImportGuardOptions = {
   seedDir: string;
@@ -29,6 +30,16 @@ export type SyntheticImportGuardResult =
       targetLabel: SyntheticImportDbLabel;
       message: string;
     };
+
+export type SyntheticValidationGuardOptions = {
+  dbLabel?: string;
+  databaseUrl?: string;
+};
+
+export type SyntheticValidationGuardResult = {
+  targetLabel: SyntheticSafeDbLabel;
+  message: string;
+};
 
 const ALLOWED_DB_LABELS = new Set(["local", "sandbox"]);
 const BLOCKED_DB_LABELS = new Set([
@@ -90,6 +101,41 @@ export function assertSyntheticImportAllowed(
     datasetLabel: metadata.dataset_label,
     targetLabel: targetLabel === "sandbox" ? "sandbox" : "local",
     message: `Synthetic dataset ${metadata.dataset_label} allowed for ${targetLabel ?? "local"} import target.`
+  };
+}
+
+export function assertSyntheticValidationDbAllowed(
+  options: SyntheticValidationGuardOptions
+): SyntheticValidationGuardResult {
+  const targetLabel = normalizeDbLabel(options.dbLabel);
+
+  if (targetLabel === null) {
+    throw new Error(
+      "Synthetic dataset DB validation requires --db-label local or --db-label sandbox."
+    );
+  }
+
+  if (BLOCKED_DB_LABELS.has(targetLabel)) {
+    throw new Error(
+      `Synthetic dataset DB validation is blocked for db label ${targetLabel}. Use local or sandbox only.`
+    );
+  }
+
+  if (!ALLOWED_DB_LABELS.has(targetLabel)) {
+    throw new Error(
+      `Synthetic dataset DB validation requires db label local or sandbox; received ${targetLabel}.`
+    );
+  }
+
+  if (looksProductionLikeDatabaseUrl(options.databaseUrl)) {
+    throw new Error(
+      "Synthetic dataset DB validation is blocked because DATABASE_URL looks like Neon, live, production, or production-like infrastructure."
+    );
+  }
+
+  return {
+    targetLabel: targetLabel === "sandbox" ? "sandbox" : "local",
+    message: `Synthetic dataset DB validation allowed for ${targetLabel} target.`
   };
 }
 

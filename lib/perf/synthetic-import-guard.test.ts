@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { SYNTHETIC_METADATA_FILE } from "./synthetic-dataset";
 import {
   assertSyntheticImportAllowed,
+  assertSyntheticValidationDbAllowed,
   looksProductionLikeDatabaseUrl
 } from "./synthetic-import-guard";
 
@@ -16,6 +17,41 @@ afterEach(() => {
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { force: true, recursive: true });
   }
+});
+
+describe("assertSyntheticValidationDbAllowed", () => {
+  it("allows local and sandbox DB validation labels", () => {
+    expect(
+      assertSyntheticValidationDbAllowed({
+        dbLabel: "local",
+        databaseUrl: "postgresql://user:pass@localhost:5432/karaoke"
+      })
+    ).toMatchObject({ targetLabel: "local" });
+    expect(
+      assertSyntheticValidationDbAllowed({
+        dbLabel: "sandbox",
+        databaseUrl: "postgresql://user:pass@sandbox.internal/karaoke"
+      })
+    ).toMatchObject({ targetLabel: "sandbox" });
+  });
+
+  it("rejects missing, blocked, and prod-like DB validation targets", () => {
+    expect(() => assertSyntheticValidationDbAllowed({})).toThrow(
+      "requires --db-label local or --db-label sandbox"
+    );
+    expect(() =>
+      assertSyntheticValidationDbAllowed({
+        dbLabel: "live",
+        databaseUrl: "postgresql://user:pass@localhost:5432/karaoke"
+      })
+    ).toThrow("blocked for db label live");
+    expect(() =>
+      assertSyntheticValidationDbAllowed({
+        dbLabel: "local",
+        databaseUrl: "postgresql://user:pass@db.example.com/prod"
+      })
+    ).toThrow("DATABASE_URL looks like Neon");
+  });
 });
 
 describe("assertSyntheticImportAllowed", () => {
