@@ -228,6 +228,51 @@ describe("searchSongs", () => {
       "song_fixture_002"
     ]);
     expect(result.items.map((item) => item.relevance_score)).toEqual([80, 60]);
+    expect(candidateQueryShapes(db)).toEqual([
+      "normalized_equals",
+      "normalized_starts_with",
+      "normalized_contains"
+    ]);
+  });
+
+  it("does not fan out to lower-priority candidate queries for exact matches", async () => {
+    const db = new FakeSearchDb({
+      songs: [
+        song({
+          id: "song_fixture_exact",
+          aliases: [
+            alias({
+              id: "alias_fixture_exact",
+              songId: "song_fixture_exact",
+              alias: "Fixture Exact",
+              normalizedAlias: "fixtureexact"
+            })
+          ]
+        }),
+        song({
+          id: "song_fixture_contains",
+          displayTitle: "Fixture Contains",
+          aliases: [
+            alias({
+              id: "alias_fixture_contains",
+              songId: "song_fixture_contains",
+              alias: "Another Fixture Exact Center",
+              normalizedAlias: "anotherfixtureexactcenter"
+            })
+          ]
+        })
+      ]
+    });
+
+    const result = await searchSongs(db, parsedQuery("q=Fixture%20Exact"));
+
+    expect(result.items.map((item) => item.song.id)).toEqual([
+      "song_fixture_exact"
+    ]);
+    expect(candidateQueryShapes(db)).toEqual([
+      "normalized_equals",
+      "normalized_starts_with"
+    ]);
   });
 
   it("uses Hangul chosung search only from two or more initials", async () => {
@@ -254,6 +299,60 @@ describe("searchSongs", () => {
       "song_fixture_chosung"
     ]);
     expect(oneInitial.items).toEqual([]);
+    expect(candidateQueryShapes(db)).toEqual([
+      "normalized_equals",
+      "normalized_starts_with",
+      "chosung_starts_with",
+      "normalized_contains",
+      "normalized_equals",
+      "normalized_starts_with",
+      "normalized_contains"
+    ]);
+  });
+
+  it("falls back to contains when chosung candidates do not fill the result limit", async () => {
+    const db = new FakeSearchDb({
+      songs: [
+        song({
+          id: "song_fixture_chosung",
+          aliases: [
+            alias({
+              songId: "song_fixture_chosung",
+              alias: "가나다 곡",
+              normalizedAlias: "가나다곡",
+              chosungAlias: "ㄱㄴㄷㄱ"
+            })
+          ]
+        }),
+        song({
+          id: "song_fixture_contains_jamo",
+          displayTitle: "Fixture Contains Jamo",
+          aliases: [
+            alias({
+              id: "alias_fixture_contains_jamo",
+              songId: "song_fixture_contains_jamo",
+              alias: "Contains Jamo",
+              normalizedAlias: "fixtureᄀᄂcenter",
+              chosungAlias: null
+            })
+          ]
+        })
+      ]
+    });
+
+    const result = await searchSongs(db, parsedQuery("q=ㄱㄴ&limit=20"));
+
+    expect(result.items.map((item) => item.song.id)).toEqual([
+      "song_fixture_chosung",
+      "song_fixture_contains_jamo"
+    ]);
+    expect(result.items.map((item) => item.relevance_score)).toEqual([70, 60]);
+    expect(candidateQueryShapes(db)).toEqual([
+      "normalized_equals",
+      "normalized_starts_with",
+      "chosung_starts_with",
+      "normalized_contains"
+    ]);
   });
 
   it("sorts by requested provider availability before default provider availability", async () => {
@@ -649,6 +748,7 @@ type FindManyArgs = Parameters<SearchDbClient["songAlias"]["findMany"]>[0];
 class FakeSearchDb implements SearchDbClient {
   private readonly providers: ProviderRecord[];
   private readonly aliases: AliasRecord[];
+  readonly aliasFindManyArgs: FindManyArgs[] = [];
   providerFindManyCalls = 0;
 
   constructor(options: {
@@ -679,8 +779,10 @@ class FakeSearchDb implements SearchDbClient {
   };
 
   readonly songAlias = {
-    findMany: async (args: FindManyArgs) =>
-      selectAliasFields(
+    findMany: async (args: FindManyArgs) => {
+      this.aliasFindManyArgs.push(args);
+
+      return selectAliasFields(
         this.aliases
           .filter((item) => matchesWhere(item, args.where))
           .sort(
@@ -692,7 +794,8 @@ class FakeSearchDb implements SearchDbClient {
           )
           .slice(0, args.take),
         args.select
-      )
+      );
+    }
   };
 }
 
@@ -779,6 +882,38 @@ function timingRecorder() {
       return calls.map((call) => call.name);
     }
   };
+}
+
+function candidateQueryShapes(db: FakeSearchDb): string[] {
+  return db.aliasFindManyArgs
+    .map((args) => args.where)
+    .filter(
+      (
+        where
+      ): where is Exclude<
+        FindManyArgs["where"],
+        { id: unknown } | { OR: unknown }
+      > => !("id" in where) && !("OR" in where)
+    )
+    .map(testConditionTimingName);
+}
+
+function testConditionTimingName(
+  condition: Exclude<FindManyArgs["where"], { id: unknown } | { OR: unknown }>
+): string {
+  if ("chosungAlias" in condition) {
+    return "chosung_starts_with";
+  }
+
+  if ("equals" in condition.normalizedAlias) {
+    return "normalized_equals";
+  }
+
+  if ("startsWith" in condition.normalizedAlias) {
+    return "normalized_starts_with";
+  }
+
+  return "normalized_contains";
 }
 
 function provider(overrides: Partial<ProviderRecord> = {}): ProviderRecord {

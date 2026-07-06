@@ -144,7 +144,7 @@ SQL query event counts:
 
 - `client_method_count` counts service-facing Prisma method calls, grouped by model method and query shape.
 - `actual_sql_query_count` counts Prisma `$on("query")` events when SQL events are enabled.
-- `candidate_alias_id_groups` records the `Promise.all` candidate query group count, condition shape, `take`, and returned IDs. Per-candidate SQL event counts are left `null` because concurrent spans can overlap; use scenario-level `sql_events` to inspect the emitted candidate SQL.
+- `candidate_alias_id_groups` records the executed candidate query group count, condition shape, `take`, and returned IDs. Exact/prefix candidate spans may overlap, while lower-priority chosung/contains spans can be skipped or staged; use scenario-level `sql_events` to inspect the emitted candidate SQL.
 - `unique_alias_id_count` and `alias_detail_lookup.id_in_count` record the deduped alias IDs used by the detail `song_aliases.id IN (...)` lookup.
 - `alias_detail_lookup.sql` records the actual SQL emitted for the detail lookup span.
 - `relation_load_observation` classifies `aliasRecordSelect()` relation loading as single join, batched relation load, possible N+1, no candidates, or unavailable.
@@ -154,8 +154,8 @@ The expected current Prisma search shapes are:
 - active provider lookup before each `searchSongs()` call
 - `normalized_alias` equals candidate lookup
 - `normalized_alias` startsWith candidate lookup
-- `normalized_alias` contains candidate lookup
-- `chosung_alias` startsWith candidate lookup when the query has usable two-or-more Korean initials
+- `normalized_alias` contains candidate lookup when higher-ranked candidates are insufficient
+- `chosung_alias` startsWith candidate lookup when the query has usable two-or-more Korean initials and higher-ranked candidates are insufficient
 - deduped `song_aliases.id IN (...)` alias detail lookup with selected `song` and `karaokeEntries`
 - suggestions lookup only when no search items are returned
 - provider list lookup for `GET /api/providers` and direct `listProviders()`

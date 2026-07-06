@@ -6,6 +6,7 @@ const HANGUL_SYLLABLE_START = 0xac00;
 const HANGUL_SYLLABLE_END = 0xd7a3;
 const HANGUL_JUNGSEONG_COUNT = 21;
 const HANGUL_JONGSEONG_COUNT = 28;
+const HANGUL_COMPATIBILITY_INITIALS_PATTERN = /^[ㄱ-ㅎ]+$/u;
 const HANGUL_INITIALS = [
   "ㄱ",
   "ㄲ",
@@ -91,5 +92,8 @@ function normalizeSearchComparableText(
 }
 
 export function canUseHangulChosungSearch(chosung: string): boolean {
-  return chosung.length >= MIN_CHOSUNG_SEARCH_LENGTH;
+  return (
+    chosung.length >= MIN_CHOSUNG_SEARCH_LENGTH &&
+    HANGUL_COMPATIBILITY_INITIALS_PATTERN.test(chosung)
+  );
 }

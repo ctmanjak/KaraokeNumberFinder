@@ -81,6 +81,11 @@ describe("canUseHangulChosungSearch", () => {
   it("rejects one-initial chosung search", () => {
     expect(canUseHangulChosungSearch("ㅈ")).toBe(false);
   });
+
+  it("rejects non-initial search text", () => {
+    expect(canUseHangulChosungSearch("fixture")).toBe(false);
+    expect(canUseHangulChosungSearch("픽스처")).toBe(false);
+  });
 });
 
 describe("normalizeChosungQuery", () => {

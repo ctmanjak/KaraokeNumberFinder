@@ -439,21 +439,65 @@ async function findTieredAliasCandidates(
   limit: number,
   timing: SearchTimingRecorder | undefined
 ): Promise<AliasRecord[]> {
-  const candidateIdGroups = await Promise.all(
-    conditions.map((condition) =>
-      measureAsync(
-        timing,
-        `search.candidate.${conditionTimingName(condition)}`,
-        () =>
-          db.songAlias.findMany({
-            where: condition,
-            select: { id: true },
-            orderBy: aliasCandidateOrderBy(),
-            take: candidateTakeForCondition(condition, limit)
-          })
-      )
-    )
+  const exactCondition = conditions.find(isNormalizedEqualsCondition);
+  const prefixCondition = conditions.find(isNormalizedStartsWithCondition);
+  const chosungCondition = conditions.find(isChosungStartsWithCondition);
+  const containsCondition = conditions.find(isNormalizedContainsCondition);
+  const candidateIdGroups: AliasIdRecord[][] = [];
+
+  const highPriorityConditions = [exactCondition, prefixCondition].filter(
+    isDefined
   );
+  let exactCandidates: AliasIdRecord[] = [];
+
+  if (highPriorityConditions.length > 0) {
+    const highPriorityCandidateGroups = await Promise.all(
+      highPriorityConditions.map(async (condition) => {
+        const candidates = await findAliasCandidateIds(
+          db,
+          condition,
+          limit,
+          timing
+        );
+
+        if (isNormalizedEqualsCondition(condition)) {
+          exactCandidates = candidates;
+        }
+
+        return candidates;
+      })
+    );
+
+    candidateIdGroups.push(...highPriorityCandidateGroups);
+  }
+
+  const highPriorityAliasIds = uniqueAliasIds(candidateIdGroups.flat());
+  const hasExactCandidates = exactCandidates.length > 0;
+  const hasEnoughHigherRankedCandidates =
+    highPriorityAliasIds.length >= limit || hasExactCandidates;
+
+  if (!hasEnoughHigherRankedCandidates && chosungCondition !== undefined) {
+    const chosungCandidates = await findAliasCandidateIds(
+      db,
+      chosungCondition,
+      limit,
+      timing
+    );
+    candidateIdGroups.push(chosungCandidates);
+  }
+
+  const stagedAliasIds = uniqueAliasIds(candidateIdGroups.flat());
+
+  if (
+    containsCondition !== undefined &&
+    !hasExactCandidates &&
+    stagedAliasIds.length < limit
+  ) {
+    candidateIdGroups.push(
+      await findAliasCandidateIds(db, containsCondition, limit, timing)
+    );
+  }
+
   const aliasIds = uniqueAliasIds(candidateIdGroups.flat());
 
   if (aliasIds.length === 0) {
@@ -467,6 +511,25 @@ async function findTieredAliasCandidates(
       orderBy: aliasCandidateOrderBy()
     })
   )) as AliasRecord[];
+}
+
+function findAliasCandidateIds(
+  db: SearchDbClient,
+  condition: SearchAliasCondition,
+  limit: number,
+  timing: SearchTimingRecorder | undefined
+): Promise<AliasIdRecord[]> {
+  return measureAsync(
+    timing,
+    `search.candidate.${conditionTimingName(condition)}`,
+    () =>
+      db.songAlias.findMany({
+        where: condition,
+        select: { id: true },
+        orderBy: aliasCandidateOrderBy(),
+        take: candidateTakeForCondition(condition, limit)
+      }) as Promise<AliasIdRecord[]>
+  );
 }
 
 function candidateTakeForCondition(
@@ -510,6 +573,49 @@ function uniqueAliasIds(aliases: AliasIdRecord[]): string[] {
   return Array.from(aliasIds.values());
 }
 
+function isDefined<T>(value: T | undefined): value is T {
+  return value !== undefined;
+}
+
+function isChosungStartsWithCondition(
+  condition: SearchAliasCondition
+): condition is Extract<SearchAliasCondition, { chosungAlias: unknown }> {
+  return "chosungAlias" in condition;
+}
+
+function isNormalizedEqualsCondition(
+  condition: SearchAliasCondition
+): condition is Extract<
+  SearchAliasCondition,
+  { normalizedAlias: { equals: string } }
+> {
+  return (
+    "normalizedAlias" in condition && "equals" in condition.normalizedAlias
+  );
+}
+
+function isNormalizedStartsWithCondition(
+  condition: SearchAliasCondition
+): condition is Extract<
+  SearchAliasCondition,
+  { normalizedAlias: { startsWith: string } }
+> {
+  return (
+    "normalizedAlias" in condition && "startsWith" in condition.normalizedAlias
+  );
+}
+
+function isNormalizedContainsCondition(
+  condition: SearchAliasCondition
+): condition is Extract<
+  SearchAliasCondition,
+  { normalizedAlias: { contains: string } }
+> {
+  return (
+    "normalizedAlias" in condition && "contains" in condition.normalizedAlias
+  );
+}
+
 async function findSearchSuggestions(
   db: SearchDbClient,
   query: SearchQuery,
@@ -534,19 +640,29 @@ async function findSearchSuggestions(
 }
 
 function conditionTimingName(condition: SearchAliasCondition): string {
-  if ("chosungAlias" in condition) {
+  if (isChosungStartsWithCondition(condition)) {
     return "chosung_starts_with";
   }
 
-  if ("equals" in condition.normalizedAlias) {
+  if (isNormalizedEqualsCondition(condition)) {
     return "normalized_equals";
   }
 
-  if ("startsWith" in condition.normalizedAlias) {
+  if (isNormalizedStartsWithCondition(condition)) {
     return "normalized_starts_with";
   }
 
-  return "normalized_contains";
+  if (isNormalizedContainsCondition(condition)) {
+    return "normalized_contains";
+  }
+
+  return unsupportedSearchAliasCondition(condition);
+}
+
+function unsupportedSearchAliasCondition(condition: never): never {
+  throw new Error(
+    `Unsupported search alias condition: ${JSON.stringify(condition)}`
+  );
 }
 
 function buildSuggestionConditions(query: SearchQuery): SearchAliasCondition[] {

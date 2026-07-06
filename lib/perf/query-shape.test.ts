@@ -51,10 +51,8 @@ describe("runPerfQueryShape", () => {
         client_method_count: expect.objectContaining({
           by_query_shape: expect.objectContaining({
             "karaoke_providers.active_for_search": 1,
-            "song_aliases.candidate.chosung_alias.starts_with": 1,
             "song_aliases.candidate.normalized_alias.equals": 1,
             "song_aliases.candidate.normalized_alias.starts_with": 1,
-            "song_aliases.candidate.normalized_alias.contains": 1,
             "song_aliases.id_in.detail_with_relations": 1
           })
         }),
@@ -62,7 +60,7 @@ describe("runPerfQueryShape", () => {
           available: true,
           total: expect.any(Number)
         }),
-        candidate_alias_id_group_count: 4,
+        candidate_alias_id_group_count: 2,
         unique_alias_id_count: 1,
         relation_load_observation: expect.objectContaining({
           classification: "batched_relation_load_not_n_plus_1",
