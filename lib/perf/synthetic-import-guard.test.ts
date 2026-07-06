@@ -91,7 +91,9 @@ describe("assertSyntheticImportAllowed", () => {
     for (const databaseUrl of [
       "postgresql://user:pass@ep-small-neon-123.us-east-1.aws.neon.tech/app",
       "postgresql://prod_user:pass@db.example.com/karaoke",
-      "postgresql://user:pass@db.example.com/live"
+      "postgresql://user:pass@db.example.com/live",
+      "postgresql://prod_user:pass@localhost:5432/karaoke",
+      "postgresql://user:pass@127.0.0.1:5432/prod"
     ]) {
       expect(() =>
         assertSyntheticImportAllowed({
@@ -116,6 +118,11 @@ describe("looksProductionLikeDatabaseUrl", () => {
         "postgresql://user:pass@127.0.0.1:5432/karaoke"
       )
     ).toBe(false);
+    expect(
+      looksProductionLikeDatabaseUrl(
+        "postgresql://user:pass@localhost:5432/prod"
+      )
+    ).toBe(true);
     expect(
       looksProductionLikeDatabaseUrl(
         "postgresql://user:pass@ep-test.neon.tech/karaoke"

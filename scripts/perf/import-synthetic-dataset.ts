@@ -27,11 +27,13 @@ type SeedPrismaClient = Pick<
 >;
 
 const args = parseCliArgs(process.argv.slice(2));
-const guard = assertGuard(args);
-const adapter = new PrismaPg(createPgPoolConfig());
-const prisma = new PrismaClient({ adapter });
+let prisma: PrismaClient | null = null;
 
 try {
+  const guard = assertGuard(args);
+  const adapter = new PrismaPg(createPgPoolConfig());
+  prisma = new PrismaClient({ adapter });
+
   console.log(guard.message);
   console.log(
     `Synthetic import target: db_label=${guard.targetLabel} mode=${args.dryRun ? "dry-run" : "import"} seed_dir=${args.seedDir}`
@@ -65,7 +67,7 @@ try {
   console.error(`error: ${errorMessage(error)}`);
   process.exitCode = 1;
 } finally {
-  await prisma.$disconnect();
+  await prisma?.$disconnect();
 }
 
 function parseArgs(args: string[]): ParsedArgs {

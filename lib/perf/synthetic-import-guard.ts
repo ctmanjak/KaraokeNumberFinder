@@ -138,14 +138,19 @@ export function looksProductionLikeDatabaseUrl(
   ]
     .join(" ")
     .toLowerCase();
+  const hasProductionLikeToken = haystack
+    .split(/[^a-z0-9]+|_/u)
+    .some((token) => ["neon", "prod", "production", "live"].includes(token));
+
+  if (hasProductionLikeToken) {
+    return true;
+  }
 
   if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
     return false;
   }
 
-  return haystack
-    .split(/[^a-z0-9]+|_/u)
-    .some((token) => ["neon", "prod", "production", "live"].includes(token));
+  return false;
 }
 
 function normalizeDbLabel(label: string | undefined): string | null {
