@@ -7,6 +7,9 @@ standard before running or interpreting synthetic-scale search perf results.
 See `scripts/perf/synthetic-dataset-contract.md` for the `[M2-Perf-09]`
 synthetic dataset generation/import, fixture, and validation contract that must
 be implemented before synthetic-scale measurements are trusted.
+See `scripts/perf/search-index-strategy-spike.md` for the `[M2-Perf-14]`
+local-only PostgreSQL index strategy spike on the
+`synthetic-10k-songs-100k-aliases` dataset.
 
 Current-seed runs and synthetic-scale runs must be interpreted separately:
 

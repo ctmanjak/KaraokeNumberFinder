@@ -1,0 +1,1046 @@
+{
+  "schema_version": 1,
+  "run": {
+    "started_at": "2026-07-07T15:55:53.351Z",
+    "commit": "17f8386455892be6d48a9430c48535d1cdf12d46",
+    "branch": "codex/m2-perf-14-index-strategy-spike",
+    "db_label": "local",
+    "dataset_label": "synthetic-10k-songs-100k-aliases",
+    "fixture_path": "perf-results/search-measurement-fixture-synthetic-10k-songs-100k-aliases.csv",
+    "iterations": 10,
+    "warmup": 3,
+    "node_version": "v20.19.0"
+  },
+  "dataset": {
+    "label": "synthetic-10k-songs-100k-aliases",
+    "current_seed_counts": {
+      "songs": 10000,
+      "song_aliases": 100000,
+      "karaoke_entries": 22520,
+      "karaoke_providers": 12
+    },
+    "scale_scenario": "current_seed"
+  },
+  "notes": [
+    "Harness is read-only and only calls find/count APIs.",
+    "Query count is counted at the Prisma client wrapper call level, not by enabling Prisma SQL query logging.",
+    "Nested relation loads may map to more than one SQL statement depending on Prisma internals; use later EXPLAIN/query-shape tickets for SQL-level detail.",
+    "API scenarios execute route handlers with Request/Response objects in-process; they include route parsing and JSON serialization but not Next.js dev server or network overhead.",
+    "dataset.scale_scenario distinguishes current seed measurements from future synthetic scale runs."
+  ],
+  "scenarios": [
+    {
+      "id": "service.search.normalized-exact-01",
+      "target": "service",
+      "endpoint": "searchSongs",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "Normalized exact",
+      "query": "Neon exact anthem",
+      "expected_song_id": "synthetic_10k_song_000001",
+      "params": {
+        "q": "Neon exact anthem"
+      },
+      "status": "ok",
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 37.53,
+        "max": 48.26,
+        "avg": 42.01,
+        "p50": 40.23,
+        "p95": 48.26
+      },
+      "total_request_time_ms": 420.08,
+      "query_count": {
+        "min": 4,
+        "max": 4,
+        "avg": 4,
+        "p50": 4,
+        "p95": 4
+      },
+      "response_size_bytes": {
+        "min": 1044,
+        "max": 1044,
+        "avg": 1044,
+        "p50": 1044,
+        "p95": 1044
+      }
+    },
+    {
+      "id": "api.search.normalized-exact-01",
+      "target": "api",
+      "endpoint": "GET /api/search",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "Normalized exact",
+      "query": "Neon exact anthem",
+      "expected_song_id": "synthetic_10k_song_000001",
+      "params": {
+        "q": "Neon exact anthem"
+      },
+      "status": 200,
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 37.94,
+        "max": 50.31,
+        "avg": 42.66,
+        "p50": 41.23,
+        "p95": 50.31
+      },
+      "total_request_time_ms": 426.56,
+      "query_count": {
+        "min": 4,
+        "max": 4,
+        "avg": 4,
+        "p50": 4,
+        "p95": 4
+      },
+      "response_size_bytes": {
+        "min": 1044,
+        "max": 1044,
+        "avg": 1044,
+        "p50": 1044,
+        "p95": 1044
+      }
+    },
+    {
+      "id": "service.search.normalized-prefix-02",
+      "target": "service",
+      "endpoint": "searchSongs",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "Normalized prefix",
+      "query": "star pressure prefix 000002",
+      "expected_song_id": "synthetic_10k_song_000002",
+      "params": {
+        "q": "star pressure prefix 000002"
+      },
+      "status": "ok",
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 84.23,
+        "max": 96.65,
+        "avg": 90.46,
+        "p50": 90,
+        "p95": 96.65
+      },
+      "total_request_time_ms": 904.63,
+      "query_count": {
+        "min": 5,
+        "max": 5,
+        "avg": 5,
+        "p50": 5,
+        "p95": 5
+      },
+      "response_size_bytes": {
+        "min": 1080,
+        "max": 1080,
+        "avg": 1080,
+        "p50": 1080,
+        "p95": 1080
+      }
+    },
+    {
+      "id": "api.search.normalized-prefix-02",
+      "target": "api",
+      "endpoint": "GET /api/search",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "Normalized prefix",
+      "query": "star pressure prefix 000002",
+      "expected_song_id": "synthetic_10k_song_000002",
+      "params": {
+        "q": "star pressure prefix 000002"
+      },
+      "status": 200,
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 84.82,
+        "max": 94.15,
+        "avg": 88.71,
+        "p50": 87.31,
+        "p95": 94.15
+      },
+      "total_request_time_ms": 887.07,
+      "query_count": {
+        "min": 5,
+        "max": 5,
+        "avg": 5,
+        "p50": 5,
+        "p95": 5
+      },
+      "response_size_bytes": {
+        "min": 1080,
+        "max": 1080,
+        "avg": 1080,
+        "p50": 1080,
+        "p95": 1080
+      }
+    },
+    {
+      "id": "service.search.normalized-contains-03",
+      "target": "service",
+      "endpoint": "searchSongs",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "Normalized contains",
+      "query": "middlecore000003",
+      "expected_song_id": "synthetic_10k_song_000003",
+      "params": {
+        "q": "middlecore000003"
+      },
+      "status": "ok",
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 75.83,
+        "max": 87.04,
+        "avg": 80.12,
+        "p50": 78.09,
+        "p95": 87.04
+      },
+      "total_request_time_ms": 801.22,
+      "query_count": {
+        "min": 5,
+        "max": 5,
+        "avg": 5,
+        "p50": 5,
+        "p95": 5
+      },
+      "response_size_bytes": {
+        "min": 1062,
+        "max": 1062,
+        "avg": 1062,
+        "p50": 1062,
+        "p95": 1062
+      }
+    },
+    {
+      "id": "api.search.normalized-contains-03",
+      "target": "api",
+      "endpoint": "GET /api/search",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "Normalized contains",
+      "query": "middlecore000003",
+      "expected_song_id": "synthetic_10k_song_000003",
+      "params": {
+        "q": "middlecore000003"
+      },
+      "status": 200,
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 75.38,
+        "max": 85.39,
+        "avg": 78.66,
+        "p50": 76.41,
+        "p95": 85.39
+      },
+      "total_request_time_ms": 786.65,
+      "query_count": {
+        "min": 5,
+        "max": 5,
+        "avg": 5,
+        "p50": 5,
+        "p95": 5
+      },
+      "response_size_bytes": {
+        "min": 1062,
+        "max": 1062,
+        "avg": 1062,
+        "p50": 1062,
+        "p95": 1062
+      }
+    },
+    {
+      "id": "service.search.hangul-chosung-prefix-04",
+      "target": "service",
+      "endpoint": "searchSongs",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "Hangul chosung prefix",
+      "query": "ㅅㅌ",
+      "expected_song_id": "synthetic_10k_song_000004",
+      "params": {
+        "q": "ㅅㅌ"
+      },
+      "status": "ok",
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 77.52,
+        "max": 85.12,
+        "avg": 80.52,
+        "p50": 80.7,
+        "p95": 85.12
+      },
+      "total_request_time_ms": 805.15,
+      "query_count": {
+        "min": 6,
+        "max": 6,
+        "avg": 6,
+        "p50": 6,
+        "p95": 6
+      },
+      "response_size_bytes": {
+        "min": 1015,
+        "max": 1015,
+        "avg": 1015,
+        "p50": 1015,
+        "p95": 1015
+      }
+    },
+    {
+      "id": "api.search.hangul-chosung-prefix-04",
+      "target": "api",
+      "endpoint": "GET /api/search",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "Hangul chosung prefix",
+      "query": "ㅅㅌ",
+      "expected_song_id": "synthetic_10k_song_000004",
+      "params": {
+        "q": "ㅅㅌ"
+      },
+      "status": 200,
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 77.12,
+        "max": 87.27,
+        "avg": 81.38,
+        "p50": 79.92,
+        "p95": 87.27
+      },
+      "total_request_time_ms": 813.81,
+      "query_count": {
+        "min": 6,
+        "max": 6,
+        "avg": 6,
+        "p50": 6,
+        "p95": 6
+      },
+      "response_size_bytes": {
+        "min": 1015,
+        "max": 1015,
+        "avg": 1015,
+        "p50": 1015,
+        "p95": 1015
+      }
+    },
+    {
+      "id": "service.search.no-result-suggestions-05",
+      "target": "service",
+      "endpoint": "searchSongs",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "No-result suggestions",
+      "query": "near misss melody",
+      "expected_song_id": "synthetic_10k_song_000005",
+      "params": {
+        "q": "near misss melody"
+      },
+      "status": "ok",
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 101.19,
+        "max": 109.61,
+        "avg": 105.58,
+        "p50": 104.82,
+        "p95": 109.61
+      },
+      "total_request_time_ms": 1055.82,
+      "query_count": {
+        "min": 5,
+        "max": 5,
+        "avg": 5,
+        "p50": 5,
+        "p95": 5
+      },
+      "response_size_bytes": {
+        "min": 131,
+        "max": 131,
+        "avg": 131,
+        "p50": 131,
+        "p95": 131
+      }
+    },
+    {
+      "id": "api.search.no-result-suggestions-05",
+      "target": "api",
+      "endpoint": "GET /api/search",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "No-result suggestions",
+      "query": "near misss melody",
+      "expected_song_id": "synthetic_10k_song_000005",
+      "params": {
+        "q": "near misss melody"
+      },
+      "status": 200,
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 101.33,
+        "max": 107.13,
+        "avg": 103.84,
+        "p50": 103.31,
+        "p95": 107.13
+      },
+      "total_request_time_ms": 1038.4,
+      "query_count": {
+        "min": 5,
+        "max": 5,
+        "avg": 5,
+        "p50": 5,
+        "p95": 5
+      },
+      "response_size_bytes": {
+        "min": 131,
+        "max": 131,
+        "avg": 131,
+        "p50": 131,
+        "p95": 131
+      }
+    },
+    {
+      "id": "service.search.valid-provider-filter-06",
+      "target": "service",
+      "endpoint": "searchSongs",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "Valid provider filter",
+      "query": "provider filter anthem",
+      "expected_song_id": "synthetic_10k_song_000006",
+      "params": {
+        "q": "provider filter anthem"
+      },
+      "status": "ok",
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 40.64,
+        "max": 44.34,
+        "avg": 41.93,
+        "p50": 41.7,
+        "p95": 44.34
+      },
+      "total_request_time_ms": 419.34,
+      "query_count": {
+        "min": 4,
+        "max": 4,
+        "avg": 4,
+        "p50": 4,
+        "p95": 4
+      },
+      "response_size_bytes": {
+        "min": 1059,
+        "max": 1059,
+        "avg": 1059,
+        "p50": 1059,
+        "p95": 1059
+      }
+    },
+    {
+      "id": "api.search.valid-provider-filter-06",
+      "target": "api",
+      "endpoint": "GET /api/search",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "Valid provider filter",
+      "query": "provider filter anthem",
+      "expected_song_id": "synthetic_10k_song_000006",
+      "params": {
+        "q": "provider filter anthem"
+      },
+      "status": 200,
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 40.45,
+        "max": 50.42,
+        "avg": 43.62,
+        "p50": 41.87,
+        "p95": 50.42
+      },
+      "total_request_time_ms": 436.16,
+      "query_count": {
+        "min": 4,
+        "max": 4,
+        "avg": 4,
+        "p50": 4,
+        "p95": 4
+      },
+      "response_size_bytes": {
+        "min": 1059,
+        "max": 1059,
+        "avg": 1059,
+        "p50": 1059,
+        "p95": 1059
+      }
+    },
+    {
+      "id": "service.search.invalid-provider-filter-07",
+      "target": "service",
+      "endpoint": "searchSongs",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "Invalid provider filter",
+      "query": "provider filter anthem",
+      "expected_song_id": "synthetic_10k_song_000006",
+      "params": {
+        "q": "provider filter anthem"
+      },
+      "status": "ok",
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 40.47,
+        "max": 51.05,
+        "avg": 44.94,
+        "p50": 43.01,
+        "p95": 51.05
+      },
+      "total_request_time_ms": 449.36,
+      "query_count": {
+        "min": 4,
+        "max": 4,
+        "avg": 4,
+        "p50": 4,
+        "p95": 4
+      },
+      "response_size_bytes": {
+        "min": 1059,
+        "max": 1059,
+        "avg": 1059,
+        "p50": 1059,
+        "p95": 1059
+      }
+    },
+    {
+      "id": "api.search.invalid-provider-filter-07",
+      "target": "api",
+      "endpoint": "GET /api/search",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "Invalid provider filter",
+      "query": "provider filter anthem",
+      "expected_song_id": "synthetic_10k_song_000006",
+      "params": {
+        "q": "provider filter anthem"
+      },
+      "status": 200,
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 40.77,
+        "max": 52.02,
+        "avg": 45.49,
+        "p50": 45.55,
+        "p95": 52.02
+      },
+      "total_request_time_ms": 454.93,
+      "query_count": {
+        "min": 4,
+        "max": 4,
+        "avg": 4,
+        "p50": 4,
+        "p95": 4
+      },
+      "response_size_bytes": {
+        "min": 1059,
+        "max": 1059,
+        "avg": 1059,
+        "p50": 1059,
+        "p95": 1059
+      }
+    },
+    {
+      "id": "service.search.high-candidate-partial-query-08",
+      "target": "service",
+      "endpoint": "searchSongs",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "High candidate partial query",
+      "query": "star",
+      "expected_song_id": "synthetic_10k_song_000007",
+      "params": {
+        "q": "star"
+      },
+      "status": "ok",
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 35.75,
+        "max": 42.05,
+        "avg": 38.58,
+        "p50": 38.29,
+        "p95": 42.05
+      },
+      "total_request_time_ms": 385.82,
+      "query_count": {
+        "min": 4,
+        "max": 4,
+        "avg": 4,
+        "p50": 4,
+        "p95": 4
+      },
+      "response_size_bytes": {
+        "min": 29328,
+        "max": 29328,
+        "avg": 29328,
+        "p50": 29328,
+        "p95": 29328
+      }
+    },
+    {
+      "id": "api.search.high-candidate-partial-query-08",
+      "target": "api",
+      "endpoint": "GET /api/search",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "High candidate partial query",
+      "query": "star",
+      "expected_song_id": "synthetic_10k_song_000007",
+      "params": {
+        "q": "star"
+      },
+      "status": 200,
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 34.22,
+        "max": 41.75,
+        "avg": 38.95,
+        "p50": 39.41,
+        "p95": 41.75
+      },
+      "total_request_time_ms": 389.45,
+      "query_count": {
+        "min": 4,
+        "max": 4,
+        "avg": 4,
+        "p50": 4,
+        "p95": 4
+      },
+      "response_size_bytes": {
+        "min": 29328,
+        "max": 29328,
+        "avg": 29328,
+        "p50": 29328,
+        "p95": 29328
+      }
+    },
+    {
+      "id": "service.search.high-entry-count-payload-09",
+      "target": "service",
+      "endpoint": "searchSongs",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "High entry-count payload",
+      "query": "payload fanout anthem",
+      "expected_song_id": "synthetic_10k_song_000008",
+      "params": {
+        "q": "payload fanout anthem"
+      },
+      "status": "ok",
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 39.95,
+        "max": 46.3,
+        "avg": 41.61,
+        "p50": 41,
+        "p95": 46.3
+      },
+      "total_request_time_ms": 416.08,
+      "query_count": {
+        "min": 4,
+        "max": 4,
+        "avg": 4,
+        "p50": 4,
+        "p95": 4
+      },
+      "response_size_bytes": {
+        "min": 5533,
+        "max": 5533,
+        "avg": 5533,
+        "p50": 5533,
+        "p95": 5533
+      }
+    },
+    {
+      "id": "api.search.high-entry-count-payload-09",
+      "target": "api",
+      "endpoint": "GET /api/search",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "High entry-count payload",
+      "query": "payload fanout anthem",
+      "expected_song_id": "synthetic_10k_song_000008",
+      "params": {
+        "q": "payload fanout anthem"
+      },
+      "status": 200,
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 40.83,
+        "max": 50.53,
+        "avg": 46.13,
+        "p50": 48.18,
+        "p95": 50.53
+      },
+      "total_request_time_ms": 461.27,
+      "query_count": {
+        "min": 4,
+        "max": 4,
+        "avg": 4,
+        "p50": 4,
+        "p95": 4
+      },
+      "response_size_bytes": {
+        "min": 5533,
+        "max": 5533,
+        "avg": 5533,
+        "p50": 5533,
+        "p95": 5533
+      }
+    },
+    {
+      "id": "service.search.provider-filter",
+      "target": "service",
+      "endpoint": "searchSongs",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "Normalized exact",
+      "query": "Neon exact anthem",
+      "expected_song_id": "synthetic_10k_song_000001",
+      "params": {
+        "q": "Neon exact anthem",
+        "provider_id": "synthetic_10k_provider_01"
+      },
+      "status": "ok",
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 36.77,
+        "max": 42,
+        "avg": 37.92,
+        "p50": 37.24,
+        "p95": 42
+      },
+      "total_request_time_ms": 379.2,
+      "query_count": {
+        "min": 4,
+        "max": 4,
+        "avg": 4,
+        "p50": 4,
+        "p95": 4
+      },
+      "response_size_bytes": {
+        "min": 1044,
+        "max": 1044,
+        "avg": 1044,
+        "p50": 1044,
+        "p95": 1044
+      }
+    },
+    {
+      "id": "api.search.provider-filter",
+      "target": "api",
+      "endpoint": "GET /api/search",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "Normalized exact",
+      "query": "Neon exact anthem",
+      "expected_song_id": "synthetic_10k_song_000001",
+      "params": {
+        "q": "Neon exact anthem",
+        "provider_id": "synthetic_10k_provider_01"
+      },
+      "status": 200,
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 37.92,
+        "max": 41.17,
+        "avg": 39.01,
+        "p50": 39.02,
+        "p95": 41.17
+      },
+      "total_request_time_ms": 390.05,
+      "query_count": {
+        "min": 4,
+        "max": 4,
+        "avg": 4,
+        "p50": 4,
+        "p95": 4
+      },
+      "response_size_bytes": {
+        "min": 1044,
+        "max": 1044,
+        "avg": 1044,
+        "p50": 1044,
+        "p95": 1044
+      }
+    },
+    {
+      "id": "api.search.invalid-provider",
+      "target": "api",
+      "endpoint": "GET /api/search",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "Normalized exact",
+      "query": "Neon exact anthem",
+      "expected_song_id": "synthetic_10k_song_000001",
+      "params": {
+        "q": "Neon exact anthem",
+        "provider_id": "__perf_missing_provider__"
+      },
+      "status": 400,
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 0.53,
+        "max": 1.21,
+        "avg": 0.67,
+        "p50": 0.58,
+        "p95": 1.21
+      },
+      "total_request_time_ms": 6.74,
+      "query_count": {
+        "min": 1,
+        "max": 1,
+        "avg": 1,
+        "p50": 1,
+        "p95": 1
+      },
+      "response_size_bytes": {
+        "min": 96,
+        "max": 96,
+        "avg": 96,
+        "p50": 96,
+        "p95": 96
+      }
+    },
+    {
+      "id": "service.providers.active",
+      "target": "service",
+      "endpoint": "listProviders",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "active providers",
+      "params": {},
+      "status": "ok",
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 0.45,
+        "max": 1.39,
+        "avg": 0.61,
+        "p50": 0.55,
+        "p95": 1.39
+      },
+      "total_request_time_ms": 6.14,
+      "query_count": {
+        "min": 1,
+        "max": 1,
+        "avg": 1,
+        "p50": 1,
+        "p95": 1
+      },
+      "response_size_bytes": {
+        "min": 2003,
+        "max": 2003,
+        "avg": 2003,
+        "p50": 2003,
+        "p95": 2003
+      }
+    },
+    {
+      "id": "api.providers.active",
+      "target": "api",
+      "endpoint": "GET /api/providers",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "active providers",
+      "params": {},
+      "status": 200,
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 0.56,
+        "max": 0.68,
+        "avg": 0.61,
+        "p50": 0.6,
+        "p95": 0.68
+      },
+      "total_request_time_ms": 6.13,
+      "query_count": {
+        "min": 1,
+        "max": 1,
+        "avg": 1,
+        "p50": 1,
+        "p95": 1
+      },
+      "response_size_bytes": {
+        "min": 2003,
+        "max": 2003,
+        "avg": 2003,
+        "p50": 2003,
+        "p95": 2003
+      }
+    },
+    {
+      "id": "service.providers.all",
+      "target": "service",
+      "endpoint": "listProviders",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "all providers",
+      "params": {
+        "active_only": "false"
+      },
+      "status": "ok",
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 0.45,
+        "max": 0.55,
+        "avg": 0.49,
+        "p50": 0.49,
+        "p95": 0.55
+      },
+      "total_request_time_ms": 4.9,
+      "query_count": {
+        "min": 1,
+        "max": 1,
+        "avg": 1,
+        "p50": 1,
+        "p95": 1
+      },
+      "response_size_bytes": {
+        "min": 2186,
+        "max": 2186,
+        "avg": 2186,
+        "p50": 2186,
+        "p95": 2186
+      }
+    },
+    {
+      "id": "api.providers.all",
+      "target": "api",
+      "endpoint": "GET /api/providers",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "all providers",
+      "params": {
+        "active_only": "false"
+      },
+      "status": 200,
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 0.49,
+        "max": 0.63,
+        "avg": 0.55,
+        "p50": 0.55,
+        "p95": 0.63
+      },
+      "total_request_time_ms": 5.52,
+      "query_count": {
+        "min": 1,
+        "max": 1,
+        "avg": 1,
+        "p50": 1,
+        "p95": 1
+      },
+      "response_size_bytes": {
+        "min": 2186,
+        "max": 2186,
+        "avg": 2186,
+        "p50": 2186,
+        "p95": 2186
+      }
+    },
+    {
+      "id": "service.providers.country",
+      "target": "service",
+      "endpoint": "listProviders",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "country KR",
+      "params": {
+        "country": "KR"
+      },
+      "status": "ok",
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 0.44,
+        "max": 1.05,
+        "avg": 0.64,
+        "p50": 0.57,
+        "p95": 1.05
+      },
+      "total_request_time_ms": 6.42,
+      "query_count": {
+        "min": 1,
+        "max": 1,
+        "avg": 1,
+        "p50": 1,
+        "p95": 1
+      },
+      "response_size_bytes": {
+        "min": 735,
+        "max": 735,
+        "avg": 735,
+        "p50": 735,
+        "p95": 735
+      }
+    },
+    {
+      "id": "api.providers.country",
+      "target": "api",
+      "endpoint": "GET /api/providers",
+      "dataset_label": "synthetic-10k-songs-100k-aliases",
+      "db_label": "local",
+      "label": "country KR",
+      "params": {
+        "country": "KR"
+      },
+      "status": 200,
+      "iterations": 10,
+      "warmup": 3,
+      "latency_ms": {
+        "min": 0.54,
+        "max": 1.21,
+        "avg": 0.65,
+        "p50": 0.58,
+        "p95": 1.21
+      },
+      "total_request_time_ms": 6.5,
+      "query_count": {
+        "min": 1,
+        "max": 1,
+        "avg": 1,
+        "p50": 1,
+        "p95": 1
+      },
+      "response_size_bytes": {
+        "min": 735,
+        "max": 735,
+        "avg": 735,
+        "p50": 735,
+        "p95": 735
+      }
+    }
+  ]
+}
