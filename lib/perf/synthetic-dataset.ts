@@ -13,6 +13,10 @@ export type SyntheticDatasetConfig = {
   idPrefix: string;
   songCount: number;
   providerCount: number;
+  rowCountRanges: {
+    karaokeEntries: { min: number; max: number };
+    karaokeProviders: { min: number; max: number };
+  };
   // Contract seed recorded in metadata and embedded in generated karaoke numbers.
   // Generation is otherwise formula-driven and does not use a PRNG.
   randomSeed: number;
@@ -100,6 +104,10 @@ const SYNTHETIC_DATASET_CONFIGS = {
     idPrefix: "synthetic_1k",
     songCount: 1_000,
     providerCount: 6,
+    rowCountRanges: {
+      karaokeEntries: { min: 2_000, max: 5_000 },
+      karaokeProviders: { min: 4, max: 10 }
+    },
     randomSeed: 1009,
     generatorVersion: SYNTHETIC_GENERATOR_VERSION,
     deterministicGeneratedAt: "2026-07-06T00:00:00.000Z"
@@ -109,6 +117,10 @@ const SYNTHETIC_DATASET_CONFIGS = {
     idPrefix: "synthetic_10k",
     songCount: 10_000,
     providerCount: 12,
+    rowCountRanges: {
+      karaokeEntries: { min: 20_000, max: 50_000 },
+      karaokeProviders: { min: 4, max: 20 }
+    },
     randomSeed: 10009,
     generatorVersion: SYNTHETIC_GENERATOR_VERSION,
     deterministicGeneratedAt: "2026-07-06T00:00:00.000Z"

@@ -74,6 +74,31 @@ like Neon/live/prod-like infrastructure is rejected even when a local label is
 provided. The same guard also runs when `seed:import -- --seed-dir <generated>`
 points at a synthetic dataset directory.
 
+Validate generated synthetic datasets before any synthetic-scale search work:
+
+```sh
+npm run perf:dataset-validate -- \
+  --dataset-label synthetic-1k-songs-10k-aliases \
+  --seed-dir tmp/synthetic-datasets/synthetic-1k-songs-10k-aliases \
+  --files-only
+
+npm run perf:dataset-validate -- \
+  --dataset-label synthetic-1k-songs-10k-aliases \
+  --seed-dir tmp/synthetic-datasets/synthetic-1k-songs-10k-aliases \
+  --db-label local
+```
+
+`--files-only` and its alias `--no-db` validate only the generated directory and
+do not require `DATABASE_URL`. DB mode is read-only and only runs `count()`
+queries scoped by `verificationNote == dataset_label` for songs, aliases,
+entries, and providers. DB validation requires `--db-label local` or
+`--db-label sandbox`; labels such as `neon`, `production`, `prod`, and `live`
+are rejected, and prod-like `DATABASE_URL` values are rejected before a Prisma
+client is created.
+
+The JSON report includes dataset label, metadata status, file row counts,
+fixture coverage, DB row counts when enabled, and explicit errors/warnings.
+
 `perf:baseline` runs the `[M2-Perf-01]` read-only baseline harness against the
 database selected by the current environment. It does not import seed data,
 write application rows, create migrations, or change `.env`.

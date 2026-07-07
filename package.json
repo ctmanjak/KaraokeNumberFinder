@@ -21,6 +21,7 @@
     "perf:baseline": "vite-node scripts/perf/baseline.ts",
     "perf:dataset-generate": "vite-node scripts/perf/generate-synthetic-dataset.ts",
     "perf:dataset-import": "vite-node scripts/perf/import-synthetic-dataset.ts",
+    "perf:dataset-validate": "vite-node scripts/perf/validate-synthetic-dataset.ts",
     "perf:explain": "vite-node scripts/perf/explain.ts",
     "perf:query-shape": "vite-node scripts/perf/query-shape.ts",
     "db:validate": "prisma validate",
