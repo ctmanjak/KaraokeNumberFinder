@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import { recordsFromCsvRows, readCsvRows, type CsvRecord } from "../seed/csv";
+import { readCsvRows, type CsvRecord } from "../seed/csv";
 import { SEED_FILE_HEADERS, type SeedFileName } from "../seed/validate";
 import {
   assertSyntheticValidationDbAllowed,
@@ -115,6 +115,9 @@ export async function validateSyntheticDataset(
 ): Promise<SyntheticDatasetValidationReport> {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const metadataErrors: string[] = [];
+  const seedFileErrors: string[] = [];
+  const fixtureErrors: string[] = [];
   const metadataPath = path.join(options.seedDir, SYNTHETIC_METADATA_FILE);
   const fixturePath = path.join(options.seedDir, SYNTHETIC_SEARCH_FIXTURE_FILE);
   const report: SyntheticDatasetValidationReport = {
@@ -146,17 +149,24 @@ export async function validateSyntheticDataset(
 
   for (const file of REQUIRED_FILES) {
     if (!existsSync(path.join(options.seedDir, file))) {
-      errors.push(`${file} is required`);
+      const message = `${file} is required`;
+      if (file === SYNTHETIC_METADATA_FILE) {
+        metadataErrors.push(message);
+      } else if (file === SYNTHETIC_SEARCH_FIXTURE_FILE) {
+        fixtureErrors.push(message);
+      } else {
+        seedFileErrors.push(message);
+      }
     }
   }
 
-  const metadata = readMetadata(metadataPath, errors);
+  const metadata = readMetadata(metadataPath, metadataErrors);
   if (metadata !== null) {
-    validateMetadata(metadata, config.label, errors);
+    validateMetadata(metadata, config.label, metadataErrors);
   }
 
-  const seedRows = readSeedFiles(options.seedDir, errors);
-  const fixtureRows = readFixtureRows(fixturePath, errors);
+  const seedRows = readSeedFiles(options.seedDir, seedFileErrors);
+  const fixtureRows = readFixtureRows(fixturePath, fixtureErrors);
 
   report.file_row_counts = {
     songs: seedRows["songs.csv"].length,
@@ -166,15 +176,22 @@ export async function validateSyntheticDataset(
     search_fixture_cases: fixtureRows.length
   };
 
-  validateFileRowCounts(report.file_row_counts, config.label, errors);
+  validateFileRowCounts(report.file_row_counts, config.label, seedFileErrors);
+  validateFixtureRowCount(report.file_row_counts, fixtureErrors);
 
   if (metadata !== null) {
-    validateMetadataRowCounts(metadata, report.file_row_counts, errors);
+    validateMetadataRowCounts(metadata, report.file_row_counts, metadataErrors);
   }
 
-  const fixtureCaseIds = validateFixtureRows(fixtureRows, config.label, errors);
+  const fixtureCaseIds = validateFixtureRows(
+    fixtureRows,
+    config.label,
+    fixtureErrors
+  );
   report.fixture_coverage.present_case_ids = [...fixtureCaseIds].sort();
-  report.fixture_coverage.status = hasFixtureErrors(errors) ? "fail" : "pass";
+  report.metadata.status = metadataErrors.length > 0 ? "fail" : "pass";
+  report.fixture_coverage.status = fixtureErrors.length > 0 ? "fail" : "pass";
+  errors.push(...metadataErrors, ...seedFileErrors, ...fixtureErrors);
 
   if (!options.filesOnly) {
     const guard = assertSyntheticValidationDbAllowed({
@@ -196,8 +213,6 @@ export async function validateSyntheticDataset(
       row_counts: dbRowCounts
     };
   }
-
-  report.metadata.status = hasMetadataErrors(errors) ? "fail" : "pass";
 
   return report;
 }
@@ -340,7 +355,7 @@ function readTypedCsv(
       return [];
     }
 
-    return recordsFromCsvRows(expectedHeader, rows);
+    return recordsFromStrictRows(file, expectedHeader, rows, errors);
   } catch (error) {
     errors.push(`${file} invalid CSV: ${errorMessage(error)}`);
     return [];
@@ -363,7 +378,12 @@ function readFixtureRows(fixturePath: string, errors: string[]): CsvRecord[] {
       return [];
     }
 
-    return recordsFromCsvRows(SEARCH_FIXTURE_HEADERS, rows);
+    return recordsFromStrictRows(
+      SYNTHETIC_SEARCH_FIXTURE_FILE,
+      SEARCH_FIXTURE_HEADERS,
+      rows,
+      errors
+    );
   } catch (error) {
     errors.push(
       `${SYNTHETIC_SEARCH_FIXTURE_FILE} invalid CSV: ${errorMessage(error)}`
@@ -380,14 +400,8 @@ function validateFileRowCounts(
   const config = syntheticDatasetConfigFor(datasetLabel);
   const expectedEntries = expectedSyntheticKaraokeEntryCount(config);
   const expectedAliases = expectedSyntheticAliasCount(config);
-  const entryRange =
-    datasetLabel === "synthetic-1k-songs-10k-aliases"
-      ? { min: 2_000, max: 5_000 }
-      : { min: 20_000, max: 50_000 };
-  const providerRange =
-    datasetLabel === "synthetic-1k-songs-10k-aliases"
-      ? { min: 4, max: 10 }
-      : { min: 4, max: 20 };
+  const entryRange = config.rowCountRanges.karaokeEntries;
+  const providerRange = config.rowCountRanges.karaokeProviders;
 
   expectCount(counts.songs, config.songCount, "songs", errors);
   expectCount(counts.song_aliases, expectedAliases, "song_aliases", errors);
@@ -411,7 +425,13 @@ function validateFileRowCounts(
     "karaoke_providers",
     errors
   );
-  expectCount(
+}
+
+function validateFixtureRowCount(
+  counts: SyntheticDatasetRowCounts,
+  errors: string[]
+): void {
+  expectMinimum(
     counts.search_fixture_cases,
     REQUIRED_SYNTHETIC_CASE_IDS.length,
     "search_fixture_cases",
@@ -484,6 +504,36 @@ function validateFixtureRows(
   return caseIds;
 }
 
+function recordsFromStrictRows(
+  file: string,
+  header: readonly string[],
+  rows: readonly string[][],
+  errors: string[]
+): CsvRecord[] {
+  return rows.slice(1).flatMap((row, index) => {
+    if (row.length === 1 && row[0]?.trim() === "") {
+      return [];
+    }
+
+    const rowNumber = index + 2;
+    if (row.length !== header.length) {
+      errors.push(
+        `${file} row ${rowNumber}: expected ${header.length} columns but found ${row.length}`
+      );
+      return [];
+    }
+
+    return [
+      {
+        rowNumber,
+        values: Object.fromEntries(
+          header.map((column, columnIndex) => [column, row[columnIndex] ?? ""])
+        )
+      }
+    ];
+  });
+}
+
 async function readDbRowCounts(
   db: SyntheticDatasetValidationDbClient,
   datasetLabel: SyntheticDatasetLabel
@@ -544,12 +594,15 @@ function expectRange(
   }
 }
 
-function hasMetadataErrors(errors: string[]): boolean {
-  return errors.some((error) => error.includes(SYNTHETIC_METADATA_FILE));
-}
-
-function hasFixtureErrors(errors: string[]): boolean {
-  return errors.some((error) => error.includes(SYNTHETIC_SEARCH_FIXTURE_FILE));
+function expectMinimum(
+  actual: number,
+  minimum: number,
+  label: string,
+  errors: string[]
+): void {
+  if (actual < minimum) {
+    errors.push(`${label} count ${actual} must be at least ${minimum}`);
+  }
 }
 
 function sameStringArray(

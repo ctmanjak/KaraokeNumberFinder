@@ -96,6 +96,29 @@ describe("validateSyntheticDataset", () => {
     );
   });
 
+  it("fails malformed seed CSV rows with the wrong column count", async () => {
+    const generated = generateSyntheticDataset({
+      datasetLabel: "synthetic-1k-songs-10k-aliases",
+      outputRoot: makeTempRoot()
+    });
+    mutateCsvRow(path.join(generated.outputDir, "songs.csv"), 1, (row) => {
+      row.pop();
+    });
+
+    const report = await validateSyntheticDataset({
+      seedDir: generated.outputDir,
+      datasetLabel: "synthetic-1k-songs-10k-aliases",
+      filesOnly: true
+    });
+
+    expect(report.errors).toContain(
+      "songs.csv row 2: expected 11 columns but found 10"
+    );
+    expect(report.errors).toContain(
+      "songs count 999 does not match expected 1000"
+    );
+  });
+
   it("fails when a required fixture case is missing", async () => {
     const generated = generateSyntheticDataset({
       datasetLabel: "synthetic-1k-songs-10k-aliases",
@@ -113,6 +136,65 @@ describe("validateSyntheticDataset", () => {
       "search-synthetic-scale.csv missing required case_id valid-provider-filter"
     );
     expect(report.fixture_coverage.status).toBe("fail");
+  });
+
+  it("fails malformed fixture CSV rows with the wrong column count", async () => {
+    const generated = generateSyntheticDataset({
+      datasetLabel: "synthetic-1k-songs-10k-aliases",
+      outputRoot: makeTempRoot()
+    });
+    mutateCsvRow(
+      path.join(generated.outputDir, SYNTHETIC_SEARCH_FIXTURE_FILE),
+      1,
+      (row) => {
+        row.push("unexpected");
+      }
+    );
+
+    const report = await validateSyntheticDataset({
+      seedDir: generated.outputDir,
+      datasetLabel: "synthetic-1k-songs-10k-aliases",
+      filesOnly: true
+    });
+
+    expect(report.errors).toContain(
+      "search-synthetic-scale.csv row 2: expected 8 columns but found 9"
+    );
+    expect(report.fixture_coverage.status).toBe("fail");
+  });
+
+  it("allows additional fixture cases when metadata row counts match", async () => {
+    const generated = generateSyntheticDataset({
+      datasetLabel: "synthetic-1k-songs-10k-aliases",
+      outputRoot: makeTempRoot()
+    });
+    appendFixtureCase(generated.outputDir, [
+      "extra-operator-case",
+      "Extra operator case",
+      "extra query",
+      "synthetic_1k_song_000001",
+      "extra",
+      "",
+      "synthetic-1k-songs-10k-aliases",
+      "Additional fixture rows are allowed by the contract."
+    ]);
+    mutateMetadata(generated.outputDir, (metadata) => ({
+      ...metadata,
+      row_counts: {
+        ...(metadata.row_counts as Record<string, unknown>),
+        search_fixture_cases: 10
+      }
+    }));
+
+    const report = await validateSyntheticDataset({
+      seedDir: generated.outputDir,
+      datasetLabel: "synthetic-1k-songs-10k-aliases",
+      filesOnly: true
+    });
+
+    expect(report.errors).toEqual([]);
+    expect(report.fixture_coverage.status).toBe("pass");
+    expect(report.file_row_counts.search_fixture_cases).toBe(10);
   });
 
   it("fails when fixture dataset labels do not match", async () => {
@@ -248,6 +330,19 @@ function removeLastCsvRecord(filePath: string): void {
   writeFileSync(filePath, `${stringifyCsvRows(rows)}\n`, "utf8");
 }
 
+function mutateCsvRow(
+  filePath: string,
+  dataRowIndex: number,
+  mutate: (row: string[]) => void
+): void {
+  const rows = parseCsv(readFileSync(filePath, "utf8"));
+  const row = rows[dataRowIndex];
+  if (row !== undefined) {
+    mutate(row);
+  }
+  writeFileSync(filePath, `${stringifyCsvRows(rows)}\n`, "utf8");
+}
+
 function removeFixtureCase(outputDir: string, caseId: string): void {
   const filePath = path.join(outputDir, SYNTHETIC_SEARCH_FIXTURE_FILE);
   const rows = parseCsv(readFileSync(filePath, "utf8"));
@@ -273,6 +368,13 @@ function mutateFixtureRow(
       mutate(row, header);
     }
   }
+  writeFileSync(filePath, `${stringifyCsvRows(rows)}\n`, "utf8");
+}
+
+function appendFixtureCase(outputDir: string, row: string[]): void {
+  const filePath = path.join(outputDir, SYNTHETIC_SEARCH_FIXTURE_FILE);
+  const rows = parseCsv(readFileSync(filePath, "utf8"));
+  rows.push(row);
   writeFileSync(filePath, `${stringifyCsvRows(rows)}\n`, "utf8");
 }
 
