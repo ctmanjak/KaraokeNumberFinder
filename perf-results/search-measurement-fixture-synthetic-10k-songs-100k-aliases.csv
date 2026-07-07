@@ -1,0 +1,10 @@
+query,expected_song_id,label
+Neon exact anthem,synthetic_10k_song_000001,Normalized exact
+star pressure prefix 000002,synthetic_10k_song_000002,Normalized prefix
+middlecore000003,synthetic_10k_song_000003,Normalized contains
+ㅅㅌ,synthetic_10k_song_000004,Hangul chosung prefix
+near misss melody,synthetic_10k_song_000005,No-result suggestions
+provider filter anthem,synthetic_10k_song_000006,Valid provider filter
+provider filter anthem,synthetic_10k_song_000006,Invalid provider filter
+star,synthetic_10k_song_000007,High candidate partial query
+payload fanout anthem,synthetic_10k_song_000008,High entry-count payload
