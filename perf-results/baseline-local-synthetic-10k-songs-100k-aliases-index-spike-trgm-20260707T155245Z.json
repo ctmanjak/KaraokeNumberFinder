@@ -19,7 +19,7 @@
       "karaoke_entries": 22520,
       "karaoke_providers": 12
     },
-    "scale_scenario": "current_seed"
+    "scale_scenario": "synthetic_future"
   },
   "notes": [
     "Harness is read-only and only calls find/count APIs.",

@@ -143,9 +143,10 @@ wrapper count reports; later `EXPLAIN ANALYZE` and Prisma query-shape tickets
 should use this harness output to choose representative cases for SQL-level
 inspection.
 
-The output always marks `dataset.scale_scenario` as `current_seed`. Future
-synthetic scale runs should use a distinct `--dataset-label` and update the
-scale scenario contract before comparing those numbers with current seed results.
+The output marks `dataset.scale_scenario` as `current_seed` for non-synthetic
+dataset labels and `synthetic_future` for labels that start with `synthetic-`.
+Synthetic scale runs should use a distinct `--dataset-label` before comparing
+those numbers with current seed results.
 
 ## EXPLAIN ANALYZE
 
