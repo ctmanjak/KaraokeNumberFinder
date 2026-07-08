@@ -154,7 +154,7 @@ export async function runPerfBaseline(
     dataset: {
       label: options.datasetLabel,
       current_seed_counts: counts,
-      scale_scenario: "current_seed"
+      scale_scenario: scaleScenarioForDatasetLabel(options.datasetLabel)
     },
     notes: [
       "Harness is read-only and only calls find/count APIs.",
@@ -165,6 +165,14 @@ export async function runPerfBaseline(
     ],
     scenarios: reports
   };
+}
+
+function scaleScenarioForDatasetLabel(
+  datasetLabel: string
+): PerfBaselineReport["dataset"]["scale_scenario"] {
+  return datasetLabel.startsWith("synthetic-")
+    ? "synthetic_future"
+    : "current_seed";
 }
 
 function validateIterations(iterations: number): number {

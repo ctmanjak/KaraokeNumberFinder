@@ -7,6 +7,9 @@ standard before running or interpreting synthetic-scale search perf results.
 See `scripts/perf/synthetic-dataset-contract.md` for the `[M2-Perf-09]`
 synthetic dataset generation/import, fixture, and validation contract that must
 be implemented before synthetic-scale measurements are trusted.
+See `scripts/perf/search-index-strategy-spike.md` for the `[M2-Perf-14]`
+local-only PostgreSQL index strategy spike on the
+`synthetic-10k-songs-100k-aliases` dataset.
 
 Current-seed runs and synthetic-scale runs must be interpreted separately:
 
@@ -140,9 +143,10 @@ wrapper count reports; later `EXPLAIN ANALYZE` and Prisma query-shape tickets
 should use this harness output to choose representative cases for SQL-level
 inspection.
 
-The output always marks `dataset.scale_scenario` as `current_seed`. Future
-synthetic scale runs should use a distinct `--dataset-label` and update the
-scale scenario contract before comparing those numbers with current seed results.
+The output marks `dataset.scale_scenario` as `current_seed` for non-synthetic
+dataset labels and `synthetic_future` for labels that start with `synthetic-`.
+Synthetic scale runs should use a distinct `--dataset-label` before comparing
+those numbers with current seed results.
 
 ## EXPLAIN ANALYZE
 

@@ -34,6 +34,7 @@ describe("runPerfBaseline", () => {
       karaoke_entries: 1,
       karaoke_providers: 1
     });
+    expect(report.dataset.scale_scenario).toBe("current_seed");
     expect(report.scenarios).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -80,6 +81,21 @@ describe("runPerfBaseline", () => {
         runStartedAt: "2026-07-06T00:00:00.000Z"
       })
     ).rejects.toThrow("iterations must be a positive integer.");
+  });
+
+  it("marks synthetic datasets as synthetic future scale runs", async () => {
+    const report = await runPerfBaseline(fakeDb(), {
+      dbLabel: "test-local",
+      datasetLabel: "synthetic-10k-songs-100k-aliases",
+      fixturePath: path.join(FIXTURES_DIR, "valid.csv"),
+      iterations: 1,
+      warmup: 0,
+      commit: "commit-sha",
+      branch: "develop",
+      runStartedAt: "2026-07-06T00:00:00.000Z"
+    });
+
+    expect(report.dataset.scale_scenario).toBe("synthetic_future");
   });
 
   it("keeps search scenario IDs distinct when labels share a slug", async () => {

@@ -9,9 +9,9 @@ migration, index, or search-code changes.
 
 ## Artifacts
 
-| Dataset | Baseline | Query shape | EXPLAIN |
-| ------- | -------- | ----------- | ------- |
-| `synthetic-1k-songs-10k-aliases` | `baseline-local-synthetic-1k-songs-10k-aliases-20260707T125027Z.json` | `query-shape-local-synthetic-1k-songs-10k-aliases-20260707T125027Z.json` | `explain-local-synthetic-1k-songs-10k-aliases-20260707T125027Z.json` |
+| Dataset                            | Baseline                                                                | Query shape                                                                | EXPLAIN                                                                |
+| ---------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `synthetic-1k-songs-10k-aliases`   | `baseline-local-synthetic-1k-songs-10k-aliases-20260707T125027Z.json`   | `query-shape-local-synthetic-1k-songs-10k-aliases-20260707T125027Z.json`   | `explain-local-synthetic-1k-songs-10k-aliases-20260707T125027Z.json`   |
 | `synthetic-10k-songs-100k-aliases` | `baseline-local-synthetic-10k-songs-100k-aliases-20260707T130129Z.json` | `query-shape-local-synthetic-10k-songs-100k-aliases-20260707T130129Z.json` | `explain-local-synthetic-10k-songs-100k-aliases-20260707T130129Z.json` |
 
 Fixture projections:
@@ -26,10 +26,10 @@ contract with `case_id`, `expected_match_type`, `provider_id`, and
 
 ## Run Metadata
 
-| Dataset | Started at | DB label | Iterations | Warmup | Songs | Aliases | Entries | Providers |
-| ------- | ---------- | -------- | ---------: | -----: | ----: | ------: | ------: | --------: |
-| `synthetic-1k-songs-10k-aliases` | 2026-07-07T12:51:34Z | `local` | 10 | 3 | 1,000 | 10,000 | 2,258 | 6 |
-| `synthetic-10k-songs-100k-aliases` | 2026-07-07T13:02:59Z | `local` | 10 | 3 | 10,000 | 100,000 | 22,520 | 12 |
+| Dataset                            | Started at           | DB label | Iterations | Warmup |  Songs | Aliases | Entries | Providers |
+| ---------------------------------- | -------------------- | -------- | ---------: | -----: | -----: | ------: | ------: | --------: |
+| `synthetic-1k-songs-10k-aliases`   | 2026-07-07T12:51:34Z | `local`  |         10 |      3 |  1,000 |  10,000 |   2,258 |         6 |
+| `synthetic-10k-songs-100k-aliases` | 2026-07-07T13:02:59Z | `local`  |         10 |      3 | 10,000 | 100,000 |  22,520 |        12 |
 
 Validation note:
 
@@ -43,16 +43,16 @@ Validation note:
 
 API p95 latency in milliseconds:
 
-| Case | 1k songs / 10k aliases | 10k songs / 100k aliases |
-| ---- | ---------------------: | -----------------------: |
-| Normalized exact | 21.79 | 85.80 |
-| Normalized prefix | 20.30 | 93.21 |
-| Normalized contains | 14.37 | 85.99 |
-| Hangul chosung prefix | 16.19 | 83.92 |
-| No-result suggestions | 26.12 | 110.24 |
-| Valid provider filter | 17.99 | 50.33 |
-| High candidate partial query | 40.47 | 43.80 |
-| High entry-count payload | 12.28 | 49.98 |
+| Case                         | 1k songs / 10k aliases | 10k songs / 100k aliases |
+| ---------------------------- | ---------------------: | -----------------------: |
+| Normalized exact             |                  21.79 |                    85.80 |
+| Normalized prefix            |                  20.30 |                    93.21 |
+| Normalized contains          |                  14.37 |                    85.99 |
+| Hangul chosung prefix        |                  16.19 |                    83.92 |
+| No-result suggestions        |                  26.12 |                   110.24 |
+| Valid provider filter        |                  17.99 |                    50.33 |
+| High candidate partial query |                  40.47 |                    43.80 |
+| High entry-count payload     |                  12.28 |                    49.98 |
 
 The local synthetic p95 results stay below the M2-Perf-08 decision gates:
 300ms for the 10k-alias threshold and 500ms for the 100k-alias threshold.
@@ -61,33 +61,33 @@ The local synthetic p95 results stay below the M2-Perf-08 decision gates:
 
 The representative query-shape counts were stable across both dataset sizes.
 
-| Case | SQL queries | Client calls | Candidate groups | Unique alias IDs | Relation load |
-| ---- | ----------: | -----------: | ---------------: | ---------------: | ------------- |
-| Normalized exact | 6 | 4 | 2 | 1 | Batched, not N+1 |
-| Normalized prefix | 7 | 5 | 3 | 1 | Batched, not N+1 |
-| Normalized contains | 7 | 5 | 3 | 1 | Batched, not N+1 |
-| Hangul chosung prefix | 8 | 6 | 4 | 1 | Batched, not N+1 |
-| No-result suggestions | 5 | 5 | 3 | 0 | Detail skipped |
-| Valid provider filter | 6 | 4 | 2 | 1 | Batched, not N+1 |
-| High candidate partial query | 6 | 4 | 2 | 100 | Batched, not N+1 |
-| High entry-count payload | 6 | 4 | 2 | 1 | Batched, not N+1 |
-| Invalid provider API path | 1 | 1 | 0 | 0 | Detail skipped |
+| Case                         | SQL queries | Client calls | Candidate groups | Unique alias IDs | Relation load    |
+| ---------------------------- | ----------: | -----------: | ---------------: | ---------------: | ---------------- |
+| Normalized exact             |           6 |            4 |                2 |                1 | Batched, not N+1 |
+| Normalized prefix            |           7 |            5 |                3 |                1 | Batched, not N+1 |
+| Normalized contains          |           7 |            5 |                3 |                1 | Batched, not N+1 |
+| Hangul chosung prefix        |           8 |            6 |                4 |                1 | Batched, not N+1 |
+| No-result suggestions        |           5 |            5 |                3 |                0 | Detail skipped   |
+| Valid provider filter        |           6 |            4 |                2 |                1 | Batched, not N+1 |
+| High candidate partial query |           6 |            4 |                2 |              100 | Batched, not N+1 |
+| High entry-count payload     |           6 |            4 |                2 |                1 | Batched, not N+1 |
+| Invalid provider API path    |           1 |            1 |                0 |                0 | Detail skipped   |
 
 Scale pressure in these runs comes from rows scanned and payload size, not from
 additional Prisma round trips.
 
 ## EXPLAIN Summary
 
-| Shape | 1k/10k alias run | 10k/100k alias run | Index usage |
-| ----- | ---------------: | -----------------: | ----------- |
-| Exact `normalized_alias ILIKE $1` | 10,000 scanned | 100,000 scanned | No index |
-| Prefix representative cases | 10,000 scanned | 100,000 scanned | No index |
-| Contains representative cases | 10,000 scanned | 100,000 scanned | No index |
-| Chosung representative case | 10,000 scanned | 100,000 scanned | No index |
-| High-candidate `star` prefix | 2,355 scanned | 22,605 scanned | `song_aliases_normalized_alias_idx` |
-| High-candidate `star` contains | 2,455 scanned | 22,705 scanned | `song_aliases_normalized_alias_idx` |
-| Alias detail by ID | 1 scanned | 1 scanned | `song_aliases_pkey` |
-| Detail with song and entries | 4 scanned | 4 scanned | PK and `karaoke_entries_song_status_idx` |
+| Shape                             | 1k/10k alias run | 10k/100k alias run | Index usage                              |
+| --------------------------------- | ---------------: | -----------------: | ---------------------------------------- |
+| Exact `normalized_alias ILIKE $1` |   10,000 scanned |    100,000 scanned | No index                                 |
+| Prefix representative cases       |   10,000 scanned |    100,000 scanned | No index                                 |
+| Contains representative cases     |   10,000 scanned |    100,000 scanned | No index                                 |
+| Chosung representative case       |   10,000 scanned |    100,000 scanned | No index                                 |
+| High-candidate `star` prefix      |    2,355 scanned |     22,605 scanned | `song_aliases_normalized_alias_idx`      |
+| High-candidate `star` contains    |    2,455 scanned |     22,705 scanned | `song_aliases_normalized_alias_idx`      |
+| Alias detail by ID                |        1 scanned |          1 scanned | `song_aliases_pkey`                      |
+| Detail with song and entries      |        4 scanned |          4 scanned | PK and `karaoke_entries_song_status_idx` |
 
 The main optimization signal is full alias-table scanning for representative
 exact, prefix, contains, and chosung searches at 100k aliases. The local latency
@@ -107,6 +107,27 @@ sandbox-only prototypes for exact/prefix index behavior and a separately gated
 contains-search option such as `pg_trgm`. The output should include before/after
 p95, rows scanned, index names used, index-size/write-cost notes, and a clear
 apply/defer/reject recommendation.
+
+## M2-Perf-14 Index Strategy Spike Artifacts
+
+M2-Perf-14 added local-only spike artifacts for the
+`synthetic-10k-songs-100k-aliases` dataset:
+
+| Candidate state                                     | Baseline                                                                                    | EXPLAIN                                                                                    |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Current indexes only                                | `baseline-local-synthetic-10k-songs-100k-aliases-index-spike-current-20260707T155245Z.json` | `explain-local-synthetic-10k-songs-100k-aliases-index-spike-current-20260707T155245Z.json` |
+| `lower(...) varchar_pattern_ops` expression indexes | n/a                                                                                         | `explain-local-synthetic-10k-songs-100k-aliases-index-spike-pattern-20260707T155245Z.json` |
+| `pg_trgm` GIN indexes                               | `baseline-local-synthetic-10k-songs-100k-aliases-index-spike-trgm-20260707T155245Z.json`    | `explain-local-synthetic-10k-songs-100k-aliases-index-spike-trgm-20260707T155245Z.json`    |
+
+Summary:
+
+- Pattern expression indexes were not used by the current `ILIKE` SQL shape.
+- `normalized_alias gin_trgm_ops` was used by current exact, prefix, and contains
+  `ILIKE` candidates and reduced representative normalized API p95 from
+  50-94ms to 4-6ms.
+- `chosung_alias gin_trgm_ops` was used by the chosung candidate, but the overall
+  chosung search path still ran normalized candidate probes.
+- The decision document is `scripts/perf/search-index-strategy-spike.md`.
 
 ## Tooling Issues
 
