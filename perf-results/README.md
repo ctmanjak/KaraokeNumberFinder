@@ -129,6 +129,54 @@ Summary:
   chosung search path still ran normalized candidate probes.
 - The decision document is `scripts/perf/search-index-strategy-spike.md`.
 
+## M2-Perf-15 Normalized Alias Trigram Index Artifacts
+
+M2-Perf-15 applied a SQL-only Prisma migration for the M2-Perf-14 normalized
+alias recommendation:
+
+- `CREATE EXTENSION IF NOT EXISTS "pg_trgm";`
+- `CREATE INDEX CONCURRENTLY "song_aliases_normalized_alias_trgm_idx" ON "song_aliases" USING gin ("normalized_alias" gin_trgm_ops);`
+
+Artifacts:
+
+| Dataset | Baseline | EXPLAIN |
+| ------- | -------- | ------- |
+| `synthetic-10k-songs-100k-aliases` | `baseline-local-synthetic-10k-songs-100k-aliases-m2-perf-15-20260708T034343Z.json` | `explain-local-synthetic-10k-songs-100k-aliases-m2-perf-15-20260708T034343Z.json` |
+
+Run metadata:
+
+| DB scope | Songs | Aliases | Entries | Providers | Concurrent index build time | New index size |
+| -------- | ----: | ------: | ------: | --------: | --------------------------: | -------------: |
+| local-only `karaoke-synthetic-postgres` | 10,000 | 100,000 | 22,520 | 12 | 0.495s wall time | 5,312KB |
+
+The concurrent Prisma migration path was also validated against a fresh local
+temporary DB. Manual `CREATE INDEX CONCURRENTLY` operations must be run as a
+standalone statement, not grouped with other SQL in one transaction block.
+
+Before/after API p95 in milliseconds, comparing against the M2-Perf-14
+current-index baseline:
+
+| Case                         | Before | After | Change |
+| ---------------------------- | -----: | ----: | -----: |
+| Normalized exact             |  50.31 |  3.76 | -92.5% |
+| Normalized prefix            |  94.15 |  5.62 | -94.0% |
+| Normalized contains          |  85.39 |  6.71 | -92.1% |
+| No-result suggestions        | 107.13 |  3.00 | -97.2% |
+| High candidate partial query |  41.75 | 17.28 | -58.6% |
+
+Representative normalized candidate EXPLAIN results:
+
+| Shape                  | Before rows scanned | After rows scanned | After index used                         | After seq scan |
+| ---------------------- | ------------------: | -----------------: | ---------------------------------------- | -------------- |
+| Exact `ILIKE $1`       |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx` | No             |
+| Prefix `ILIKE $1 || %` |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx` | No             |
+| Contains `ILIKE %$1%`  |             100,000 |                224 | `song_aliases_normalized_alias_trgm_idx` | No             |
+
+The run used only the local synthetic DB. Neon and production-like databases
+were not used. M2-Perf-15 did not add a `chosung_alias` trigram index, pattern
+index, query rewrite, search-code change, ranking change, generated client
+change, API payload change, or pagination/provider behavior change.
+
 ## Tooling Issues
 
 - Synthetic fixture projection should be upgraded to the full contract before
