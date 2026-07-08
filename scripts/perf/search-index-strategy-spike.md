@@ -209,3 +209,84 @@ Acceptance checks:
   before adding a chosung-specific index?
 - Should synthetic fixture projection be upgraded to the full case-id contract
   before the implementation PR so automated comparisons are less label-based?
+
+## M2-Perf-15 Implementation Result
+
+M2-Perf-15 applies the M2-Perf-14 recommendation with a SQL-only Prisma
+migration:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE INDEX CONCURRENTLY "song_aliases_normalized_alias_trgm_idx"
+ON "song_aliases" USING gin ("normalized_alias" gin_trgm_ops);
+```
+
+No Prisma schema, generated client, search code, ranking, API payload, query
+rewrite, `chosung_alias` trigram index, or `lower(...) varchar_pattern_ops`
+index was added.
+
+DB scope:
+
+- Local-only PostgreSQL container: `karaoke-synthetic-postgres`
+- Connection used only via command-scoped
+  `DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55432/postgres`
+- Neon and production-like databases were not used.
+- Observed local row counts: 10,000 songs, 100,000 aliases, 22,520 entries, 12
+  providers.
+
+Migration and index notes:
+
+- `pg_trgm` availability was confirmed locally through `pg_available_extensions`
+  with installed version `1.6`.
+- `npx prisma migrate deploy` completed successfully against a fresh local
+  temporary DB, confirming the Prisma migration path handles PostgreSQL's
+  `CREATE INDEX CONCURRENTLY` requirement to run outside a transaction block.
+- A 100,000-alias local synthetic rebuild of
+  `song_aliases_normalized_alias_trgm_idx` with `CREATE INDEX CONCURRENTLY`
+  completed in 0.495s wall time when run as a standalone statement.
+- Manual operation note: `CREATE INDEX CONCURRENTLY` must not be grouped with
+  other SQL statements in a single transaction block.
+- `song_aliases_normalized_alias_trgm_idx` size was 5,312KB on 100,000 aliases.
+- Rollback SQL:
+
+```sql
+DROP INDEX CONCURRENTLY IF EXISTS "song_aliases_normalized_alias_trgm_idx";
+DROP EXTENSION "pg_trgm"; -- only if no other database objects depend on it.
+```
+
+Artifacts:
+
+- `perf-results/baseline-local-synthetic-10k-songs-100k-aliases-m2-perf-15-20260708T034343Z.json`
+- `perf-results/explain-local-synthetic-10k-songs-100k-aliases-m2-perf-15-20260708T034343Z.json`
+
+### M2-Perf-14 Current Index vs M2-Perf-15
+
+API p95 in milliseconds, 10 measured iterations after 3 warmups:
+
+| Case                         | M2-Perf-14 current p95 | M2-Perf-15 p95 | Change |
+| ---------------------------- | ---------------------: | --------------: | -----: |
+| Normalized exact             |                  50.31 |            3.76 | -92.5% |
+| Normalized prefix            |                  94.15 |            5.62 | -94.0% |
+| Normalized contains          |                  85.39 |            6.71 | -92.1% |
+| No-result suggestions        |                 107.13 |            3.00 | -97.2% |
+| High candidate partial query |                  41.75 |           17.28 | -58.6% |
+
+Representative EXPLAIN comparison:
+
+| Case and shape               | Before rows scanned | After rows scanned | After index used                             | After seq scan | After sort | After execution ms |
+| ---------------------------- | ------------------: | -----------------: | -------------------------------------------- | -------------- | ---------- | -----------------: |
+| Exact `ILIKE $1`             |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.205 |
+| Exact prefix                 |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.183 |
+| Exact contains               |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.191 |
+| Prefix starts-with           |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.257 |
+| Prefix contains              |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.343 |
+| Contains contains            |             100,000 |                224 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              2.069 |
+| No-result contains           |             100,000 |                  0 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.032 |
+| High-candidate `star` prefix |              22,605 |             22,605 | `song_aliases_normalized_alias_idx`          | No             | Yes        |             12.161 |
+| High-candidate `star` contains |            22,705 |             22,705 | `song_aliases_normalized_alias_idx`          | No             | Yes        |             12.300 |
+| Detail lookup by alias ID    |                   1 |                  1 | `song_aliases_pkey`                          | No             | Yes        |              0.039 |
+| Detail with song and entries |                   4 |                  4 | `song_aliases_pkey`, `songs_pkey`, entry idx | No             | Yes        |              0.078 |
+
+The normalized exact/prefix/contains candidate shapes no longer perform full
+100,000-row alias-table scans. Sorts still occur because the current query shape
+keeps the existing order by normalized alias, song ID, alias, and ID.
