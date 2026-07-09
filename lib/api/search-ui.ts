@@ -24,13 +24,15 @@ export async function fetchProviders(
   }
 
   const payload = (await readJson(response)) as
-    { items?: ProviderListItem[] } | undefined;
+    { items?: ProviderListItem[] } | null | undefined;
 
-  if (payload === undefined) {
+  if (payload === undefined || payload === null) {
     throw new Error(fallback);
   }
 
-  return "items" in payload && Array.isArray(payload.items)
+  return typeof payload === "object" &&
+    "items" in payload &&
+    Array.isArray(payload.items)
     ? payload.items
     : [];
 }
@@ -52,9 +54,10 @@ export async function fetchSearchResults(
     throw new Error(errorMessage(await readJson(response), fallback));
   }
 
-  const payload = (await readJson(response)) as SearchResponse | undefined;
+  const payload = (await readJson(response)) as
+    SearchResponse | null | undefined;
 
-  if (payload === undefined) {
+  if (payload === undefined || payload === null) {
     throw new Error(fallback);
   }
 

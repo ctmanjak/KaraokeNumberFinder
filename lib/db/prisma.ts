@@ -36,6 +36,15 @@ function createPgPoolConfig(): PoolConfig {
   };
 
   if (rejectUnauthorized !== undefined && rejectUnauthorized.trim() !== "") {
+    if (
+      process.env.NODE_ENV === "production" &&
+      rejectUnauthorized.trim() === "false"
+    ) {
+      throw new Error(
+        "DATABASE_SSL_REJECT_UNAUTHORIZED=false is not allowed in production."
+      );
+    }
+
     config.ssl = { rejectUnauthorized: rejectUnauthorized !== "false" };
   }
 

@@ -50,7 +50,9 @@ describe("assertSyntheticValidationDbAllowed", () => {
         dbLabel: "local",
         databaseUrl: "postgresql://user:pass@db.example.com/prod"
       })
-    ).toThrow("DATABASE_URL looks like Neon");
+    ).toThrow(
+      "Synthetic dataset DB validation is blocked because DATABASE_URL looks like Neon, live, production, or production-like infrastructure."
+    );
   });
 });
 
@@ -137,7 +139,9 @@ describe("assertSyntheticImportAllowed", () => {
           dbLabel: "local",
           databaseUrl
         })
-      ).toThrow("DATABASE_URL looks like Neon");
+      ).toThrow(
+        "Synthetic import is blocked because DATABASE_URL looks like Neon, live, production, or production-like infrastructure."
+      );
     }
   });
 });

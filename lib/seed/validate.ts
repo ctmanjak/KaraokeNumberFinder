@@ -469,17 +469,28 @@ function validateAliasSearchFields(
       });
     }
 
-    if (!isBlank(alias.values.chosung_alias)) {
-      if (alias.values.chosung_alias !== searchFields.chosungAlias) {
-        issues.push({
-          severity: "error",
-          file: "song_aliases.csv",
-          row: alias.rowNumber,
-          message: `chosung_alias must be ${searchFields.chosungAlias}`
-        });
+    if (isBlank(alias.values.chosung_alias)) {
+      if (searchFields.chosungAlias === "") {
+        continue;
       }
-    } else if (searchFields.chosungAlias === "") {
+
+      issues.push({
+        severity: "error",
+        file: "song_aliases.csv",
+        row: alias.rowNumber,
+        message: `chosung_alias must be ${searchFields.chosungAlias}`
+      });
+
       continue;
+    }
+
+    if (alias.values.chosung_alias !== searchFields.chosungAlias) {
+      issues.push({
+        severity: "error",
+        file: "song_aliases.csv",
+        row: alias.rowNumber,
+        message: `chosung_alias must be ${searchFields.chosungAlias}`
+      });
     }
   }
 }
