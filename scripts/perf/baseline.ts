@@ -177,6 +177,7 @@ function createPgPoolConfig() {
 
 function toPerfBaselineDbClient(prisma: PrismaClient): PerfBaselineDbClient {
   return {
+    $queryRaw: (query, ...values) => prisma.$queryRaw(query, ...values),
     karaokeProvider: {
       findMany: (args) => prisma.karaokeProvider.findMany(args as never)
     },

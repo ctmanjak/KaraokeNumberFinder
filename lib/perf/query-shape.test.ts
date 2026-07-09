@@ -110,10 +110,54 @@ describe("runPerfQueryShape", () => {
       })
     );
   });
+
+  it("records the raw candidate/detail search path when available", async () => {
+    const sqlLog: PerfQueryShapeSqlLog = { events: [] };
+    const report = await runPerfQueryShape(
+      fakeDb(() => sqlLog, { rawSearch: true }),
+      {
+        dbLabel: "test-local",
+        datasetLabel: "current-seed-test",
+        fixturePath: path.join(FIXTURES_DIR, "valid.csv"),
+        caseLimit: 1,
+        commit: "commit-sha",
+        branch: "codex/test",
+        runStartedAt: "2026-07-06T00:00:00.000Z"
+      },
+      sqlLog
+    );
+    const searchScenario = report.scenarios.find(
+      (scenario) => scenario.id === "service.search.hangul-display-title-01"
+    );
+
+    expect(searchScenario).toEqual(
+      expect.objectContaining({
+        endpoint: "searchSongs",
+        client_method_count: expect.objectContaining({
+          by_query_shape: expect.objectContaining({
+            "karaoke_providers.active_for_search": 1,
+            "song_aliases.raw_candidate_detail": 1
+          })
+        }),
+        candidate_alias_id_group_count: 0,
+        unique_alias_id_count: 1,
+        alias_detail_lookup: expect.objectContaining({
+          executed: true,
+          id_in_count: 1,
+          returned_alias_count: 1,
+          client_method_count: 1
+        }),
+        relation_load_observation: expect.objectContaining({
+          classification: "single_join_or_prisma_join"
+        })
+      })
+    );
+  });
 });
 
 function fakeDb(
-  getSqlLog?: () => PerfQueryShapeSqlLog | undefined
+  getSqlLog?: () => PerfQueryShapeSqlLog | undefined,
+  options: { rawSearch?: boolean } = {}
 ): PerfQueryShapeDbClient {
   const provider = {
     id: "provider_alpha",
@@ -157,8 +201,43 @@ function fakeDb(
       ]
     }
   };
+  const rawAliasRow = {
+    alias_id: fullAlias.id,
+    alias_song_id: fullAlias.songId,
+    alias: fullAlias.alias,
+    language: fullAlias.language,
+    alias_type: fullAlias.aliasType,
+    normalized_alias: fullAlias.normalizedAlias,
+    chosung_alias: fullAlias.chosungAlias,
+    song_id: fullAlias.song.id,
+    original_language: fullAlias.song.originalLanguage,
+    canonical_title: fullAlias.song.canonicalTitle,
+    display_title: fullAlias.song.displayTitle,
+    canonical_artist: fullAlias.song.canonicalArtist,
+    release_year: fullAlias.song.releaseYear,
+    tie_in: fullAlias.song.tieIn,
+    karaoke_entry_id: fullAlias.song.karaokeEntries[0]?.id ?? null,
+    provider_id: fullAlias.song.karaokeEntries[0]?.providerId ?? null,
+    karaoke_number: fullAlias.song.karaokeEntries[0]?.karaokeNumber ?? null,
+    version_info: fullAlias.song.karaokeEntries[0]?.versionInfo ?? null,
+    availability_status:
+      fullAlias.song.karaokeEntries[0]?.availabilityStatus ?? null,
+    last_verified_at: fullAlias.song.karaokeEntries[0]?.lastVerifiedAt ?? null
+  };
 
   return {
+    ...(options.rawSearch === true
+      ? {
+          $queryRaw: async <T = unknown>() => {
+            pushSql(
+              getSqlLog,
+              "SELECT * FROM song_aliases JOIN songs ON songs.id = song_aliases.song_id LEFT JOIN karaoke_entries ON karaoke_entries.song_id = songs.id"
+            );
+
+            return [rawAliasRow] as T;
+          }
+        }
+      : {}),
     karaokeProvider: {
       findMany: async () => {
         pushSql(getSqlLog, "SELECT * FROM karaoke_providers");

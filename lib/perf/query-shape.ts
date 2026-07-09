@@ -22,6 +22,7 @@ export type PerfQueryShapeOptions = {
 };
 
 export type PerfQueryShapeDbClient = {
+  $queryRaw?: SearchDbClient["$queryRaw"];
   karaokeProvider: {
     findMany(args: unknown): Promise<unknown[]>;
   };
@@ -392,13 +393,17 @@ async function runScenario(
   const sqlAvailable = sqlLog !== undefined;
   const summarizedSqlEvents = sqlEvents.map(summarizeSqlEvent);
   const detailCalls = calls.filter(
-    (call) => call.queryShape === "song_aliases.id_in.detail_with_relations"
+    (call) =>
+      call.queryShape === "song_aliases.id_in.detail_with_relations" ||
+      call.queryShape === "song_aliases.raw_candidate_detail"
   );
   const detailCall = detailCalls[0];
+  const detailSqlEvents = sqlForDetailCall(detailCall, summarizedSqlEvents);
   const candidateGroups = calls.filter((call) =>
     call.queryShape.startsWith("song_aliases.candidate.")
   );
   const aliasIds = new Set<string>();
+  const detailAliasIds = new Set(readResultIds(detailCall?.argsSummary));
 
   for (const call of candidateGroups) {
     const ids = readResultIds(call.argsSummary);
@@ -430,7 +435,7 @@ async function runScenario(
       condition: readWhere(call.argsSummary),
       take: readTake(call.argsSummary),
       returned: call.resultCount,
-      sql_query_count: sqlCountForCall(call)
+      sql_query_count: sqlCountForCall(call, summarizedSqlEvents)
     })),
     candidate_alias_id_group_count: candidateGroups.length,
     candidate_alias_id_total: candidateGroups.reduce(
@@ -438,20 +443,19 @@ async function runScenario(
       0
     ),
     unique_alias_id_count:
-      readIdInCount(detailCall?.argsSummary) ?? aliasIds.size,
+      readIdInCount(detailCall?.argsSummary) ??
+      (detailAliasIds.size > 0 ? detailAliasIds.size : aliasIds.size),
     alias_detail_lookup: {
       executed: detailCall !== undefined,
-      id_in_count: readIdInCount(detailCall?.argsSummary) ?? 0,
-      returned_alias_count: detailCall?.resultCount ?? 0,
+      id_in_count:
+        readIdInCount(detailCall?.argsSummary) ?? detailAliasIds.size,
+      returned_alias_count:
+        detailCall?.queryShape === "song_aliases.raw_candidate_detail"
+          ? detailAliasIds.size
+          : (detailCall?.resultCount ?? 0),
       client_method_count: detailCalls.length,
-      sql_query_count:
-        detailCall === undefined ? null : sqlCountForCall(detailCall),
-      sql:
-        detailCall === undefined
-          ? []
-          : sqlForCall(detailCall, summarizedSqlEvents).map(
-              (event) => event.sql
-            )
+      sql_query_count: detailCall === undefined ? null : detailSqlEvents.length,
+      sql: detailSqlEvents.map((event) => event.sql)
     },
     relation_load_observation: classifyRelationLoad(
       detailCall,
@@ -463,7 +467,7 @@ async function runScenario(
       query_shape: call.queryShape,
       args_summary: stripResultIds(call.argsSummary),
       result_count: call.resultCount,
-      sql_query_count: sqlCountForCall(call)
+      sql_query_count: sqlCountForCall(call, summarizedSqlEvents)
     })),
     sql_events: summarizedSqlEvents
   };
@@ -540,7 +544,24 @@ function instrumentDb(
   calls: InstrumentedCall[],
   sqlLog: PerfQueryShapeSqlLog | undefined
 ): SearchDbClient & ProviderDbClient {
+  const queryRaw = db.$queryRaw?.bind(db);
+
   return {
+    ...(queryRaw === undefined
+      ? {}
+      : {
+          $queryRaw: async (query, ...values) =>
+            (await recordCall(
+              "$queryRaw",
+              "song_aliases.raw_candidate_detail",
+              { query, values },
+              calls,
+              sqlLog,
+              async () => {
+                return queryRaw<unknown[]>(query, ...values);
+              }
+            )) as never
+        }),
     karaokeProvider: {
       findMany: async (args) =>
         (await recordCall(
@@ -696,7 +717,7 @@ function classifyRelationLoad(
     };
   }
 
-  const detailEvents = sqlForCall(detailCall, events);
+  const detailEvents = sqlForDetailCall(detailCall, events);
   const songSqlCount = detailEvents.filter((event) =>
     event.tables.includes("songs")
   ).length;
@@ -778,9 +799,24 @@ function normalizeSql(sql: string): string {
   return sql.replace(/\s+/gu, " ").trim();
 }
 
-function sqlCountForCall(call: InstrumentedCall): number | null {
+function sqlCountForCall(
+  call: InstrumentedCall,
+  events?: PerfQueryShapeSqlEventSummary[]
+): number | null {
   if (call.queryShape.startsWith("song_aliases.candidate.")) {
     return null;
+  }
+
+  if (events !== undefined) {
+    if (call.queryShape === "song_aliases.raw_candidate_detail") {
+      return rawCandidateDetailSqlEvents(events).length;
+    }
+
+    if (call.queryShape.startsWith("karaoke_providers.")) {
+      return events.filter(
+        (event) => event.query_shape === "karaoke_providers.select"
+      ).length;
+    }
   }
 
   if (call.sqlStartIndex === null || call.sqlEndIndex === null) {
@@ -799,6 +835,29 @@ function sqlForCall(
   }
 
   return events.slice(call.sqlStartIndex, call.sqlEndIndex);
+}
+
+function sqlForDetailCall(
+  call: InstrumentedCall | undefined,
+  events: PerfQueryShapeSqlEventSummary[]
+): PerfQueryShapeSqlEventSummary[] {
+  if (call === undefined) {
+    return [];
+  }
+
+  if (call.queryShape === "song_aliases.raw_candidate_detail") {
+    return rawCandidateDetailSqlEvents(events);
+  }
+
+  return sqlForCall(call, events);
+}
+
+function rawCandidateDetailSqlEvents(
+  events: PerfQueryShapeSqlEventSummary[]
+): PerfQueryShapeSqlEventSummary[] {
+  return events.filter(
+    (event) => event.query_shape === "song_aliases.detail_with_song_relation"
+  );
 }
 
 function summarizeArgs(args: unknown): Record<string, unknown> {
@@ -837,7 +896,17 @@ function readResultIds(argsSummary: unknown): string[] {
 
 function resultIds(result: unknown[]): string[] {
   return result
-    .map((row) => (isRecord(row) && typeof row.id === "string" ? row.id : null))
+    .map((row) => {
+      if (!isRecord(row)) {
+        return null;
+      }
+
+      if (typeof row.id === "string") {
+        return row.id;
+      }
+
+      return typeof row.alias_id === "string" ? row.alias_id : null;
+    })
     .filter((value): value is string => value !== null);
 }
 
