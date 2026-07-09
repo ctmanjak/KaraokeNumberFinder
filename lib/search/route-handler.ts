@@ -16,13 +16,23 @@ import {
 
 type SearchFunction = (
   query: SearchQuery,
-  context?: { timing?: SearchTimingRecorder }
+  context?: { signal?: AbortSignal; timing?: SearchTimingRecorder }
 ) => Promise<SearchResponse>;
 
-export function createSearchGetHandler(search: SearchFunction) {
+type SearchGetHandlerOptions = {
+  timeoutMs?: number;
+};
+
+const DEFAULT_SEARCH_TIMEOUT_MS = 10_000;
+
+export function createSearchGetHandler(
+  search: SearchFunction,
+  options: SearchGetHandlerOptions = {}
+) {
   return async function GET(request: Request): Promise<Response> {
     const totalStartedAt = performance.now();
     const url = new URL(request.url);
+    const searchTimeoutMs = options.timeoutMs ?? DEFAULT_SEARCH_TIMEOUT_MS;
     const timingEnabled = shouldEmitPerfTiming(request, url);
     const timingState = timingEnabled ? createTimingRecorder() : undefined;
     const timing = timingState?.recorder;
@@ -49,7 +59,10 @@ export function createSearchGetHandler(search: SearchFunction) {
 
     try {
       const body = await measureAsync(timing, "route.search", () =>
-        search(parsed.query, { timing })
+        withSearchTimeout(
+          (signal) => search(parsed.query, { signal, timing }),
+          searchTimeoutMs
+        )
       );
 
       return timedJsonResponse(
@@ -70,6 +83,22 @@ export function createSearchGetHandler(search: SearchFunction) {
             }
           },
           400,
+          timings,
+          timing,
+          totalStartedAt,
+          timingEnabled
+        );
+      }
+
+      if (error instanceof SearchTimeoutError) {
+        return timedJsonResponse(
+          {
+            error: {
+              code: "SEARCH_TIMEOUT",
+              message: "Search timed out."
+            }
+          },
+          504,
           timings,
           timing,
           totalStartedAt,
@@ -100,6 +129,36 @@ export function createSearchGetHandlerForDb(db: SearchDbClient) {
   return createSearchGetHandler((query, context) =>
     searchSongs(db, query, { timing: context?.timing })
   );
+}
+
+class SearchTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`Search exceeded ${timeoutMs}ms timeout.`);
+    this.name = "SearchTimeoutError";
+  }
+}
+
+async function withSearchTimeout<T>(
+  operation: (signal: AbortSignal) => Promise<T>,
+  timeoutMs: number
+): Promise<T> {
+  const abortController = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      abortController.abort();
+      reject(new SearchTimeoutError(timeoutMs));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([operation(abortController.signal), timeout]);
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+  }
 }
 
 function timedJsonResponse(

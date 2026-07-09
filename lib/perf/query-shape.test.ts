@@ -5,6 +5,11 @@ import { describe, expect, it } from "vitest";
 
 import type { SearchAliasCondition } from "../search/search";
 import {
+  isAliasIdWhere,
+  isAliasOrWhere,
+  matchesAliasWhere
+} from "../search/test-where-match";
+import {
   runPerfQueryShape,
   type PerfQueryShapeDbClient,
   type PerfQueryShapeSqlLog
@@ -256,7 +261,7 @@ function fakeDb(
         };
         const where = query.where;
 
-        if (hasIdWhere(where)) {
+        if (isAliasIdWhere(where)) {
           pushSql(getSqlLog, "SELECT * FROM song_aliases WHERE id IN ($1)");
           pushSql(getSqlLog, "SELECT * FROM songs WHERE id IN ($1)");
           pushSql(
@@ -272,12 +277,12 @@ function fakeDb(
           "SELECT id FROM song_aliases WHERE normalized_alias ILIKE $1"
         );
 
-        if (hasOrWhere(where)) {
+        if (isAliasOrWhere(where)) {
           return [];
         }
 
         return aliasRows
-          .filter((row) => matches(row, where))
+          .filter((row) => matchesAliasWhere(row, where))
           .map((row) => ({ id: row.id }));
       },
       count: async () => 3
@@ -302,46 +307,6 @@ function alias(
     normalizedAlias,
     chosungAlias
   };
-}
-
-function matches(
-  row: ReturnType<typeof alias>,
-  condition: SearchAliasCondition
-): boolean {
-  if ("normalizedAlias" in condition) {
-    if ("equals" in condition.normalizedAlias) {
-      return row.normalizedAlias === condition.normalizedAlias.equals;
-    }
-
-    if ("startsWith" in condition.normalizedAlias) {
-      return row.normalizedAlias.startsWith(
-        condition.normalizedAlias.startsWith
-      );
-    }
-
-    return row.normalizedAlias.includes(condition.normalizedAlias.contains);
-  }
-
-  return (
-    row.chosungAlias?.startsWith(condition.chosungAlias.startsWith) ?? false
-  );
-}
-
-type FakeSearchAliasWhere =
-  | { id: { in: string[] } }
-  | { OR: SearchAliasCondition[] }
-  | SearchAliasCondition;
-
-function hasIdWhere(where: FakeSearchAliasWhere): where is {
-  id: { in: string[] };
-} {
-  return "id" in where;
-}
-
-function hasOrWhere(where: FakeSearchAliasWhere): where is {
-  OR: SearchAliasCondition[];
-} {
-  return "OR" in where;
 }
 
 function pushSql(

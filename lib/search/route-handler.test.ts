@@ -187,6 +187,34 @@ describe("createSearchGetHandler", () => {
     expect(consoleError).toHaveBeenCalledOnce();
     consoleError.mockRestore();
   });
+
+  it("returns a timeout error when search lookup exceeds the request timeout", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const GET = createSearchGetHandler(
+        async () => new Promise<SearchResponse>(() => undefined),
+        { timeoutMs: 1 }
+      );
+      const responsePromise = GET(
+        new Request("http://localhost/api/search?q=fixture")
+      );
+
+      await vi.advanceTimersByTimeAsync(1);
+
+      const response = await responsePromise;
+
+      expect(response.status).toBe(504);
+      await expect(response.json()).resolves.toEqual({
+        error: {
+          code: "SEARCH_TIMEOUT",
+          message: "Search timed out."
+        }
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 function emptyResponse(): SearchResponse {

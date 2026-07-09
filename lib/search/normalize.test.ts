@@ -86,6 +86,10 @@ describe("canUseHangulChosungSearch", () => {
     expect(canUseHangulChosungSearch("fixture")).toBe(false);
     expect(canUseHangulChosungSearch("픽스처")).toBe(false);
   });
+
+  it("rejects composite final consonants", () => {
+    expect(canUseHangulChosungSearch("ㄱㄳ")).toBe(false);
+  });
 });
 
 describe("normalizeChosungQuery", () => {

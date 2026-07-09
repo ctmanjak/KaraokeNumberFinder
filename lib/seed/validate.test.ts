@@ -121,6 +121,22 @@ describe("validateSeedDirectory", () => {
       ])
     );
   });
+
+  it("reports a blank chosung_alias when a Hangul alias requires one", () => {
+    const seedDir = makeTempSeedDir({
+      "song_aliases.csv": readFixture(VALID_DIR, "song_aliases.csv").replace(
+        "픽스처노래,ㅍㅅㅊㄴㄹ,",
+        "픽스처노래,,"
+      )
+    });
+    const result = validateSeedDirectory(seedDir, { now: NOW });
+
+    expect(result.errors.map(formatSeedValidationIssue)).toEqual(
+      expect.arrayContaining([
+        "song_aliases.csv row 2: chosung_alias must be ㅍㅅㅊㄴㄹ"
+      ])
+    );
+  });
 });
 
 function makeTempSeedDir(overrides: Parameters<typeof makeSeedDir>[2]): string {

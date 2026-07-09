@@ -366,10 +366,10 @@ h1 {
   display: grid;
   gap: 6px;
   margin-top: 14px;
-  border: 1px solid #c9d7d4;
+  border: 1px solid var(--state-accent-border);
   border-radius: 8px;
   padding: 14px;
-  background: #f3faf8;
+  background: var(--state-accent-surface);
 }
 
 .provider-name,

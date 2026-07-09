@@ -515,6 +515,7 @@ async function findTieredAliasCandidatesRaw(
       ? 0
       : candidateTakeForCondition(chosungCondition, limit);
   const chosungQuery = chosungCondition?.chosungAlias.startsWith ?? "";
+  const hasChosungCondition = chosungCondition !== undefined;
 
   const rows = await measureAsync(timing, "search.candidate_detail.raw", () =>
     queryRaw<RawAliasDetailRow[]>(Prisma.sql`
@@ -546,7 +547,7 @@ async function findTieredAliasCandidatesRaw(
           SELECT id
           FROM song_aliases
           WHERE
-            ${chosungCondition !== undefined}
+            ${hasChosungCondition}
             AND NOT (SELECT has_exact FROM high_priority_state)
             AND (SELECT alias_count FROM high_priority_state) < ${limit}
             AND chosung_alias ILIKE ${`${escapeLikePattern(chosungQuery)}%`} ESCAPE ${SQL_LIKE_ESCAPE}

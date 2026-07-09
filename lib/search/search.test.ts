@@ -7,6 +7,7 @@ import {
   searchSongs,
   type SearchDbClient
 } from "./search";
+import { matchesAliasWhere } from "./test-where-match";
 
 describe("parseSearchQuery", () => {
   it("defaults limit to 20 and normalizes q", () => {
@@ -349,6 +350,39 @@ describe("searchSongs", () => {
       "normalized_starts_with",
       "chosung_starts_with",
       "normalized_contains",
+      "normalized_equals",
+      "normalized_starts_with",
+      "normalized_contains"
+    ]);
+  });
+
+  it("routes composite final consonants through normal search", async () => {
+    const compositeFinalQuery = "ㄱㄳ";
+    const db = new FakeSearchDb({
+      songs: [
+        song({
+          id: "song_fixture_composite_jamo",
+          aliases: [
+            alias({
+              songId: "song_fixture_composite_jamo",
+              alias: "Composite Jamo",
+              normalizedAlias: `fixture${compositeFinalQuery.normalize(
+                "NFKC"
+              )}center`,
+              chosungAlias: "ㄱㄳㄷ"
+            })
+          ]
+        })
+      ]
+    });
+
+    const result = await searchSongs(db, parsedQuery("q=ㄱㄳ&limit=20"));
+
+    expect(result.items.map((item) => item.song.id)).toEqual([
+      "song_fixture_composite_jamo"
+    ]);
+    expect(result.items[0]?.relevance_score).toBe(60);
+    expect(candidateQueryShapes(db)).toEqual([
       "normalized_equals",
       "normalized_starts_with",
       "normalized_contains"
@@ -864,7 +898,7 @@ class FakeSearchDb implements SearchDbClient {
 
       return selectAliasFields(
         this.aliases
-          .filter((item) => matchesWhere(item, args.where))
+          .filter((item) => matchesAliasWhere(item, args.where))
           .sort(
             (left, right) =>
               left.normalizedAlias.localeCompare(right.normalizedAlias) ||
@@ -896,49 +930,6 @@ function selectAliasFields(
   }
 
   return aliases;
-}
-
-function matchesWhere(
-  aliasRecord: AliasRecord,
-  where: FindManyArgs["where"]
-): boolean {
-  if ("id" in where) {
-    return where.id.in.includes(aliasRecord.id);
-  }
-
-  if ("OR" in where) {
-    return where.OR.some((condition) =>
-      matchesCondition(aliasRecord, condition)
-    );
-  }
-
-  return matchesCondition(aliasRecord, where);
-}
-
-function matchesCondition(
-  aliasRecord: AliasRecord,
-  condition: Exclude<FindManyArgs["where"], { OR: unknown } | { id: unknown }>
-): boolean {
-  if ("normalizedAlias" in condition) {
-    if ("equals" in condition.normalizedAlias) {
-      return aliasRecord.normalizedAlias === condition.normalizedAlias.equals;
-    }
-
-    if ("startsWith" in condition.normalizedAlias) {
-      return aliasRecord.normalizedAlias.startsWith(
-        condition.normalizedAlias.startsWith
-      );
-    }
-
-    return aliasRecord.normalizedAlias.includes(
-      condition.normalizedAlias.contains
-    );
-  }
-
-  return (
-    aliasRecord.chosungAlias?.startsWith(condition.chosungAlias.startsWith) ??
-    false
-  );
 }
 
 function parsedQuery(query: string) {
