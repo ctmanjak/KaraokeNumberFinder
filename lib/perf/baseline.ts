@@ -27,6 +27,7 @@ export type PerfBaselineOptions = {
 };
 
 export type PerfBaselineDbClient = {
+  $queryRaw?: SearchDbClient["$queryRaw"];
   karaokeProvider: {
     findMany(args: unknown): Promise<unknown[]>;
   };
@@ -489,8 +490,18 @@ function createCountingDbClient(
   db: PerfBaselineDbClient,
   counter: QueryCounter
 ): PerfBaselineDbClient {
+  const queryRaw = db.$queryRaw?.bind(db);
+
   return {
     ...db,
+    ...(queryRaw === undefined
+      ? {}
+      : {
+          $queryRaw: (query, ...values) => {
+            counter.increment();
+            return queryRaw(query, ...values);
+          }
+        }),
     karaokeProvider: {
       ...db.karaokeProvider,
       findMany: (args) => {

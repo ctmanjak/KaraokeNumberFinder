@@ -138,6 +138,51 @@ describe("searchSongs", () => {
     });
   });
 
+  it("maps raw candidate/detail rows without Prisma alias fan-out", async () => {
+    const db = new FakeSearchDb({
+      rawRows: [
+        rawAliasRow({
+          alias_id: "alias_fixture_raw",
+          alias_song_id: "song_fixture_raw",
+          alias: "Fixture Raw",
+          normalized_alias: "fixtureraw",
+          song_id: "song_fixture_raw",
+          display_title: "Fixture Raw Display",
+          karaoke_entry_id: "entry_fixture_raw_alpha"
+        }),
+        rawAliasRow({
+          alias_id: "alias_fixture_raw",
+          alias_song_id: "song_fixture_raw",
+          alias: "Fixture Raw",
+          normalized_alias: "fixtureraw",
+          song_id: "song_fixture_raw",
+          display_title: "Fixture Raw Display",
+          karaoke_entry_id: "entry_fixture_raw_beta",
+          provider_id: "provider_beta",
+          karaoke_number: "67890"
+        })
+      ]
+    });
+
+    const result = await searchSongs(db, parsedQuery("q=Fixture%20Raw"));
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      song: {
+        id: "song_fixture_raw",
+        display_title: "Fixture Raw Display",
+        matched_aliases: [{ id: "alias_fixture_raw", alias: "Fixture Raw" }]
+      },
+      karaoke_entries: [
+        { id: "entry_fixture_raw_alpha", provider_id: "provider_alpha" },
+        { id: "entry_fixture_raw_beta", provider_id: "provider_beta" }
+      ],
+      relevance_score: 100
+    });
+    expect(db.rawQueryCalls).toBe(1);
+    expect(db.aliasFindManyArgs).toEqual([]);
+  });
+
   it("records search timing labels for result and suggestion paths", async () => {
     const successfulTiming = timingRecorder();
     const suggestionTiming = timingRecorder();
@@ -744,16 +789,42 @@ type SongRecord = AliasRecord["song"];
 type TestSongRecord = SongRecord & { aliases: AliasRecord[] };
 type EntryRecord = SongRecord["karaokeEntries"][number];
 type FindManyArgs = Parameters<SearchDbClient["songAlias"]["findMany"]>[0];
+type RawAliasRow = {
+  alias_id: string;
+  alias_song_id: string;
+  alias: string;
+  language: string;
+  alias_type: string;
+  normalized_alias: string;
+  chosung_alias: string | null;
+  song_id: string;
+  original_language: string;
+  canonical_title: string;
+  display_title: string;
+  canonical_artist: string;
+  release_year: number | null;
+  tie_in: string | null;
+  karaoke_entry_id: string | null;
+  provider_id: string | null;
+  karaoke_number: string | null;
+  version_info: string | null;
+  availability_status: string | null;
+  last_verified_at: string | null;
+};
 
 class FakeSearchDb implements SearchDbClient {
   private readonly providers: ProviderRecord[];
   private readonly aliases: AliasRecord[];
+  private readonly rawRows?: RawAliasRow[];
+  readonly $queryRaw?: SearchDbClient["$queryRaw"];
   readonly aliasFindManyArgs: FindManyArgs[] = [];
   providerFindManyCalls = 0;
+  rawQueryCalls = 0;
 
   constructor(options: {
     providers?: ProviderRecord[];
     songs?: TestSongRecord[];
+    rawRows?: RawAliasRow[];
   }) {
     this.providers = options.providers ?? [
       provider({ id: "provider_alpha", isDefault: true }),
@@ -766,6 +837,15 @@ class FakeSearchDb implements SearchDbClient {
         song: item
       }))
     );
+    this.rawRows = options.rawRows;
+
+    if (this.rawRows !== undefined) {
+      this.$queryRaw = async <T = unknown>() => {
+        this.rawQueryCalls += 1;
+
+        return this.rawRows as T;
+      };
+    }
   }
 
   readonly karaokeProvider = {
@@ -921,6 +1001,32 @@ function provider(overrides: Partial<ProviderRecord> = {}): ProviderRecord {
     id: "provider_alpha",
     isActive: true,
     isDefault: false,
+    ...overrides
+  };
+}
+
+function rawAliasRow(overrides: Partial<RawAliasRow> = {}): RawAliasRow {
+  return {
+    alias_id: "alias_fixture_001_ko",
+    alias_song_id: "song_fixture_001",
+    alias: "Fixture Alias",
+    language: "ko",
+    alias_type: "translated_title",
+    normalized_alias: "fixturealias",
+    chosung_alias: null,
+    song_id: "song_fixture_001",
+    original_language: "ja",
+    canonical_title: "Fixture Original Title",
+    display_title: "Fixture Display Title",
+    canonical_artist: "Fixture Artist",
+    release_year: 2026,
+    tie_in: "Fixture Series OP",
+    karaoke_entry_id: "entry_fixture_001_alpha",
+    provider_id: "provider_alpha",
+    karaoke_number: "12345",
+    version_info: "original",
+    availability_status: "available",
+    last_verified_at: "2026-06-25",
     ...overrides
   };
 }

@@ -198,6 +198,7 @@ function toPerfQueryShapeDbClient(
   prisma: PrismaClient<"query">
 ): PerfQueryShapeDbClient {
   return {
+    $queryRaw: (query, ...values) => prisma.$queryRaw(query, ...values),
     karaokeProvider: {
       findMany: (args) => prisma.karaokeProvider.findMany(args as never)
     },

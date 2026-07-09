@@ -4,6 +4,7 @@ import {
   normalizeSearchText
 } from "./normalize";
 import { measureAsync, measureSync, type SearchTimingRecorder } from "./timing";
+import { Prisma } from "../generated/prisma/client";
 
 export const DEFAULT_SEARCH_LIMIT = 20;
 export const MAX_SEARCH_LIMIT = 50;
@@ -185,6 +186,10 @@ type SearchAliasOrderBy = Array<
 >;
 
 export type SearchDbClient = {
+  $queryRaw?<T = unknown>(
+    query: TemplateStringsArray | Prisma.Sql,
+    ...values: unknown[]
+  ): Promise<T>;
   karaokeProvider: {
     findMany(args: {
       where: { isActive: true };
@@ -209,6 +214,29 @@ type RankedSong = {
   bestScore: number;
 };
 
+type RawAliasDetailRow = {
+  alias_id: string;
+  alias_song_id: string;
+  alias: string;
+  language: string;
+  alias_type: string;
+  normalized_alias: string;
+  chosung_alias: string | null;
+  song_id: string;
+  original_language: string;
+  canonical_title: string;
+  display_title: string;
+  canonical_artist: string;
+  release_year: number | null;
+  tie_in: string | null;
+  karaoke_entry_id: string | null;
+  provider_id: string | null;
+  karaoke_number: string | null;
+  version_info: string | null;
+  availability_status: string | null;
+  last_verified_at: Date | string | null;
+};
+
 const MIN_EXACT_CANDIDATE_TAKE = 50;
 const MIN_PREFIX_CANDIDATE_TAKE = 100;
 const MIN_CHOSUNG_CANDIDATE_TAKE = 100;
@@ -216,6 +244,7 @@ const MIN_PARTIAL_CANDIDATE_TAKE = 200;
 const MAX_PARTIAL_CANDIDATE_TAKE = 500;
 const SUGGESTION_CANDIDATE_TAKE = 25;
 const AVAILABLE_STATUS = "available";
+const SQL_LIKE_ESCAPE = "\\";
 const activeProviderCache = new WeakMap<
   SearchDbClient,
   ActiveProviderCacheEntry
@@ -277,35 +306,45 @@ export async function searchSongs(
   options: { now?: Date; timing?: SearchTimingRecorder } = {}
 ): Promise<SearchResponse> {
   const now = options.now ?? new Date();
-  const activeProviders = await measureAsync(
-    options.timing,
-    "search.providers",
-    () => getActiveProviders(db)
-  );
-  const activeProviderIds = new Set(
-    activeProviders.map((provider) => provider.id)
-  );
-
-  if (
-    query.providerId !== undefined &&
-    !activeProviderIds.has(query.providerId)
-  ) {
-    throw new InvalidProviderError(query.providerId);
-  }
-
-  const defaultProvider = activeProviders.find(
-    (provider) => provider.isDefault
-  );
   const conditions = buildSearchAliasConditions(query);
 
   if (conditions.length === 0) {
     return emptySearchResponse(query);
   }
 
-  const aliases = await measureAsync(
+  const activeProvidersPromise = measureAsync(
     options.timing,
-    "search.candidates.total",
-    () => findTieredAliasCandidates(db, conditions, query.limit, options.timing)
+    "search.providers",
+    () => getActiveProviders(db)
+  );
+  const findAliases = () =>
+    measureAsync(options.timing, "search.candidates.total", () =>
+      findTieredAliasCandidates(db, conditions, query.limit, options.timing)
+    );
+  let activeProviders: ProviderRecord[];
+  let aliases: AliasRecord[];
+
+  if (query.providerId === undefined) {
+    [activeProviders, aliases] = await Promise.all([
+      activeProvidersPromise,
+      findAliases()
+    ]);
+  } else {
+    activeProviders = await activeProvidersPromise;
+
+    const activeProviderIds = new Set(
+      activeProviders.map((provider) => provider.id)
+    );
+
+    if (!activeProviderIds.has(query.providerId)) {
+      throw new InvalidProviderError(query.providerId);
+    }
+
+    aliases = await findAliases();
+  }
+
+  const defaultProvider = activeProviders.find(
+    (provider) => provider.isDefault
   );
 
   const rankedSongs = measureSync(options.timing, "search.rank", () =>
@@ -439,6 +478,151 @@ async function findTieredAliasCandidates(
   limit: number,
   timing: SearchTimingRecorder | undefined
 ): Promise<AliasRecord[]> {
+  if (shouldUseRawSearchPath(db)) {
+    return findTieredAliasCandidatesRaw(db, conditions, limit, timing);
+  }
+
+  return findTieredAliasCandidatesPrisma(db, conditions, limit, timing);
+}
+
+async function findTieredAliasCandidatesRaw(
+  db: SearchDbClient,
+  conditions: SearchAliasCondition[],
+  limit: number,
+  timing: SearchTimingRecorder | undefined
+): Promise<AliasRecord[]> {
+  const exactCondition = conditions.find(isNormalizedEqualsCondition);
+  const prefixCondition = conditions.find(isNormalizedStartsWithCondition);
+  const chosungCondition = conditions.find(isChosungStartsWithCondition);
+  const containsCondition = conditions.find(isNormalizedContainsCondition);
+
+  if (
+    db.$queryRaw === undefined ||
+    exactCondition === undefined ||
+    prefixCondition === undefined ||
+    containsCondition === undefined
+  ) {
+    return findTieredAliasCandidatesPrisma(db, conditions, limit, timing);
+  }
+
+  const queryRaw = db.$queryRaw.bind(db);
+  const normalizedQuery = exactCondition.normalizedAlias.equals;
+  const exactTake = candidateTakeForCondition(exactCondition, limit);
+  const prefixTake = candidateTakeForCondition(prefixCondition, limit);
+  const containsTake = candidateTakeForCondition(containsCondition, limit);
+  const chosungTake =
+    chosungCondition === undefined
+      ? 0
+      : candidateTakeForCondition(chosungCondition, limit);
+  const chosungQuery = chosungCondition?.chosungAlias.startsWith ?? "";
+
+  const rows = await measureAsync(timing, "search.candidate_detail.raw", () =>
+    queryRaw<RawAliasDetailRow[]>(Prisma.sql`
+        WITH exact_candidates AS MATERIALIZED (
+          SELECT id
+          FROM song_aliases
+          WHERE normalized_alias ILIKE ${escapeLikePattern(normalizedQuery)} ESCAPE ${SQL_LIKE_ESCAPE}
+          ORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC
+          LIMIT ${exactTake}
+        ),
+        prefix_candidates AS MATERIALIZED (
+          SELECT id
+          FROM song_aliases
+          WHERE normalized_alias ILIKE ${`${escapeLikePattern(normalizedQuery)}%`} ESCAPE ${SQL_LIKE_ESCAPE}
+          ORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC
+          LIMIT ${prefixTake}
+        ),
+        high_priority_alias_ids AS MATERIALIZED (
+          SELECT id FROM exact_candidates
+          UNION
+          SELECT id FROM prefix_candidates
+        ),
+        high_priority_state AS MATERIALIZED (
+          SELECT
+            (SELECT COUNT(*) FROM high_priority_alias_ids) AS alias_count,
+            EXISTS (SELECT 1 FROM exact_candidates) AS has_exact
+        ),
+        chosung_candidates AS MATERIALIZED (
+          SELECT id
+          FROM song_aliases
+          WHERE
+            ${chosungCondition !== undefined}
+            AND NOT (SELECT has_exact FROM high_priority_state)
+            AND (SELECT alias_count FROM high_priority_state) < ${limit}
+            AND chosung_alias ILIKE ${`${escapeLikePattern(chosungQuery)}%`} ESCAPE ${SQL_LIKE_ESCAPE}
+          ORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC
+          LIMIT ${chosungTake}
+        ),
+        staged_alias_ids AS MATERIALIZED (
+          SELECT id FROM high_priority_alias_ids
+          UNION
+          SELECT id FROM chosung_candidates
+        ),
+        staged_state AS MATERIALIZED (
+          SELECT COUNT(*) AS alias_count FROM staged_alias_ids
+        ),
+        contains_candidates AS MATERIALIZED (
+          SELECT id
+          FROM song_aliases
+          WHERE
+            NOT (SELECT has_exact FROM high_priority_state)
+            AND (SELECT alias_count FROM staged_state) < ${limit}
+            AND normalized_alias ILIKE ${`%${escapeLikePattern(normalizedQuery)}%`} ESCAPE ${SQL_LIKE_ESCAPE}
+          ORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC
+          LIMIT ${containsTake}
+        ),
+        candidate_alias_ids AS MATERIALIZED (
+          SELECT id FROM staged_alias_ids
+          UNION
+          SELECT id FROM contains_candidates
+        )
+        SELECT
+          sa.id AS alias_id,
+          sa.song_id AS alias_song_id,
+          sa.alias,
+          sa.language,
+          sa.alias_type::text AS alias_type,
+          sa.normalized_alias,
+          sa.chosung_alias,
+          s.id AS song_id,
+          s.original_language,
+          s.canonical_title,
+          s.display_title,
+          s.canonical_artist,
+          s.release_year,
+          s.tie_in,
+          ke.id AS karaoke_entry_id,
+          ke.provider_id,
+          ke.karaoke_number,
+          ke.version_info,
+          ke.availability_status::text AS availability_status,
+          ke.last_verified_at
+        FROM candidate_alias_ids candidates
+        JOIN song_aliases sa ON sa.id = candidates.id
+        JOIN songs s ON s.id = sa.song_id
+        LEFT JOIN karaoke_entries ke ON ke.song_id = s.id
+        ORDER BY
+          sa.normalized_alias ASC,
+          sa.song_id ASC,
+          sa.alias ASC,
+          sa.id ASC,
+          ke.provider_id ASC NULLS LAST,
+          ke.availability_status ASC NULLS LAST,
+          ke.version_info ASC NULLS LAST,
+          ke.karaoke_number ASC NULLS LAST,
+          ke.id ASC NULLS LAST
+      `)
+  );
+
+  return mapRawAliasDetailRows(rows);
+}
+
+async function findTieredAliasCandidatesPrisma(
+  db: SearchDbClient,
+  conditions: SearchAliasCondition[],
+  limit: number,
+  timing: SearchTimingRecorder | undefined
+): Promise<AliasRecord[]> {
   const exactCondition = conditions.find(isNormalizedEqualsCondition);
   const prefixCondition = conditions.find(isNormalizedStartsWithCondition);
   const chosungCondition = conditions.find(isChosungStartsWithCondition);
@@ -511,6 +695,75 @@ async function findTieredAliasCandidates(
       orderBy: aliasCandidateOrderBy()
     })
   )) as AliasRecord[];
+}
+
+function shouldUseRawSearchPath(db: SearchDbClient): boolean {
+  return (
+    db.$queryRaw !== undefined && process.env.SEARCH_RAW_SQL_DISABLED !== "1"
+  );
+}
+
+function mapRawAliasDetailRows(rows: RawAliasDetailRow[]): AliasRecord[] {
+  const aliasesById = new Map<string, AliasRecord>();
+  const entryIdsByAliasId = new Map<string, Set<string>>();
+
+  for (const row of rows) {
+    let alias = aliasesById.get(row.alias_id);
+
+    if (alias === undefined) {
+      alias = {
+        id: row.alias_id,
+        songId: row.alias_song_id,
+        alias: row.alias,
+        language: row.language,
+        aliasType: row.alias_type,
+        normalizedAlias: row.normalized_alias,
+        chosungAlias: row.chosung_alias,
+        song: {
+          id: row.song_id,
+          originalLanguage: row.original_language,
+          canonicalTitle: row.canonical_title,
+          displayTitle: row.display_title,
+          canonicalArtist: row.canonical_artist,
+          releaseYear: row.release_year,
+          tieIn: row.tie_in,
+          karaokeEntries: []
+        }
+      };
+      aliasesById.set(alias.id, alias);
+    }
+
+    if (row.karaoke_entry_id === null) {
+      continue;
+    }
+
+    let entryIds = entryIdsByAliasId.get(row.alias_id);
+
+    if (entryIds === undefined) {
+      entryIds = new Set<string>();
+      entryIdsByAliasId.set(row.alias_id, entryIds);
+    }
+
+    if (entryIds.has(row.karaoke_entry_id)) {
+      continue;
+    }
+
+    entryIds.add(row.karaoke_entry_id);
+    alias.song.karaokeEntries.push({
+      id: row.karaoke_entry_id,
+      providerId: row.provider_id ?? "",
+      karaokeNumber: row.karaoke_number ?? "",
+      versionInfo: row.version_info ?? "",
+      availabilityStatus: row.availability_status ?? "",
+      lastVerifiedAt: row.last_verified_at
+    });
+  }
+
+  return Array.from(aliasesById.values());
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/gu, (match) => `\\${match}`);
 }
 
 function findAliasCandidateIds(

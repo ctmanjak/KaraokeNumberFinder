@@ -442,6 +442,7 @@ Deferred candidate tickets after M2-Perf-08:
 | Candidate                              | Trigger                                                                             |
 | -------------------------------------- | ----------------------------------------------------------------------------------- |
 | `[M2-Perf-14] PostgreSQL search index strategy spike for synthetic 100k aliases` | M2-Perf-12 EXPLAIN shows full alias-table scans at 100k aliases, even though warm local p95 remains below gate. |
+| `[M2-Perf-16] reduce search DB round-trips with raw SQL query shape` | After M2-Perf-15, production has the normalized trigram index, but current seed timing still shows route latency dominated by provider, candidate, and alias-detail DB round trips. Notion: https://app.notion.com/p/3974c60a73038187a57eca2d04bbc2a3 |
 | Search payload trimming proposal       | Response bytes or relation-load timing grows with entries per song/provider.        |
 | Pagination/cursor design               | Result counts exceed first-page needs and stable cursor semantics become necessary. |
 | Synthetic fixture contract completion  | Fixture projection blocks reliable case ID, provider filter, and dataset-label validation across tools. |
