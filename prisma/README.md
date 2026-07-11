@@ -40,11 +40,22 @@ Docker Compose is not required for the first milestone. If you prefer Docker, ru
 
 ## Prisma 7 config
 
-The root `prisma.config.ts` loads `.env` and passes the connection string to Prisma CLI:
+The root `prisma.config.ts` loads `.env` and passes the connection string to Prisma CLI. It falls back to a local placeholder URL so `prisma generate` and build/typecheck/test pre-scripts can run in a clean checkout before a real database is configured:
 
 ```ts
 import "dotenv/config";
-import { defineConfig, env } from "prisma/config";
+import { defineConfig } from "prisma/config";
+
+const FALLBACK_DATABASE_URL =
+  "postgresql://prisma:prisma@localhost:5432/karaoke_number_finder?schema=public";
+
+function prismaCliDatabaseUrl(): string {
+  const configured = process.env.DATABASE_URL;
+
+  return configured === undefined || configured.trim() === ""
+    ? FALLBACK_DATABASE_URL
+    : configured;
+}
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -52,10 +63,12 @@ export default defineConfig({
     path: "prisma/migrations"
   },
   datasource: {
-    url: env("DATABASE_URL")
+    url: prismaCliDatabaseUrl()
   }
 });
 ```
+
+Application runtime code and DB-backed seed/perf scripts still require a real `DATABASE_URL` before opening a database connection.
 
 `schema.prisma` keeps only the datasource provider in the datasource block:
 

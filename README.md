@@ -49,6 +49,12 @@ npm run dev
 
 브라우저에서 `http://localhost:3000`을 엽니다.
 
+홈 화면은 모바일 폭 1열 검색 화면입니다. 제공사 목록은
+`GET /api/providers`에서 로드하고, 운영 기본 제공사가 있으면 기본 선택합니다.
+검색어 입력 중에는 결과를 갱신하지 않으며 Enter 또는 검색 버튼 제출 시에만
+`GET /api/search?q=...`를 호출합니다. 제공사를 선택한 상태에서는
+`provider_id` query parameter를 함께 보냅니다.
+
 로컬 환경변수는 `.env.example`을 기준으로 설정합니다. PostgreSQL 연결 문자열은 `DATABASE_URL`에 둡니다. Prisma 7에서는 이 값을 `prisma/schema.prisma`가 아니라 루트 `prisma.config.ts`에서 읽습니다.
 
 ```dotenv
@@ -102,6 +108,128 @@ npx prisma migrate dev --name add_core_search_schema
 ```
 
 Prisma Client는 `lib/generated/prisma`에 생성되며 저장소에 커밋하지 않습니다.
+
+## Public API
+
+### `GET /api/search`
+
+인증 없이 DB의 `Song`, `SongAlias`, `KaraokeProvider`, `KaraokeEntry` 데이터를 기준으로 검색 결과 카드에 필요한 정보를 반환합니다.
+
+```bash
+curl "http://localhost:3000/api/search?q=fixture"
+curl "http://localhost:3000/api/search?q=%E3%84%B1%E3%84%B4&provider_id=provider_alpha&limit=10"
+```
+
+Query parameters:
+
+| 이름          | 기본값 | 설명                                                  |
+| ------------- | ------ | ----------------------------------------------------- |
+| `q`           | 필수   | 공백 제거 후 1자 이상 검색어                          |
+| `provider_id` | 없음   | 활성 제공사 ID. 지정하면 해당 제공사 수록 여부를 우선 |
+| `limit`       | `20`   | 반환 개수. 1 이상 50 이하 정수                        |
+
+검색은 `SongAlias.normalized_alias`의 exact/prefix/partial match와 `chosung_alias` prefix match를 사용합니다. 한글 초성 검색은 2자 이상 query에서만 적용합니다.
+
+```json
+{
+  "query": "Fixture Alias",
+  "normalized_query": "fixturealias",
+  "items": [
+    {
+      "song": {
+        "id": "song_fixture_001",
+        "original_language": "ja",
+        "canonical_title": "Fixture Original Title",
+        "display_title": "Fixture Display Title",
+        "canonical_artist": "Fixture Artist",
+        "release_year": 2026,
+        "tie_in": "Fixture Series OP",
+        "matched_aliases": [
+          {
+            "id": "alias_fixture_001_ko",
+            "alias": "Fixture Alias",
+            "language": "ko",
+            "alias_type": "translated_title"
+          }
+        ]
+      },
+      "karaoke_entries": [
+        {
+          "id": "entry_fixture_001_alpha",
+          "provider_id": "provider_alpha",
+          "karaoke_number": "12345",
+          "version_info": "original",
+          "availability_status": "available",
+          "last_verified_at": "2026-06-25",
+          "is_stale": false
+        }
+      ],
+      "distinguishing_labels": ["Fixture Artist", "Fixture Series OP", "2026"],
+      "relevance_score": 100
+    }
+  ],
+  "next_cursor": null,
+  "suggestions": []
+}
+```
+
+오류 응답은 다음 형태를 사용합니다.
+
+```json
+{
+  "error": {
+    "code": "INVALID_QUERY",
+    "message": "q must contain at least one non-whitespace character."
+  }
+}
+```
+
+### `GET /api/providers`
+
+인증 없이 DB의 `KaraokeProvider` 데이터를 기준으로 제공사 목록을 반환합니다. 기본값은 활성 제공사만 조회합니다.
+
+```bash
+curl "http://localhost:3000/api/providers"
+curl "http://localhost:3000/api/providers?country=KR"
+curl "http://localhost:3000/api/providers?active_only=false"
+```
+
+Query parameters:
+
+| 이름          | 기본값 | 설명                                            |
+| ------------- | ------ | ----------------------------------------------- |
+| `country`     | 없음   | ISO 3166-1 alpha-2 대문자 2글자 국가 코드 필터  |
+| `active_only` | `true` | `true`면 활성 제공사만, `false`면 비활성도 포함 |
+
+응답은 `display_order`, `name`, `id` 순으로 안정 정렬됩니다.
+`last_catalog_updated_at`은 값이 있으면 `YYYY-MM-DD` 날짜 문자열로 반환합니다.
+
+```json
+{
+  "items": [
+    {
+      "id": "provider_alpha",
+      "name": "Generic Provider Alpha",
+      "country": "KR",
+      "is_active": true,
+      "display_order": 10,
+      "is_default": true,
+      "last_catalog_updated_at": null
+    }
+  ]
+}
+```
+
+오류 응답은 다음 형태를 사용합니다.
+
+```json
+{
+  "error": {
+    "code": "INVALID_QUERY",
+    "message": "active_only must be either true or false."
+  }
+}
+```
 
 ## 프로젝트 구조
 

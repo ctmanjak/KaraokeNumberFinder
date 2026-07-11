@@ -1,1 +1,98 @@
 id,song_id,alias,language,alias_type,normalized_alias,chosung_alias,source_url,source_name,verified_by,verification_note
+alias_song_ja_0001_001,song_ja_0001,잔혹한 천사의 테제,ko,display_title,잔혹한천사의테제,ㅈㅎㅎㅊㅅㅇㅌㅈ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0001_002,song_ja_0001,残酷な天使のテーゼ,ja,canonical_title,残酷な天使のテーゼ,,https://en.wikipedia.org/wiki/Music_of_Neon_Genesis_Evangelion,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0001_003,song_ja_0001,Zankoku na Tenshi no Thesis,ro,romanized_title,zankokunatenshinothesis,,https://en.wikipedia.org/wiki/Music_of_Neon_Genesis_Evangelion,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0001_004,song_ja_0001,A Cruel Angel's Thesis,en,english_title,acruelangelsthesis,,https://en.wikipedia.org/wiki/Music_of_Neon_Genesis_Evangelion,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0001_005,song_ja_0001,신세기 에반게리온,ko,content,신세기에반게리온,ㅅㅅㄱㅇㅂㄱㄹㅇ,https://en.wikipedia.org/wiki/Music_of_Neon_Genesis_Evangelion,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0001_006,song_ja_0001,Neon Genesis Evangelion,en,content,neongenesisevangelion,,https://en.wikipedia.org/wiki/Music_of_Neon_Genesis_Evangelion,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0001_007,song_ja_0001,타카하시 요코,ko,artist,타카하시요코,ㅌㅋㅎㅅㅇㅋ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0002_001,song_ja_0002,네가 모르는 이야기,ko,display_title,네가모르는이야기,ㄴㄱㅁㄹㄴㅇㅇㄱ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0002_002,song_ja_0002,君の知らない物語,ja,canonical_title,君の知らない物語,,https://en.wikipedia.org/wiki/Supercell_(band),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0002_003,song_ja_0002,Kimi no Shiranai Monogatari,ro,romanized_title,kiminoshiranaimonogatari,,https://en.wikipedia.org/wiki/Supercell_(band),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0002_004,song_ja_0002,The Story You Don't Know,en,english_title,thestoryyoudontknow,,https://en.wikipedia.org/wiki/Supercell_(band),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0002_005,song_ja_0002,바케모노가타리,ko,content,바케모노가타리,ㅂㅋㅁㄴㄱㅌㄹ,https://en.wikipedia.org/wiki/Supercell_(band),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0002_006,song_ja_0002,Bakemonogatari,en,content,bakemonogatari,,https://en.wikipedia.org/wiki/Supercell_(band),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0002_007,song_ja_0002,슈퍼셀,ko,artist,슈퍼셀,ㅅㅍㅅ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0003_001,song_ja_0003,아이러니,ko,display_title,아이러니,ㅇㅇㄹㄴ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0003_002,song_ja_0003,irony,ja,canonical_title,irony,,https://en.wikipedia.org/wiki/Irony_(ClariS_song),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0003_003,song_ja_0003,Oreimo,en,content,oreimo,,https://en.wikipedia.org/wiki/Irony_(ClariS_song),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0003_004,song_ja_0003,내 여동생이 이렇게 귀여울 리가 없어,ko,content,내여동생이이렇게귀여울리가없어,ㄴㅇㄷㅅㅇㅇㄹㄱㄱㅇㅇㄹㄱㅇㅇ,https://en.wikipedia.org/wiki/Irony_(ClariS_song),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0003_005,song_ja_0003,俺の妹がこんなに可愛いわけがない,ja,content,俺の妹がこんなに可愛いわけがない,,https://en.wikipedia.org/wiki/Irony_(ClariS_song),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0003_006,song_ja_0003,클라리스,ko,artist,클라리스,ㅋㄹㄹㅅ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0004_001,song_ja_0004,퍼스트 키스,ko,display_title,퍼스트키스,ㅍㅅㅌㅋㅅ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0004_002,song_ja_0004,First kiss,ja,canonical_title,firstkiss,,https://zh.wikipedia.org/wiki/FIRST_KISS_(%E6%AD%8C%E6%9B%B2),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0004_003,song_ja_0004,First Kiss,en,alternate_spelling,firstkiss,,https://zh.wikipedia.org/wiki/FIRST_KISS_(%E6%AD%8C%E6%9B%B2),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0004_004,song_ja_0004,제로의 사역마,ko,content,제로의사역마,ㅈㄹㅇㅅㅇㅁ,https://zh.wikipedia.org/wiki/FIRST_KISS_(%E6%AD%8C%E6%9B%B2),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0004_005,song_ja_0004,ゼロの使い魔,ja,content,ゼロの使い魔,,https://zh.wikipedia.org/wiki/FIRST_KISS_(%E6%AD%8C%E6%9B%B2),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0004_006,song_ja_0004,이치코,ko,artist,이치코,ㅇㅊㅋ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0005_001,song_ja_0005,베텔기우스,ko,display_title,베텔기우스,ㅂㅌㄱㅇㅅ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0005_002,song_ja_0005,ベテルギウス,ja,canonical_title,ベテルギウス,,https://zh.wikipedia.org/wiki/%E5%84%AA%E9%87%8C,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0005_003,song_ja_0005,Betelgeuse,en,english_title,betelgeuse,,https://zh.wikipedia.org/wiki/%E5%84%AA%E9%87%8C,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0005_004,song_ja_0005,Yuuri,ro,artist,yuuri,,https://zh.wikipedia.org/wiki/%E5%84%AA%E9%87%8C,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0005_005,song_ja_0005,유우리,ko,artist,유우리,ㅇㅇㄹ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0005_006,song_ja_0005,SUPER RICH,und,content,superrich,,https://zh.wikipedia.org/wiki/%E5%84%AA%E9%87%8C,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0006_001,song_ja_0006,레몬,ko,display_title,레몬,ㄹㅁ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0006_002,song_ja_0006,Lemon,ja,canonical_title,lemon,,https://en.wikipedia.org/wiki/Lemon_(Kenshi_Yonezu_song),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0006_003,song_ja_0006,Kenshi Yonezu,ro,artist,kenshiyonezu,,https://en.wikipedia.org/wiki/Lemon_(Kenshi_Yonezu_song),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0006_004,song_ja_0006,요네즈 켄시,ko,artist,요네즈켄시,ㅇㄴㅈㅋㅅ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0006_005,song_ja_0006,米津玄師,ja,artist,米津玄師,,https://en.wikipedia.org/wiki/Lemon_(Kenshi_Yonezu_song),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0006_006,song_ja_0006,언내추럴,ko,content,언내추럴,ㅇㄴㅊㄹ,https://en.wikipedia.org/wiki/Lemon_(Kenshi_Yonezu_song),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0006_007,song_ja_0006,Unnatural,en,content,unnatural,,https://en.wikipedia.org/wiki/Lemon_(Kenshi_Yonezu_song),Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0007_001,song_ja_0007,멜트,ko,display_title,멜트,ㅁㅌ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0007_002,song_ja_0007,メルト,ja,canonical_title,メルト,,https://zh.wikipedia.org/wiki/Melt,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0007_003,song_ja_0007,Melt,en,english_title,melt,,https://zh.wikipedia.org/wiki/Melt,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0007_004,song_ja_0007,하츠네 미쿠,ko,artist,하츠네미쿠,ㅎㅊㄴㅁㅋ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0007_005,song_ja_0007,初音ミク,ja,artist,初音ミク,,https://zh.wikipedia.org/wiki/Melt,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0007_006,song_ja_0007,Hatsune Miku,ro,artist,hatsunemiku,,https://zh.wikipedia.org/wiki/Melt,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0007_007,song_ja_0007,ryo,und,artist,ryo,,https://zh.wikipedia.org/wiki/Melt,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0007_008,song_ja_0007,supercell,und,artist,supercell,,https://zh.wikipedia.org/wiki/Melt,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0008_001,song_ja_0008,내일의 밤하늘 초계반,ko,display_title,내일의밤하늘초계반,ㄴㅇㅇㅂㅎㄴㅊㄱㅂ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0008_002,song_ja_0008,アスノヨゾラ哨戒班,ja,canonical_title,アスノヨゾラ哨戒班,,https://en.wikipedia.org/wiki/Orangestar,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0008_003,song_ja_0008,Asu no Yozora Shoukaihan,ro,romanized_title,asunoyozorashoukaihan,,https://en.wikipedia.org/wiki/Orangestar,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0008_004,song_ja_0008,Night Sky Patrol of Tomorrow,en,english_title,nightskypatroloftomorrow,,https://en.wikipedia.org/wiki/Orangestar,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0008_005,song_ja_0008,오렌지스타,ko,artist,오렌지스타,ㅇㄹㅈㅅㅌ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0008_006,song_ja_0008,Orangestar,und,artist,orangestar,,https://en.wikipedia.org/wiki/Orangestar,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0008_007,song_ja_0008,IA,und,artist,ia,,https://en.wikipedia.org/wiki/Orangestar,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0009_001,song_ja_0009,"시간의 비, 최종 전쟁",ko,display_title,"시간의비,최종전쟁",ㅅㄱㅇㅂㅊㅈㅈㅈ,,user_input,manjak,Staging metadata source; exact song source and release date need review before production use
+alias_song_ja_0009_002,song_ja_0009,時ノ雨、最終戦争,ja,canonical_title,時ノ雨、最終戦争,,https://en.wikipedia.org/wiki/Orangestar,Wikipedia,manjak,Staging metadata source; exact song source and release date need review before production use
+alias_song_ja_0009_003,song_ja_0009,Toki no Ame Saishuu Sensou,ro,romanized_title,tokinoamesaishuusensou,,https://en.wikipedia.org/wiki/Orangestar,Wikipedia,manjak,Staging metadata source; exact song source and release date need review before production use
+alias_song_ja_0009_004,song_ja_0009,오렌지스타,ko,artist,오렌지스타,ㅇㄹㅈㅅㅌ,,user_input,manjak,Staging metadata source; exact song source and release date need review before production use
+alias_song_ja_0009_005,song_ja_0009,Orangestar,und,artist,orangestar,,https://en.wikipedia.org/wiki/Orangestar,Wikipedia,manjak,Staging metadata source; exact song source and release date need review before production use
+alias_song_ja_0009_006,song_ja_0009,IA,und,artist,ia,,https://en.wikipedia.org/wiki/Orangestar,Wikipedia,manjak,Staging metadata source; exact song source and release date need review before production use
+alias_song_ja_0010_001,song_ja_0010,히로인,ko,display_title,히로인,ㅎㄹㅇ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0010_002,song_ja_0010,ヒロイン,ja,canonical_title,ヒロイン,,https://zh.wikipedia.org/wiki/Back_number,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0010_003,song_ja_0010,Heroine,en,english_title,heroine,,https://zh.wikipedia.org/wiki/Back_number,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0010_004,song_ja_0010,백 넘버,ko,artist,백넘버,ㅂㄴㅂ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0010_005,song_ja_0010,back number,und,artist,backnumber,,https://zh.wikipedia.org/wiki/Back_number,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0010_006,song_ja_0010,JR SKISKI,und,content,jrskiski,,https://zh.wikipedia.org/wiki/Back_number,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0011_001,song_ja_0011,수평선,ko,display_title,수평선,ㅅㅍㅅ,,user_input,manjak,Staging metadata source; exact tie-in/source detail needs review before production use
+alias_song_ja_0011_002,song_ja_0011,水平線,ja,canonical_title,水平線,,https://zh.wikipedia.org/wiki/Back_number,Wikipedia,manjak,Staging metadata source; exact tie-in/source detail needs review before production use
+alias_song_ja_0011_003,song_ja_0011,Suiheisen,ro,romanized_title,suiheisen,,https://zh.wikipedia.org/wiki/Back_number,Wikipedia,manjak,Staging metadata source; exact tie-in/source detail needs review before production use
+alias_song_ja_0011_004,song_ja_0011,Horizon,en,english_title,horizon,,https://zh.wikipedia.org/wiki/Back_number,Wikipedia,manjak,Staging metadata source; exact tie-in/source detail needs review before production use
+alias_song_ja_0011_005,song_ja_0011,백 넘버,ko,artist,백넘버,ㅂㄴㅂ,,user_input,manjak,Staging metadata source; exact tie-in/source detail needs review before production use
+alias_song_ja_0011_006,song_ja_0011,back number,und,artist,backnumber,,https://zh.wikipedia.org/wiki/Back_number,Wikipedia,manjak,Staging metadata source; exact tie-in/source detail needs review before production use
+alias_song_ja_0011_007,song_ja_0011,인터하이,ko,content,인터하이,ㅇㅌㅎㅇ,https://zh.wikipedia.org/wiki/Back_number,Wikipedia,manjak,Staging metadata source; exact tie-in/source detail needs review before production use
+alias_song_ja_0011_008,song_ja_0011,Inter-High,en,content,interhigh,,https://zh.wikipedia.org/wiki/Back_number,Wikipedia,manjak,Staging metadata source; exact tie-in/source detail needs review before production use
+alias_song_ja_0012_001,song_ja_0012,달맞이 꽃,ko,display_title,달맞이꽃,ㄷㅁㅇㄲ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0012_002,song_ja_0012,ツキミソウ,ja,canonical_title,ツキミソウ,,https://en.wikipedia.org/wiki/Novelbright,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0012_003,song_ja_0012,Tsukimisou,ro,romanized_title,tsukimisou,,https://en.wikipedia.org/wiki/Novelbright,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0012_004,song_ja_0012,Evening Primrose,en,english_title,eveningprimrose,,https://en.wikipedia.org/wiki/Novelbright,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0012_005,song_ja_0012,노벨브라이트,ko,artist,노벨브라이트,ㄴㅂㅂㄹㅇㅌ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0012_006,song_ja_0012,Novelbright,und,artist,novelbright,,https://en.wikipedia.org/wiki/Novelbright,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0013_001,song_ja_0013,그저 목소리 하나,ko,display_title,그저목소리하나,ㄱㅈㅁㅅㄹㅎㄴ,,user_input,manjak,Needs reliable song metadata source before production use
+alias_song_ja_0013_002,song_ja_0013,ただ声一つ,ja,canonical_title,ただ声一つ,,,user_input,manjak,Needs reliable song metadata source before production use
+alias_song_ja_0013_003,song_ja_0013,Tada Koe Hitotsu,ro,romanized_title,tadakoehitotsu,,,user_input,manjak,Needs reliable song metadata source before production use
+alias_song_ja_0013_004,song_ja_0013,로쿠데나시,ko,artist,로쿠데나시,ㄹㅋㄷㄴㅅ,,user_input,manjak,Needs reliable song metadata source before production use
+alias_song_ja_0013_005,song_ja_0013,ロクデナシ,ja,artist,ロクデナシ,,,user_input,manjak,Needs reliable song metadata source before production use
+alias_song_ja_0013_006,song_ja_0013,Rokudenashi,ro,artist,rokudenashi,,,user_input,manjak,Needs reliable song metadata source before production use
+alias_song_ja_0014_001,song_ja_0014,잿빛과 푸름,ko,display_title,잿빛과푸름,ㅈㅂㄱㅍㄹ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0014_002,song_ja_0014,쟃빛과 푸름,ko,alternate_spelling,쟃빛과푸름,ㅈㅂㄱㅍㄹ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0014_003,song_ja_0014,灰色と青,ja,canonical_title,灰色と青,,https://zh.wikipedia.org/wiki/%E7%81%B0%E8%89%B2%E4%B8%8E%E9%9D%92,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0014_004,song_ja_0014,Haiiro to Ao,ro,romanized_title,haiirotoao,,https://zh.wikipedia.org/wiki/%E7%81%B0%E8%89%B2%E4%B8%8E%E9%9D%92,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0014_005,song_ja_0014,Gray and Blue,en,english_title,grayandblue,,https://zh.wikipedia.org/wiki/%E7%81%B0%E8%89%B2%E4%B8%8E%E9%9D%92,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0014_006,song_ja_0014,요네즈 켄시,ko,artist,요네즈켄시,ㅇㄴㅈㅋㅅ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0014_007,song_ja_0014,스다 마사키,ko,artist,스다마사키,ㅅㄷㅁㅅㅋ,,user_input,manjak,Staging metadata source; review before production use
+alias_song_ja_0014_008,song_ja_0014,米津玄師,ja,artist,米津玄師,,https://zh.wikipedia.org/wiki/%E7%81%B0%E8%89%B2%E4%B8%8E%E9%9D%92,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0014_009,song_ja_0014,菅田将暉,ja,artist,菅田将暉,,https://zh.wikipedia.org/wiki/%E7%81%B0%E8%89%B2%E4%B8%8E%E9%9D%92,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0014_010,song_ja_0014,Kenshi Yonezu,ro,artist,kenshiyonezu,,https://zh.wikipedia.org/wiki/%E7%81%B0%E8%89%B2%E4%B8%8E%E9%9D%92,Wikipedia,manjak,Staging metadata source; review before production use
+alias_song_ja_0014_011,song_ja_0014,Masaki Suda,ro,artist,masakisuda,,https://zh.wikipedia.org/wiki/%E7%81%B0%E8%89%B2%E4%B8%8E%E9%9D%92,Wikipedia,manjak,Staging metadata source; review before production use

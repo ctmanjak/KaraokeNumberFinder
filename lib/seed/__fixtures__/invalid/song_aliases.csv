@@ -1,0 +1,7 @@
+id,song_id,alias,language,alias_type,normalized_alias,chosung_alias,source_url,source_name,verified_by,verification_note
+alias_missing_song,song_missing,픽스처 노래,ko,display_title,픽스처노래,ㅍㅅㅊㄴㄹ,https://example.com/song,Generic song source,ops_fixture,Missing song FK
+alias_bad_type,song_fixture_001,Fixture Song,ro,bad_type,fixturesong,,https://example.com/song,Generic song source,ops_fixture,Bad alias type
+alias_bad_normalized,song_fixture_001,Fixture Song,ro,romanized_title,wrong,,https://example.com/song,Generic song source,ops_fixture,Bad normalized alias
+alias_bad_chosung,song_fixture_001,픽스처 노래,ko,display_title,픽스처노래,wrong,https://example.com/song,Generic song source,ops_fixture,Bad chosung alias
+alias_duplicate,song_fixture_001,Fixture Song,ro,romanized_title,fixturesong,,https://example.com/song,Generic song source,ops_fixture,Duplicate alias key
+alias_bad_type,song_fixture_001,Another Fixture Alias,en,english_title,anotherfixturealias,,https://example.com/song,Generic song source,ops_fixture,Duplicate alias id

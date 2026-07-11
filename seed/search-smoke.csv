@@ -1,0 +1,9 @@
+query,expected_song_id,label
+잔혹한 천사의 테제,song_ja_0001,hangul display title
+Zankoku na Tenshi,song_ja_0001,romanized title
+신세기 에반게리온,song_ja_0001,content alias
+ㅈㅎㅎ,song_ja_0001,hangul chosung
+레몬,song_ja_0006,hangul display title
+Kenshi Yonezu,song_ja_0006,artist alias
+수평선,song_ja_0011,hangul display title
+back number,song_ja_0011,artist alias
