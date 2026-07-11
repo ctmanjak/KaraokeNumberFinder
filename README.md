@@ -8,8 +8,9 @@
 
 ## 프로젝트 링크
 
-- [Notion 프로젝트 문서 DB](https://manjak.notion.site/129d2a929d244460ae4bf198be2ff6ce?v=e5eea8ba67114bbab85be5e477616d55&source=copy_link)
-- [Notion 티켓 DB](https://manjak.notion.site/775ce4e63cfb43d6b998e16ff87853ca?v=b67df60b79904caabc616c41616e365b&source=copy_link)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Open-22c55e?style=for-the-badge&logo=vercel&logoColor=white)](https://karaoke-number-finder.vercel.app)
+[![Project Docs](https://img.shields.io/badge/Notion-Project_Docs-111827?style=for-the-badge&logo=notion&logoColor=white)](https://manjak.notion.site/129d2a929d244460ae4bf198be2ff6ce?v=e5eea8ba67114bbab85be5e477616d55&source=copy_link)
+[![Task Board](https://img.shields.io/badge/Notion-Task_Board-7c3aed?style=for-the-badge&logo=notion&logoColor=white)](https://manjak.notion.site/775ce4e63cfb43d6b998e16ff87853ca?v=b67df60b79904caabc616c41616e365b&source=copy_link)
 
 노래방에서 외국어 곡 번호를 빠르게 찾기 위한 검색 중심 웹앱입니다.
 
