@@ -6,6 +6,11 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-1f2937?style=for-the-badge&logo=typescript)
 ![Audit](https://img.shields.io/badge/audit-clean-064e3b?style=for-the-badge)
 
+## 프로젝트 링크
+
+- [Notion 프로젝트 문서 DB](https://manjak.notion.site/129d2a929d244460ae4bf198be2ff6ce?v=e5eea8ba67114bbab85be5e477616d55&source=copy_link)
+- [Notion 티켓 DB](https://manjak.notion.site/775ce4e63cfb43d6b998e16ff87853ca?v=b67df60b79904caabc616c41616e365b&source=copy_link)
+
 노래방에서 외국어 곡 번호를 빠르게 찾기 위한 검색 중심 웹앱입니다.
 
 한국어 제목, 원제, 로마자, 영문명, 콘텐츠명, 약칭, 한글 초성처럼 사용자가 실제로 기억하는 표현을 받아 제공사별 예약 번호와 수록 상태를 보여주는 것이 목표입니다.
