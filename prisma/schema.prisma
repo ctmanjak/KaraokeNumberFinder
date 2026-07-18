@@ -47,6 +47,7 @@ model Song {
   updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
   aliases          SongAlias[]
   karaokeEntries   KaraokeEntry[]
+  favorites        Favorite[]
 
   @@index([originalLanguage], map: "songs_original_language_idx")
   @@index([displayTitle], map: "songs_display_title_idx")
@@ -79,20 +80,21 @@ model SongAlias {
 }
 
 model KaraokeProvider {
-  id                   String         @id @db.VarChar(128)
-  name                 String         @db.VarChar(256)
-  country              String         @db.VarChar(2)
-  isActive             Boolean        @default(true) @map("is_active")
-  displayOrder         Int            @map("display_order")
-  isDefault            Boolean        @default(false) @map("is_default")
-  sourceUrl            String?        @map("source_url") @db.Text
-  sourceName           String?        @map("source_name") @db.VarChar(256)
-  verifiedBy           String         @map("verified_by") @db.VarChar(128)
-  verificationNote     String?        @map("verification_note") @db.Text
-  lastCatalogUpdatedAt DateTime?      @map("last_catalog_updated_at") @db.Date
-  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                   String           @id @db.VarChar(128)
+  name                 String           @db.VarChar(256)
+  country              String           @db.VarChar(2)
+  isActive             Boolean          @default(true) @map("is_active")
+  displayOrder         Int              @map("display_order")
+  isDefault            Boolean          @default(false) @map("is_default")
+  sourceUrl            String?          @map("source_url") @db.Text
+  sourceName           String?          @map("source_name") @db.VarChar(256)
+  verifiedBy           String           @map("verified_by") @db.VarChar(128)
+  verificationNote     String?          @map("verification_note") @db.Text
+  lastCatalogUpdatedAt DateTime?        @map("last_catalog_updated_at") @db.Date
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
   karaokeEntries       KaraokeEntry[]
+  userPreferences      UserPreference[]
 
   @@unique([country, name], map: "karaoke_providers_country_name_key")
   @@index([isActive, isDefault], map: "karaoke_providers_active_default_idx")
@@ -122,4 +124,115 @@ model KaraokeEntry {
   @@index([songId, availabilityStatus], map: "karaoke_entries_song_status_idx")
   @@index([lastVerifiedAt], map: "karaoke_entries_last_verified_at_idx")
   @@map("karaoke_entries")
+}
+
+model User {
+  id            String          @id @default(uuid()) @db.Uuid
+  name          String          @db.VarChar(256)
+  email         String          @db.VarChar(320)
+  emailVerified Boolean         @default(false) @map("email_verified")
+  image         String?         @db.Text
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  accounts      Account[]
+  sessions      Session[]
+  preference    UserPreference?
+  favorites     Favorite[]
+  searchHistory SearchHistory[]
+
+  @@unique([email], map: "users_email_key")
+  @@map("users")
+}
+
+model Account {
+  id                    String    @id @default(uuid()) @db.Uuid
+  userId                String    @map("user_id") @db.Uuid
+  providerId            String    @map("provider_id") @db.VarChar(64)
+  accountId             String    @map("account_id") @db.VarChar(255)
+  accessToken           String?   @map("access_token") @db.Text
+  refreshToken          String?   @map("refresh_token") @db.Text
+  idToken               String?   @map("id_token") @db.Text
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at") @db.Timestamptz(6)
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at") @db.Timestamptz(6)
+  scope                 String?   @db.Text
+  tokenType             String?   @map("token_type") @db.VarChar(64)
+  password              String?   @db.Text
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([providerId, accountId], map: "accounts_provider_id_account_id_key")
+  @@index([userId], map: "accounts_user_id_idx")
+  @@map("accounts")
+}
+
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  token     String   @db.VarChar(255)
+  userId    String   @map("user_id") @db.Uuid
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  ipAddress String?  @map("ip_address") @db.VarChar(64)
+  userAgent String?  @map("user_agent") @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([token], map: "sessions_token_key")
+  @@index([userId, expiresAt], map: "sessions_user_id_expires_at_idx")
+  @@index([expiresAt], map: "sessions_expires_at_idx")
+  @@map("sessions")
+}
+
+model Verification {
+  id         String   @id @default(uuid()) @db.Uuid
+  identifier String   @db.VarChar(512)
+  value      String   @db.Text
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([identifier], map: "verifications_identifier_idx")
+  @@index([expiresAt], map: "verifications_expires_at_idx")
+  @@map("verifications")
+}
+
+model UserPreference {
+  userId            String           @id @map("user_id") @db.Uuid
+  defaultProviderId String?          @map("default_provider_id") @db.VarChar(128)
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  defaultProvider   KaraokeProvider? @relation(fields: [defaultProviderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([defaultProviderId], map: "user_preferences_default_provider_id_idx")
+  @@map("user_preferences")
+}
+
+model Favorite {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  songId    String   @map("song_id") @db.VarChar(128)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  song      Song     @relation(fields: [songId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([userId, songId], map: "favorites_user_id_song_id_key")
+  @@index([userId, createdAt(sort: Desc), id(sort: Desc)], map: "favorites_user_id_created_at_id_idx")
+  @@index([songId], map: "favorites_song_id_idx")
+  @@map("favorites")
+}
+
+model SearchHistory {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  query           String   @db.VarChar(200)
+  normalizedQuery String   @map("normalized_query") @db.VarChar(200)
+  searchedAt      DateTime @default(now()) @map("searched_at") @db.Timestamptz(6)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([userId, normalizedQuery], map: "search_histories_user_id_normalized_query_key")
+  @@index([userId, searchedAt(sort: Desc), id(sort: Desc)], map: "search_histories_user_id_searched_at_id_idx")
+  @@map("search_histories")
 }

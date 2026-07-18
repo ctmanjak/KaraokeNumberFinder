@@ -1,0 +1,52 @@
+name: M3 schema
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/m3-schema.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "prisma/**"
+      - "prisma.config.ts"
+      - "scripts/m3/**"
+      - "vitest.config.ts"
+  push:
+    branches:
+      - develop
+    paths:
+      - ".github/workflows/m3-schema.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "prisma/**"
+      - "prisma.config.ts"
+      - "scripts/m3/**"
+      - "vitest.config.ts"
+
+jobs:
+  migration-constraints:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: karaoke_number_finder_m3_test
+          POSTGRES_PASSWORD: prisma
+          POSTGRES_USER: prisma
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U prisma -d karaoke_number_finder_m3_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+      - run: npm ci
+      - run: npm run test:m3-db
+        env:
+          M3_TEST_DATABASE_URL: postgresql://prisma:prisma@127.0.0.1:5432/karaoke_number_finder_m3_test
