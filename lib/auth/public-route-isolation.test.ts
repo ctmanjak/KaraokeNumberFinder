@@ -1,26 +1,46 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createProvidersGetHandler } from "../providers/route-handler";
-import { createSearchGetHandler } from "../search/route-handler";
+afterEach(() => {
+  vi.doUnmock("./server");
+  vi.resetModules();
+});
 
 describe("public route authentication isolation", () => {
   it("keeps public route modules free of auth/session imports", () => {
     for (const route of [
       "app/api/search/route.ts",
-      "app/api/providers/route.ts"
+      "app/api/providers/route.ts",
+      "lib/search/route-handler.ts",
+      "lib/search/search.ts",
+      "lib/providers/route-handler.ts",
+      "lib/providers/providers.ts"
     ]) {
       const source = readFileSync(path.join(process.cwd(), route), "utf8");
-      expect(source).not.toMatch(/auth|session/iu);
+      expect(source).not.toMatch(/auth|session|personalization/iu);
     }
   });
 
   it("keeps search and provider handlers working when auth DB access fails", async () => {
-    const authDatabaseLookup = vi.fn(async () => {
-      throw new Error("auth database unavailable");
+    vi.resetModules();
+    const authModuleInitialization = vi.fn(() => {
+      return {
+        getServerAuth() {
+          throw new Error("auth database unavailable");
+        },
+        getServerAuthRuntime() {
+          throw new Error("auth database unavailable");
+        }
+      };
     });
+    vi.doMock("./server", () => authModuleInitialization());
+    const [{ createSearchGetHandler }, { createProvidersGetHandler }] =
+      await Promise.all([
+        import("../search/route-handler"),
+        import("../providers/route-handler")
+      ]);
     const search = createSearchGetHandler(async () => ({
       query: "hello",
       normalized_query: "hello",
@@ -37,6 +57,12 @@ describe("public route authentication isolation", () => {
 
     expect(searchResponse.status).toBe(200);
     expect(providersResponse.status).toBe(200);
-    expect(authDatabaseLookup).not.toHaveBeenCalled();
+    expect(authModuleInitialization).not.toHaveBeenCalled();
+
+    const authModule = await import("./server");
+    expect(authModuleInitialization).toHaveBeenCalledTimes(1);
+    expect(() => authModule.getServerAuth()).toThrow(
+      "auth database unavailable"
+    );
   });
 });

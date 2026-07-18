@@ -41,7 +41,8 @@
     "next": "^16.2.9",
     "pg": "^8.22.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "server-only": "^0.0.1"
   },
   "overrides": {
     "@hono/node-server": "1.19.13",
