@@ -176,6 +176,19 @@ describe("default provider client", () => {
     });
   });
 
+  it("rejects a non-string preference source instead of coercing it", async () => {
+    const fetcher = vi.fn(async () =>
+      jsonResponse({
+        source: ["user"],
+        default_provider: providers[0]
+      })
+    ) as typeof fetch;
+
+    await expect(fetchUserPreference(fetcher)).resolves.toEqual({
+      status: "unavailable"
+    });
+  });
+
   it("times out a pending preference read as unavailable", async () => {
     vi.useFakeTimers();
 

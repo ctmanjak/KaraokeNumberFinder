@@ -304,7 +304,8 @@ function isUserPreferenceReadModel(
     Array.isArray(value) ||
     Object.keys(value).length !== 2 ||
     !("source" in value) ||
-    !["user", "operational_default", "none"].includes(String(value.source)) ||
+    typeof value.source !== "string" ||
+    !["user", "operational_default", "none"].includes(value.source) ||
     !("default_provider" in value)
   ) {
     return false;
