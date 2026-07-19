@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 afterEach(() => {
   vi.doUnmock("./server");
+  vi.doUnmock("../favorites/repository");
   vi.resetModules();
 });
 
@@ -19,7 +20,7 @@ describe("public route authentication isolation", () => {
       "lib/providers/providers.ts"
     ]) {
       const source = readFileSync(path.join(process.cwd(), route), "utf8");
-      expect(source).not.toMatch(/auth|session|personalization/iu);
+      expect(source).not.toMatch(/auth|session|personalization|favorites?/iu);
     }
   });
 
@@ -35,7 +36,11 @@ describe("public route authentication isolation", () => {
         }
       };
     });
+    const favoriteModuleInitialization = vi.fn(() => {
+      throw new Error("favorite database unavailable");
+    });
     vi.doMock("./server", () => authModuleInitialization());
+    vi.doMock("../favorites/repository", () => favoriteModuleInitialization());
     const [{ createSearchGetHandler }, { createProvidersGetHandler }] =
       await Promise.all([
         import("../search/route-handler"),
@@ -58,6 +63,7 @@ describe("public route authentication isolation", () => {
     expect(searchResponse.status).toBe(200);
     expect(providersResponse.status).toBe(200);
     expect(authModuleInitialization).not.toHaveBeenCalled();
+    expect(favoriteModuleInitialization).not.toHaveBeenCalled();
 
     const authModule = await import("./server");
     expect(authModuleInitialization).toHaveBeenCalledTimes(1);
