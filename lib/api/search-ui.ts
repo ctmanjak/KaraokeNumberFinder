@@ -1,4 +1,5 @@
 import type { ProviderListItem } from "@/lib/providers/providers";
+import { selectOperationalDefaultProvider } from "@/lib/preferences/default-provider";
 import type { SearchResponse } from "@/lib/search/search";
 
 export type ApiErrorPayload = {
@@ -67,12 +68,7 @@ export async function fetchSearchResults(
 export function selectInitialProvider(
   providers: ProviderListItem[]
 ): string | undefined {
-  return (
-    providers.find((provider) => provider.is_default && provider.is_active)
-      ?.id ??
-    providers.find((provider) => provider.is_active)?.id ??
-    providers[0]?.id
-  );
+  return selectOperationalDefaultProvider(providers)?.id;
 }
 
 function errorMessage(payload: unknown, fallback: string): string {

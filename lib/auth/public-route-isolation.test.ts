@@ -7,6 +7,7 @@ afterEach(() => {
   vi.doUnmock("./server");
   vi.doUnmock("../favorites/repository");
   vi.doUnmock("../search-history/repository");
+  vi.doUnmock("../user-preference/repository");
   vi.resetModules();
 });
 
@@ -22,7 +23,7 @@ describe("public route authentication isolation", () => {
     ]) {
       const source = readFileSync(path.join(process.cwd(), route), "utf8");
       expect(source).not.toMatch(
-        /\b(?:auth|session|personalization|favorites?)\b/iu
+        /auth|session|personalization|favorites?|user[-_]?preference/iu
       );
     }
   });
@@ -45,10 +46,16 @@ describe("public route authentication isolation", () => {
     const searchHistoryModuleInitialization = vi.fn(() => {
       throw new Error("search history database unavailable");
     });
+    const userPreferenceModuleInitialization = vi.fn(() => {
+      throw new Error("user preference database unavailable");
+    });
     vi.doMock("./server", () => authModuleInitialization());
     vi.doMock("../favorites/repository", () => favoriteModuleInitialization());
     vi.doMock("../search-history/repository", () =>
       searchHistoryModuleInitialization()
+    );
+    vi.doMock("../user-preference/repository", () =>
+      userPreferenceModuleInitialization()
     );
     const [{ createSearchGetHandler }, { createProvidersGetHandler }] =
       await Promise.all([
@@ -74,6 +81,7 @@ describe("public route authentication isolation", () => {
     expect(authModuleInitialization).not.toHaveBeenCalled();
     expect(favoriteModuleInitialization).not.toHaveBeenCalled();
     expect(searchHistoryModuleInitialization).not.toHaveBeenCalled();
+    expect(userPreferenceModuleInitialization).not.toHaveBeenCalled();
 
     const authModule = await import("./server");
     expect(authModuleInitialization).toHaveBeenCalledTimes(1);
