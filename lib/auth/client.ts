@@ -1,3 +1,9 @@
+import {
+  createRequestTimeout,
+  readErrorEnvelope,
+  readJson
+} from "@/lib/http/client";
+
 export const AUTH_REQUEST_TIMEOUT_MS = 5_000;
 
 export type BrowserAuthState =
@@ -162,47 +168,5 @@ function isGoogleSignInPayload(
     );
   } catch {
     return false;
-  }
-}
-
-function readErrorEnvelope(value: unknown): {
-  code?: string;
-  message?: string;
-} {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    Array.isArray(value) ||
-    typeof (value as Record<string, unknown>).error !== "object" ||
-    (value as Record<string, unknown>).error === null
-  ) {
-    return {};
-  }
-
-  const error = (value as { error: Record<string, unknown> }).error;
-  return {
-    ...(typeof error.code === "string" ? { code: error.code } : {}),
-    ...(typeof error.message === "string" ? { message: error.message } : {})
-  };
-}
-
-function createRequestTimeout(timeoutMs: number): Readonly<{
-  clear: () => void;
-  signal: AbortSignal;
-}> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  return {
-    clear: () => clearTimeout(timeoutId),
-    signal: controller.signal
-  };
-}
-
-async function readJson(response: Response): Promise<unknown> {
-  try {
-    return await response.json();
-  } catch {
-    return undefined;
   }
 }
