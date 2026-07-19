@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 afterEach(() => {
   vi.doUnmock("./server");
   vi.doUnmock("../favorites/repository");
+  vi.doUnmock("../search-history/repository");
   vi.resetModules();
 });
 
@@ -41,8 +42,14 @@ describe("public route authentication isolation", () => {
     const favoriteModuleInitialization = vi.fn(() => {
       throw new Error("favorite database unavailable");
     });
+    const searchHistoryModuleInitialization = vi.fn(() => {
+      throw new Error("search history database unavailable");
+    });
     vi.doMock("./server", () => authModuleInitialization());
     vi.doMock("../favorites/repository", () => favoriteModuleInitialization());
+    vi.doMock("../search-history/repository", () =>
+      searchHistoryModuleInitialization()
+    );
     const [{ createSearchGetHandler }, { createProvidersGetHandler }] =
       await Promise.all([
         import("../search/route-handler"),
@@ -66,6 +73,7 @@ describe("public route authentication isolation", () => {
     expect(providersResponse.status).toBe(200);
     expect(authModuleInitialization).not.toHaveBeenCalled();
     expect(favoriteModuleInitialization).not.toHaveBeenCalled();
+    expect(searchHistoryModuleInitialization).not.toHaveBeenCalled();
 
     const authModule = await import("./server");
     expect(authModuleInitialization).toHaveBeenCalledTimes(1);
