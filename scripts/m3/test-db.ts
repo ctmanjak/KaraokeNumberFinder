@@ -10,9 +10,19 @@ const testDatabaseUrl = requireM3TestDatabaseUrl(
 runLocalBinary("prisma", ["migrate", "deploy"], {
   DATABASE_URL: testDatabaseUrl
 });
+runLocalBinary("prisma", ["generate"], {
+  DATABASE_URL: testDatabaseUrl
+});
 runLocalBinary("vitest", ["run", "prisma/auth-user-data-schema.test.ts"], {
   M3_TEST_DATABASE_URL: testDatabaseUrl
 });
+runLocalBinary(
+  "vitest",
+  ["run", "lib/search-history/repository.integration.test.ts"],
+  {
+    M3_TEST_DATABASE_URL: testDatabaseUrl
+  }
+);
 
 function runLocalBinary(
   binaryName: string,

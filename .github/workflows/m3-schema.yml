@@ -9,6 +9,7 @@ on:
       - "prisma/**"
       - "prisma.config.ts"
       - "scripts/m3/**"
+      - "lib/search-history/**"
       - "vitest.config.ts"
   push:
     branches:
@@ -20,6 +21,7 @@ on:
       - "prisma/**"
       - "prisma.config.ts"
       - "scripts/m3/**"
+      - "lib/search-history/**"
       - "vitest.config.ts"
 
 jobs:
