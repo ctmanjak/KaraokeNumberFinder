@@ -23,6 +23,13 @@ runLocalBinary(
     M3_TEST_DATABASE_URL: testDatabaseUrl
   }
 );
+runLocalBinary(
+  "vitest",
+  ["run", "lib/user-preference/repository.integration.test.ts"],
+  {
+    M3_TEST_DATABASE_URL: testDatabaseUrl
+  }
+);
 
 function runLocalBinary(
   binaryName: string,

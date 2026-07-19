@@ -8,6 +8,7 @@ import {
   waitFor
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_PROVIDER_STORAGE_KEY } from "@/lib/preferences/default-provider-storage";
 import { MobileSearchPage } from "./MobileSearchPage";
 
 const providers = [
@@ -138,6 +139,7 @@ const searchResponse = {
 describe("MobileSearchPage", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    window.localStorage.clear();
   });
 
   afterEach(() => {
@@ -155,7 +157,7 @@ describe("MobileSearchPage", () => {
     expect((select as HTMLSelectElement).value).toBe("provider_default");
   });
 
-  it("falls back to the first active provider when no default exists", async () => {
+  it("falls back to the first active provider in operational order when no default exists", async () => {
     mockFetch([
       {
         ok: true,
@@ -172,7 +174,232 @@ describe("MobileSearchPage", () => {
 
     const select = await screen.findByLabelText("제공사");
 
-    expect((select as HTMLSelectElement).value).toBe("provider_secondary");
+    expect((select as HTMLSelectElement).value).toBe("provider_default");
+  });
+
+  it("restores a guest provider selection on a later browser visit", async () => {
+    window.localStorage.setItem(
+      DEFAULT_PROVIDER_STORAGE_KEY,
+      JSON.stringify({ version: 1, provider_id: "provider_secondary" })
+    );
+    mockFetch([{ ok: true, body: { items: providers } }]);
+
+    render(<MobileSearchPage />);
+
+    const select = await screen.findByLabelText("제공사");
+    await waitFor(() => {
+      expect((select as HTMLSelectElement).value).toBe("provider_secondary");
+    });
+    expect(
+      window.localStorage.getItem(DEFAULT_PROVIDER_STORAGE_KEY)
+    ).not.toBeNull();
+  });
+
+  it("discards a removed local provider and restores the operational default", async () => {
+    window.localStorage.setItem(
+      DEFAULT_PROVIDER_STORAGE_KEY,
+      JSON.stringify({ version: 1, provider_id: "provider-removed" })
+    );
+    mockFetch([{ ok: true, body: { items: providers } }]);
+
+    render(<MobileSearchPage />);
+
+    const select = await screen.findByLabelText("제공사");
+    await waitFor(() => {
+      expect((select as HTMLSelectElement).value).toBe("provider_default");
+      expect(
+        window.localStorage.getItem(DEFAULT_PROVIDER_STORAGE_KEY)
+      ).toBeNull();
+    });
+  });
+
+  it("lets an authenticated server user setting win and removes local state", async () => {
+    window.localStorage.setItem(
+      DEFAULT_PROVIDER_STORAGE_KEY,
+      JSON.stringify({ version: 1, provider_id: "provider_secondary" })
+    );
+    mockFetchWithPreference([{ ok: true, body: { items: providers } }], {
+      get: { ok: true, body: preferencePayload("provider_tertiary", "user") }
+    });
+
+    render(<MobileSearchPage />);
+
+    const select = await screen.findByLabelText("제공사");
+    await waitFor(() => {
+      expect((select as HTMLSelectElement).value).toBe("provider_tertiary");
+      expect(
+        window.localStorage.getItem(DEFAULT_PROVIDER_STORAGE_KEY)
+      ).toBeNull();
+    });
+  });
+
+  it("seeds an authenticated user from valid local state and removes it only after success", async () => {
+    window.localStorage.setItem(
+      DEFAULT_PROVIDER_STORAGE_KEY,
+      JSON.stringify({ version: 1, provider_id: "provider_secondary" })
+    );
+    const fetchMock = mockFetchWithPreference(
+      [{ ok: true, body: { items: providers } }],
+      {
+        get: {
+          ok: true,
+          body: preferencePayload("provider_default", "operational_default")
+        },
+        put: { ok: true, body: preferencePayload("provider_secondary", "user") }
+      }
+    );
+
+    render(<MobileSearchPage />);
+
+    const select = await screen.findByLabelText("제공사");
+    await waitFor(() => {
+      expect((select as HTMLSelectElement).value).toBe("provider_secondary");
+      expect(
+        window.localStorage.getItem(DEFAULT_PROVIDER_STORAGE_KEY)
+      ).toBeNull();
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/user-preference/default-provider",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ provider_id: "provider_secondary" })
+      })
+    );
+  });
+
+  it("keeps local state and public search usable when server seeding fails", async () => {
+    window.localStorage.setItem(
+      DEFAULT_PROVIDER_STORAGE_KEY,
+      JSON.stringify({ version: 1, provider_id: "provider_secondary" })
+    );
+    const fetchMock = mockFetchWithPreference(
+      [
+        { ok: true, body: { items: providers } },
+        { ok: true, body: searchResponse }
+      ],
+      {
+        get: {
+          ok: true,
+          body: preferencePayload("provider_default", "operational_default")
+        },
+        put: { ok: false, status: 500, body: {} }
+      }
+    );
+
+    render(<MobileSearchPage />);
+
+    const select = await screen.findByLabelText("제공사");
+    await waitFor(() => {
+      expect((select as HTMLSelectElement).value).toBe("provider_secondary");
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/user-preference/default-provider",
+        expect.any(Object)
+      );
+    });
+    expect(
+      window.localStorage.getItem(DEFAULT_PROVIDER_STORAGE_KEY)
+    ).not.toBeNull();
+
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "sample title" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    await screen.findByText("Sample Display Title");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/search?q=sample+title&provider_id=provider_secondary"
+    );
+  });
+
+  it("stores the latest authenticated selection locally while an earlier PUT is pending", async () => {
+    const firstPut = deferred<Response>();
+    let putCount = 0;
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = input.toString();
+
+        if (url === "/api/providers") {
+          return jsonResponse({ items: providers });
+        }
+
+        if (url === "/api/user-preference") {
+          return jsonResponse(preferencePayload("provider_tertiary", "user"));
+        }
+
+        if (url === "/api/user-preference/default-provider") {
+          putCount += 1;
+          if (putCount === 1) {
+            return firstPut.promise;
+          }
+
+          return jsonResponse(preferencePayload("provider_secondary", "user"));
+        }
+
+        throw new Error(`Unexpected fetch call: ${url} (${init?.method})`);
+      }
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<MobileSearchPage />);
+
+    const select = await screen.findByLabelText("제공사");
+    await waitFor(() => {
+      expect((select as HTMLSelectElement).value).toBe("provider_tertiary");
+    });
+
+    fireEvent.change(select, { target: { value: "provider_default" } });
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.filter(
+          ([input]) =>
+            input.toString() === "/api/user-preference/default-provider"
+        )
+      ).toHaveLength(1);
+    });
+
+    fireEvent.change(select, { target: { value: "provider_secondary" } });
+
+    expect(window.localStorage.getItem(DEFAULT_PROVIDER_STORAGE_KEY)).toBe(
+      JSON.stringify({ version: 1, provider_id: "provider_secondary" })
+    );
+
+    firstPut.resolve(
+      jsonResponse(preferencePayload("provider_default", "user"))
+    );
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.filter(
+          ([input]) =>
+            input.toString() === "/api/user-preference/default-provider"
+        )
+      ).toHaveLength(2);
+      expect(
+        window.localStorage.getItem(DEFAULT_PROVIDER_STORAGE_KEY)
+      ).toBeNull();
+    });
+  });
+
+  it("keeps search usable when localStorage access throws", async () => {
+    vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+      throw new Error("storage disabled");
+    });
+    const fetchMock = mockFetch([
+      { ok: true, body: { items: providers } },
+      { ok: true, body: searchResponse }
+    ]);
+
+    render(<MobileSearchPage />);
+
+    await screen.findByLabelText("제공사");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "sample title" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    await screen.findByText("Sample Display Title");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/search?q=sample+title&provider_id=provider_default"
+    );
   });
 
   it("does not call search API before submit or while typing", async () => {
@@ -185,8 +412,11 @@ describe("MobileSearchPage", () => {
       target: { value: "sample title" }
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith("/api/providers");
+    expect(
+      fetchMock.mock.calls.filter(([input]) =>
+        input.toString().startsWith("/api/search")
+      )
+    ).toHaveLength(0);
   });
 
   it("calls search API when the search button submits", async () => {
@@ -242,7 +472,11 @@ describe("MobileSearchPage", () => {
     });
     fireEvent.submit(screen.getByRole("search"));
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(
+      fetchMock.mock.calls.filter(([input]) =>
+        input.toString().startsWith("/api/search")
+      )
+    ).toHaveLength(0);
   });
 
   it("includes the selected provider_id in search requests", async () => {
@@ -290,6 +524,45 @@ describe("MobileSearchPage", () => {
     expect(summary?.textContent).not.toContain("Generic Provider Secondary");
   });
 
+  it("updates existing card priority immediately and uses the new provider for later searches", async () => {
+    const fetchMock = mockFetch([
+      { ok: true, body: { items: providers } },
+      { ok: true, body: searchResponse },
+      { ok: true, body: searchResponse }
+    ]);
+
+    render(<MobileSearchPage />);
+
+    const select = await screen.findByLabelText("제공사");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "sample title" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    const card = await screen.findByLabelText("선택 제공사 번호");
+    expect(card.textContent).toContain("12345");
+    const searchCallsBeforeChange = fetchMock.mock.calls.filter(([input]) =>
+      input.toString().startsWith("/api/search")
+    );
+
+    fireEvent.change(select, { target: { value: "provider_secondary" } });
+
+    expect(card.textContent).toContain("미수록");
+    expect(card.textContent).not.toContain("12345");
+    expect(
+      fetchMock.mock.calls.filter(([input]) =>
+        input.toString().startsWith("/api/search")
+      )
+    ).toHaveLength(searchCallsBeforeChange.length);
+
+    fireEvent.submit(screen.getByRole("search"));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        "/api/search?q=sample+title&provider_id=provider_secondary"
+      );
+    });
+  });
+
   it("ignores stale search responses when requests resolve out of order", async () => {
     const slowSearch = deferred<Response>();
     const fastSearch = deferred<Response>();
@@ -298,6 +571,10 @@ describe("MobileSearchPage", () => {
 
       if (url === "/api/providers") {
         return Promise.resolve(jsonResponse({ items: providers }));
+      }
+
+      if (url === "/api/user-preference") {
+        return Promise.resolve(unauthenticatedResponse());
       }
 
       if (url.startsWith("/api/search?q=slow")) {
@@ -359,6 +636,10 @@ describe("MobileSearchPage", () => {
         return Promise.resolve(jsonResponse({ items: providers }));
       }
 
+      if (url === "/api/user-preference") {
+        return Promise.resolve(unauthenticatedResponse());
+      }
+
       if (url.startsWith("/api/search?q=sample")) {
         return pendingSearch.promise;
       }
@@ -394,6 +675,10 @@ describe("MobileSearchPage", () => {
 
       if (url === "/api/providers") {
         return Promise.resolve(jsonResponse({ items: providers }));
+      }
+
+      if (url === "/api/user-preference") {
+        return Promise.resolve(unauthenticatedResponse());
       }
 
       if (url.startsWith("/api/search?q=first")) {
@@ -585,6 +870,10 @@ describe("MobileSearchPage", () => {
 
       if (url === "/api/providers") {
         return Promise.resolve(jsonResponse({ items: providers }));
+      }
+
+      if (url === "/api/user-preference") {
+        return Promise.resolve(unauthenticatedResponse());
       }
 
       if (url.startsWith("/api/search?q=first")) {
@@ -886,7 +1175,11 @@ describe("MobileSearchPage", () => {
 function mockFetch(
   responses: Array<{ ok: boolean; status?: number; body: unknown }>
 ) {
-  const fetchMock = vi.fn(async () => {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    if (input.toString() === "/api/user-preference") {
+      return unauthenticatedResponse();
+    }
+
     const response = responses.shift();
 
     if (response === undefined) {
@@ -903,6 +1196,52 @@ function mockFetch(
   vi.stubGlobal("fetch", fetchMock);
 
   return fetchMock;
+}
+
+function mockFetchWithPreference(
+  responses: Array<{ ok: boolean; status?: number; body: unknown }>,
+  preference: {
+    get: { ok: boolean; status?: number; body: unknown };
+    put?: { ok: boolean; status?: number; body: unknown };
+  }
+) {
+  const fetchMock = vi.fn(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url === "/api/user-preference") {
+        return queuedResponse(preference.get);
+      }
+
+      if (url === "/api/user-preference/default-provider") {
+        expect(init?.method).toBe("PUT");
+        return queuedResponse(
+          preference.put ?? { ok: false, status: 500, body: {} }
+        );
+      }
+
+      const response = responses.shift();
+      if (response === undefined) {
+        throw new Error(`Unexpected fetch call: ${url}`);
+      }
+
+      return queuedResponse(response);
+    }
+  );
+
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function queuedResponse(response: {
+  ok: boolean;
+  status?: number;
+  body: unknown;
+}): Response {
+  return {
+    ok: response.ok,
+    status: response.status ?? (response.ok ? 200 : 500),
+    json: async () => response.body
+  } as Response;
 }
 
 function deferred<T>() {
@@ -922,6 +1261,26 @@ function jsonResponse(body: unknown, ok = true): Response {
     status: ok ? 200 : 500,
     json: async () => body
   } as Response;
+}
+
+function unauthenticatedResponse(): Response {
+  return {
+    ok: false,
+    status: 401,
+    json: async () => ({
+      error: { code: "UNAUTHENTICATED", message: "Authentication is required." }
+    })
+  } as Response;
+}
+
+function preferencePayload(
+  providerId: string,
+  source: "user" | "operational_default"
+) {
+  return {
+    default_provider: providers.find(({ id }) => id === providerId) ?? null,
+    source
+  };
 }
 
 function searchResponseWithSong({

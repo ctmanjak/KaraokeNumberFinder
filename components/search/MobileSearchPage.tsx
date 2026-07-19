@@ -1,11 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent
+} from "react";
 import {
   fetchProviders,
   fetchSearchResults,
   selectInitialProvider
 } from "@/lib/api/search-ui";
+import {
+  bootstrapDefaultProvider,
+  saveDefaultProviderSelectionLocally,
+  syncDefaultProviderSelection,
+  type DefaultProviderPersistenceMode
+} from "@/lib/preferences/default-provider-client";
 import type { ProviderListItem } from "@/lib/providers/providers";
 import type { SearchResponse, SearchResultItem } from "@/lib/search/search";
 import { SearchResultCard } from "./SearchResultCard";
@@ -26,9 +38,6 @@ export function MobileSearchPage() {
     string | undefined
   >();
   const [successfulQuery, setSuccessfulQuery] = useState("");
-  const [successfulProviderId, setSuccessfulProviderId] = useState<
-    string | undefined
-  >();
   const [successfulProviderName, setSuccessfulProviderName] = useState<
     string | undefined
   >();
@@ -40,6 +49,41 @@ export function MobileSearchPage() {
     () => new Set()
   );
   const latestSearchRequestId = useRef(0);
+  const selectedProviderIdRef = useRef<string | undefined>(undefined);
+  const providerSelectionVersion = useRef(0);
+  const lastUserSelectedProviderId = useRef<string | undefined>(undefined);
+  const preferenceMode = useRef<DefaultProviderPersistenceMode | "unknown">(
+    "unknown"
+  );
+  const preferenceWriteQueue = useRef<Promise<void>>(Promise.resolve());
+
+  const updateSelectedProvider = useCallback(
+    (providerId: string | undefined): void => {
+      selectedProviderIdRef.current = providerId;
+      setSelectedProviderId(providerId);
+    },
+    []
+  );
+
+  const persistProviderSelection = useCallback(
+    (
+      providerId: string,
+      mode: DefaultProviderPersistenceMode | "unknown" = preferenceMode.current
+    ): void => {
+      saveDefaultProviderSelectionLocally(providerId);
+
+      if (mode !== "authenticated") {
+        return;
+      }
+
+      preferenceWriteQueue.current = preferenceWriteQueue.current
+        .catch(() => undefined)
+        .then(async () => {
+          await syncDefaultProviderSelection({ providerId });
+        });
+    },
+    []
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -50,10 +94,37 @@ export function MobileSearchPage() {
           return;
         }
 
+        const operationalDefaultId = selectInitialProvider(items);
+        const bootstrapSelectionVersion = providerSelectionVersion.current;
+
         setProviders(items);
-        setSelectedProviderId(selectInitialProvider(items));
+        updateSelectedProvider(operationalDefaultId);
         setProvidersStatus("success");
         setProviderError(null);
+
+        void bootstrapDefaultProvider({ providers: items }).then((result) => {
+          preferenceMode.current = result.mode;
+
+          if (!isMounted) {
+            return;
+          }
+
+          if (
+            providerSelectionVersion.current === bootstrapSelectionVersion &&
+            lastUserSelectedProviderId.current === undefined
+          ) {
+            updateSelectedProvider(result.selectedProviderId);
+            return;
+          }
+
+          const latestProviderId = selectedProviderIdRef.current;
+          if (
+            result.mode === "authenticated" &&
+            latestProviderId !== undefined
+          ) {
+            persistProviderSelection(latestProviderId, result.mode);
+          }
+        });
       })
       .catch((error: unknown) => {
         if (!isMounted) {
@@ -73,7 +144,17 @@ export function MobileSearchPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [persistProviderSelection, updateSelectedProvider]);
+
+  function handleProviderChange(providerId: string | undefined): void {
+    providerSelectionVersion.current += 1;
+    lastUserSelectedProviderId.current = providerId;
+    updateSelectedProvider(providerId);
+
+    if (providerId !== undefined) {
+      persistProviderSelection(providerId);
+    }
+  }
 
   async function runSearch(
     nextQuery: string,
@@ -111,7 +192,6 @@ export function MobileSearchPage() {
       setResults(response.items);
       setSuggestions(response.suggestions);
       setSuccessfulQuery(response.query);
-      setSuccessfulProviderId(providerId);
       setSuccessfulProviderName(providerName);
       setSearchStatus("success");
     } catch (error) {
@@ -181,7 +261,7 @@ export function MobileSearchPage() {
               value={selectedProviderId ?? ""}
               disabled={providers.length === 0}
               onChange={(event) =>
-                setSelectedProviderId(event.target.value || undefined)
+                handleProviderChange(event.target.value || undefined)
               }
             >
               {providers.length === 0 ? (
@@ -211,8 +291,8 @@ export function MobileSearchPage() {
             status={searchStatus}
             submittedQuery={submittedQuery}
             successfulQuery={successfulQuery}
-            successfulProviderId={successfulProviderId}
             successfulProviderName={successfulProviderName}
+            selectedProviderId={selectedProviderId}
             providers={providers}
             results={results}
             suggestions={suggestions}
@@ -244,8 +324,8 @@ function SearchState({
   status,
   submittedQuery,
   successfulQuery,
-  successfulProviderId,
   successfulProviderName,
+  selectedProviderId,
   providers,
   results,
   suggestions,
@@ -258,8 +338,8 @@ function SearchState({
   status: RequestState;
   submittedQuery: string;
   successfulQuery: string;
-  successfulProviderId: string | undefined;
   successfulProviderName: string | undefined;
+  selectedProviderId: string | undefined;
   providers: ProviderListItem[];
   results: SearchResultItem[];
   suggestions: string[];
@@ -364,7 +444,7 @@ function SearchState({
             key={item.song.id}
             item={item}
             providers={providers}
-            selectedProviderId={successfulProviderId}
+            selectedProviderId={selectedProviderId}
             isExpanded={expandedSongIds.has(item.song.id)}
             onToggleExpanded={() => onToggleExpanded(item.song.id)}
           />

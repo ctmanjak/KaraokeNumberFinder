@@ -10,6 +10,8 @@ on:
       - "prisma.config.ts"
       - "scripts/m3/**"
       - "lib/search-history/**"
+      - "lib/preferences/default-provider.ts"
+      - "lib/user-preference/**"
       - "vitest.config.ts"
   push:
     branches:
@@ -22,6 +24,8 @@ on:
       - "prisma.config.ts"
       - "scripts/m3/**"
       - "lib/search-history/**"
+      - "lib/preferences/default-provider.ts"
+      - "lib/user-preference/**"
       - "vitest.config.ts"
 
 jobs:
