@@ -8,7 +8,10 @@ type SearchResultCardProps = {
   providers: ProviderListItem[];
   selectedProviderId?: string;
   isExpanded: boolean;
+  isFavorite: boolean;
+  isFavoritePending: boolean;
   onToggleExpanded: () => void;
+  onToggleFavorite: () => void;
 };
 
 type ProviderDisplay = {
@@ -35,7 +38,10 @@ export function SearchResultCard({
   providers,
   selectedProviderId,
   isExpanded,
-  onToggleExpanded
+  isFavorite,
+  isFavoritePending,
+  onToggleExpanded,
+  onToggleFavorite
 }: SearchResultCardProps) {
   const providerNameById = providerNameMap(providers);
   const primaryEntry = selectPrimaryEntry(item.karaoke_entries, {
@@ -64,7 +70,26 @@ export function SearchResultCard({
           <h2>{item.song.display_title}</h2>
           <p className="canonical-title">{item.song.canonical_title}</p>
         </div>
-        <span className="score-label">관련도 {item.relevance_score}</span>
+        <div className="result-actions">
+          <span className="score-label">관련도 {item.relevance_score}</span>
+          <button
+            className="favorite-button"
+            type="button"
+            aria-label={
+              isFavorite
+                ? `${item.song.display_title} 즐겨찾기에서 제거`
+                : `${item.song.display_title} 즐겨찾기에 추가`
+            }
+            aria-pressed={isFavorite}
+            disabled={isFavoritePending}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleFavorite();
+            }}
+          >
+            <span aria-hidden="true">{isFavorite ? "★" : "☆"}</span>
+          </button>
+        </div>
       </div>
 
       <p className="artist-name">{item.song.canonical_artist}</p>

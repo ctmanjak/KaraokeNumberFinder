@@ -40,7 +40,8 @@ export async function fetchProviders(
 
 export async function fetchSearchResults(
   request: SearchRequest,
-  fetcher: typeof fetch = fetch
+  fetcher: typeof fetch = fetch,
+  signal?: AbortSignal
 ): Promise<SearchResponse> {
   const fallback = "검색 요청에 실패했습니다.";
   const params = new URLSearchParams({ q: request.query });
@@ -49,7 +50,9 @@ export async function fetchSearchResults(
     params.set("provider_id", request.providerId);
   }
 
-  const response = await fetcher(`/api/search?${params.toString()}`);
+  const url = `/api/search?${params.toString()}`;
+  const response =
+    signal === undefined ? await fetcher(url) : await fetcher(url, { signal });
 
   if (!response.ok) {
     throw new Error(errorMessage(await readJson(response), fallback));
