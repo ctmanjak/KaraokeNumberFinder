@@ -1,4 +1,7 @@
-import { personalizationError } from "../personalization";
+import {
+  PersonalizationApiError,
+  personalizationError
+} from "../personalization";
 
 export type FavoriteCursor = Readonly<{
   id: string;
@@ -38,8 +41,7 @@ export function decodeFavoriteCursor(value: string): FavoriteCursor {
     return { id: parsed[1] };
   } catch (error) {
     if (
-      error instanceof Error &&
-      "code" in error &&
+      error instanceof PersonalizationApiError &&
       error.code === "INVALID_REQUEST"
     ) {
       throw error;

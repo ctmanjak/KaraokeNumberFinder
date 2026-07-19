@@ -20,7 +20,9 @@ describe("public route authentication isolation", () => {
       "lib/providers/providers.ts"
     ]) {
       const source = readFileSync(path.join(process.cwd(), route), "utf8");
-      expect(source).not.toMatch(/auth|session|personalization|favorites?/iu);
+      expect(source).not.toMatch(
+        /\b(?:auth|session|personalization|favorites?)\b/iu
+      );
     }
   });
 

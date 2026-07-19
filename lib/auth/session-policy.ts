@@ -1,3 +1,5 @@
+import type { GenericEndpointContext } from "better-auth";
+
 import { SESSION_ABSOLUTE_TTL_SECONDS } from "./policy";
 
 type SessionDates = {
@@ -14,7 +16,7 @@ export function capNewSessionExpiry<T extends SessionDates>(session: T): T {
 
 export function capSessionRefresh(
   update: { expiresAt?: Date; [key: string]: unknown },
-  context: SessionHookContext | null
+  context: GenericEndpointContext | null
 ): { expiresAt?: Date; [key: string]: unknown } | null {
   const current = context?.context.session?.session;
   if (
@@ -30,16 +32,6 @@ export function capSessionRefresh(
     expiresAt: minimumDate(update.expiresAt, absoluteExpiry(current.createdAt))
   };
 }
-
-type SessionHookContext = {
-  context: {
-    session: {
-      session: {
-        createdAt: unknown;
-      };
-    } | null;
-  };
-};
 
 export function absoluteExpiry(createdAt: Date): Date {
   return new Date(createdAt.getTime() + SESSION_ABSOLUTE_TTL_SECONDS * 1_000);

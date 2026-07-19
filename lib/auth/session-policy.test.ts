@@ -1,3 +1,4 @@
+import type { GenericEndpointContext } from "better-auth";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -30,7 +31,7 @@ describe("session absolute expiry policy", () => {
     );
     const context = {
       context: { session: { session: { createdAt } } }
-    };
+    } as GenericEndpointContext;
 
     expect(
       capSessionRefresh({ expiresAt: requested }, context)?.expiresAt
