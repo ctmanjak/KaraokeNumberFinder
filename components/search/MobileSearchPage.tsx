@@ -7,11 +7,27 @@ import {
   useState,
   type FormEvent
 } from "react";
+import Link from "next/link";
+import { GoogleLoginDialog } from "@/components/auth/GoogleLoginDialog";
 import {
   fetchProviders,
   fetchSearchResults,
   selectInitialProvider
 } from "@/lib/api/search-ui";
+import {
+  createGoogleSignInUrl,
+  fetchBrowserAuthState
+} from "@/lib/auth/client";
+import {
+  deleteFavorite,
+  fetchAllFavoriteSongIds,
+  isUnauthenticatedFavoriteError,
+  putFavorite
+} from "@/lib/favorites/client";
+import {
+  clearPendingFavoriteIntent,
+  writePendingFavoriteIntent
+} from "@/lib/favorites/pending-intent";
 import {
   bootstrapDefaultProvider,
   saveDefaultProviderSelectionLocally,
@@ -23,8 +39,19 @@ import type { SearchResponse, SearchResultItem } from "@/lib/search/search";
 import { SearchResultCard } from "./SearchResultCard";
 
 type RequestState = "idle" | "loading" | "success" | "error";
+type FavoriteSessionState =
+  "loading" | "authenticated" | "guest" | "unavailable" | "expired";
+type FavoriteNotice = Readonly<{
+  message: string;
+  retry: "session" | "favorites" | null;
+}>;
+const SEARCH_REQUEST_TIMEOUT_MS = 8_000;
 
-export function MobileSearchPage() {
+export function MobileSearchPage({
+  navigateToAuth = (url) => window.location.assign(url)
+}: {
+  navigateToAuth?: (url: string) => void;
+} = {}) {
   const [providers, setProviders] = useState<ProviderListItem[]>([]);
   const [providersStatus, setProvidersStatus] =
     useState<RequestState>("loading");
@@ -48,7 +75,31 @@ export function MobileSearchPage() {
   const [expandedSongIds, setExpandedSongIds] = useState<Set<string>>(
     () => new Set()
   );
+  const [favoriteSessionStatus, setFavoriteSessionStatus] =
+    useState<FavoriteSessionState>("loading");
+  const [favoritesStatus, setFavoritesStatus] = useState<RequestState>("idle");
+  const [favoriteSongIds, setFavoriteSongIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [pendingFavoriteSongIds, setPendingFavoriteSongIds] = useState<
+    Set<string>
+  >(() => new Set());
+  const [favoriteNotice, setFavoriteNotice] = useState<FavoriteNotice | null>(
+    null
+  );
+  const [loginPrompt, setLoginPrompt] = useState<{
+    songId: string;
+    intent: "add" | "reauthenticate";
+    reason: "guest" | "expired";
+  } | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginSubmitting, setLoginSubmitting] = useState(false);
+  const [loginIntentStored, setLoginIntentStored] = useState(false);
   const latestSearchRequestId = useRef(0);
+  const activeSearchRequest = useRef<{
+    controller: AbortController;
+    timeoutId: ReturnType<typeof setTimeout>;
+  } | null>(null);
   const selectedProviderIdRef = useRef<string | undefined>(undefined);
   const providerSelectionVersion = useRef(0);
   const lastUserSelectedProviderId = useRef<string | undefined>(undefined);
@@ -56,6 +107,51 @@ export function MobileSearchPage() {
     "unknown"
   );
   const preferenceWriteQueue = useRef<Promise<void>>(Promise.resolve());
+  const favoriteBootstrapVersion = useRef(0);
+  const pendingFavoriteSongIdsRef = useRef<Set<string>>(new Set());
+
+  const loadFavoritePersonalization = useCallback(async (): Promise<void> => {
+    const requestVersion = favoriteBootstrapVersion.current + 1;
+    favoriteBootstrapVersion.current = requestVersion;
+    setFavoriteSessionStatus("loading");
+    setFavoritesStatus("idle");
+
+    const auth = await fetchBrowserAuthState();
+    if (favoriteBootstrapVersion.current !== requestVersion) {
+      return;
+    }
+
+    if (auth.status !== "authenticated") {
+      setFavoriteSessionStatus(auth.status);
+      setFavoritesStatus("idle");
+      return;
+    }
+
+    setFavoriteSessionStatus("authenticated");
+    setFavoritesStatus("loading");
+
+    try {
+      const songIds = await fetchAllFavoriteSongIds();
+      if (favoriteBootstrapVersion.current !== requestVersion) {
+        return;
+      }
+
+      setFavoriteSongIds(songIds);
+      setFavoritesStatus("success");
+      setFavoriteNotice(null);
+    } catch (error) {
+      if (favoriteBootstrapVersion.current !== requestVersion) {
+        return;
+      }
+
+      if (isUnauthenticatedFavoriteError(error)) {
+        setFavoriteSessionStatus("expired");
+        setFavoritesStatus("idle");
+      } else {
+        setFavoritesStatus("error");
+      }
+    }
+  }, []);
 
   const updateSelectedProvider = useCallback(
     (providerId: string | undefined): void => {
@@ -114,16 +210,17 @@ export function MobileSearchPage() {
             lastUserSelectedProviderId.current === undefined
           ) {
             updateSelectedProvider(result.selectedProviderId);
-            return;
+          } else {
+            const latestProviderId = selectedProviderIdRef.current;
+            if (
+              result.mode === "authenticated" &&
+              latestProviderId !== undefined
+            ) {
+              persistProviderSelection(latestProviderId, result.mode);
+            }
           }
 
-          const latestProviderId = selectedProviderIdRef.current;
-          if (
-            result.mode === "authenticated" &&
-            latestProviderId !== undefined
-          ) {
-            persistProviderSelection(latestProviderId, result.mode);
-          }
+          void loadFavoritePersonalization();
         });
       })
       .catch((error: unknown) => {
@@ -139,12 +236,158 @@ export function MobileSearchPage() {
             ? error.message
             : "제공사 목록을 불러오지 못했습니다."
         );
+        void loadFavoritePersonalization();
       });
 
     return () => {
       isMounted = false;
+      favoriteBootstrapVersion.current += 1;
+      if (activeSearchRequest.current !== null) {
+        clearTimeout(activeSearchRequest.current.timeoutId);
+        activeSearchRequest.current.controller.abort();
+        activeSearchRequest.current = null;
+      }
     };
-  }, [persistProviderSelection, updateSelectedProvider]);
+  }, [
+    loadFavoritePersonalization,
+    persistProviderSelection,
+    updateSelectedProvider
+  ]);
+
+  async function handleToggleFavorite(songId: string): Promise<void> {
+    if (
+      favoriteSessionStatus === "guest" ||
+      favoriteSessionStatus === "expired"
+    ) {
+      setLoginPrompt({
+        songId,
+        intent: "add",
+        reason: favoriteSessionStatus === "expired" ? "expired" : "guest"
+      });
+      setLoginError(null);
+      return;
+    }
+
+    if (favoriteSessionStatus !== "authenticated") {
+      setFavoriteNotice({
+        message:
+          "로그인 상태를 확인하지 못했습니다. 검색은 계속 사용할 수 있습니다.",
+        retry: "session"
+      });
+      return;
+    }
+
+    if (favoritesStatus !== "success") {
+      setFavoriteNotice({
+        message:
+          "즐겨찾기 상태를 불러오지 못했습니다. 확인 후 다시 시도해 주세요.",
+        retry: "favorites"
+      });
+      return;
+    }
+
+    if (pendingFavoriteSongIdsRef.current.has(songId)) {
+      return;
+    }
+
+    const wasFavorite = favoriteSongIds.has(songId);
+    pendingFavoriteSongIdsRef.current.add(songId);
+    setPendingFavoriteSongIds((current) => new Set(current).add(songId));
+    setFavoriteSongIds((current) => {
+      const next = new Set(current);
+      if (wasFavorite) {
+        next.delete(songId);
+      } else {
+        next.add(songId);
+      }
+      return next;
+    });
+    setFavoriteNotice(null);
+
+    try {
+      if (wasFavorite) {
+        await deleteFavorite(songId);
+      } else {
+        await putFavorite(songId);
+      }
+    } catch (error) {
+      setFavoriteSongIds((current) => {
+        const next = new Set(current);
+        if (wasFavorite) {
+          next.add(songId);
+        } else {
+          next.delete(songId);
+        }
+        return next;
+      });
+
+      if (isUnauthenticatedFavoriteError(error)) {
+        setFavoriteSessionStatus("expired");
+        setLoginPrompt({
+          songId,
+          intent: wasFavorite ? "reauthenticate" : "add",
+          reason: "expired"
+        });
+        setLoginError(null);
+      } else {
+        setFavoriteNotice({
+          message:
+            "즐겨찾기 변경에 실패해 이전 상태로 되돌렸습니다. 검색 결과는 유지됩니다.",
+          retry: null
+        });
+      }
+    } finally {
+      pendingFavoriteSongIdsRef.current.delete(songId);
+      setPendingFavoriteSongIds((current) => {
+        const next = new Set(current);
+        next.delete(songId);
+        return next;
+      });
+    }
+  }
+
+  async function handleGoogleLogin(): Promise<void> {
+    if (loginPrompt === null || loginSubmitting) {
+      return;
+    }
+
+    setLoginSubmitting(true);
+    setLoginError(null);
+
+    if (loginPrompt.intent === "add") {
+      if (!writePendingFavoriteIntent(loginPrompt.songId)) {
+        setLoginError(
+          "브라우저에 선택한 곡을 안전하게 보관하지 못했습니다. 저장소 설정을 확인하고 다시 시도해 주세요."
+        );
+        setLoginSubmitting(false);
+        return;
+      }
+      setLoginIntentStored(true);
+    }
+
+    try {
+      const url = await createGoogleSignInUrl({ callbackURL: "/favorites" });
+      navigateToAuth(url);
+    } catch {
+      setLoginError(
+        "로그인 요청을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요."
+      );
+      setLoginSubmitting(false);
+    }
+  }
+
+  function handleCancelLogin(): void {
+    if (loginIntentStored && !clearPendingFavoriteIntent()) {
+      setLoginError(
+        "저장된 자동 추가 요청을 취소하지 못했습니다. 브라우저 저장소 설정을 확인하고 다시 시도해 주세요."
+      );
+      return;
+    }
+    setLoginIntentStored(false);
+    setLoginSubmitting(false);
+    setLoginError(null);
+    setLoginPrompt(null);
+  }
 
   function handleProviderChange(providerId: string | undefined): void {
     providerSelectionVersion.current += 1;
@@ -168,6 +411,16 @@ export function MobileSearchPage() {
 
     const requestId = latestSearchRequestId.current + 1;
     latestSearchRequestId.current = requestId;
+    if (activeSearchRequest.current !== null) {
+      clearTimeout(activeSearchRequest.current.timeoutId);
+      activeSearchRequest.current.controller.abort();
+    }
+    const controller = new AbortController();
+    const request = {
+      controller,
+      timeoutId: setTimeout(() => controller.abort(), SEARCH_REQUEST_TIMEOUT_MS)
+    };
+    activeSearchRequest.current = request;
 
     setSubmittedQuery(trimmedQuery);
     setSubmittedProviderId(providerId);
@@ -180,10 +433,14 @@ export function MobileSearchPage() {
     setSearchError(null);
 
     try {
-      const response: SearchResponse = await fetchSearchResults({
-        query: trimmedQuery,
-        providerId
-      });
+      const response: SearchResponse = await fetchSearchResults(
+        {
+          query: trimmedQuery,
+          providerId
+        },
+        fetch,
+        controller.signal
+      );
 
       if (latestSearchRequestId.current !== requestId) {
         return;
@@ -201,8 +458,17 @@ export function MobileSearchPage() {
 
       setSearchStatus("error");
       setSearchError(
-        error instanceof Error ? error.message : "검색 요청에 실패했습니다."
+        controller.signal.aborted
+          ? "검색 요청 시간이 초과되었습니다."
+          : error instanceof Error
+            ? error.message
+            : "검색 요청에 실패했습니다."
       );
+    } finally {
+      clearTimeout(request.timeoutId);
+      if (activeSearchRequest.current === request) {
+        activeSearchRequest.current = null;
+      }
     }
   }
 
@@ -222,7 +488,12 @@ export function MobileSearchPage() {
     <main className="search-shell">
       <div className="mobile-frame">
         <section className="search-hero" aria-labelledby="page-title">
-          <p className="eyebrow">KaraokeNumberFinder</p>
+          <div className="hero-navigation">
+            <p className="eyebrow">KaraokeNumberFinder</p>
+            <Link className="back-link" href="/favorites">
+              즐겨찾기
+            </Link>
+          </div>
           <h1 id="page-title">노래방 번호 검색</h1>
         </section>
 
@@ -287,6 +558,29 @@ export function MobileSearchPage() {
         </section>
 
         <section className="results-section" aria-live="polite">
+          {favoriteNotice === null ? null : (
+            <div className="inline-status inline-status-error" role="alert">
+              <span>{favoriteNotice.message}</span>
+              <div className="inline-actions">
+                {favoriteNotice.retry === null ? null : (
+                  <button
+                    className="link-button"
+                    type="button"
+                    onClick={() => void loadFavoritePersonalization()}
+                  >
+                    다시 확인
+                  </button>
+                )}
+                <button
+                  className="link-button"
+                  type="button"
+                  onClick={() => setFavoriteNotice(null)}
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          )}
           <SearchState
             status={searchStatus}
             submittedQuery={submittedQuery}
@@ -297,6 +591,8 @@ export function MobileSearchPage() {
             results={results}
             suggestions={suggestions}
             expandedSongIds={expandedSongIds}
+            favoriteSongIds={favoriteSongIds}
+            pendingFavoriteSongIds={pendingFavoriteSongIds}
             error={searchError}
             onToggleExpanded={(songId) =>
               setExpandedSongIds((current) => {
@@ -313,9 +609,20 @@ export function MobileSearchPage() {
             }
             onRetry={() => void runSearch(submittedQuery, submittedProviderId)}
             onSearchSuggestion={handleSuggestionSearch}
+            onToggleFavorite={(songId) => void handleToggleFavorite(songId)}
           />
         </section>
       </div>
+      {loginPrompt === null ? null : (
+        <GoogleLoginDialog
+          reason={loginPrompt.reason}
+          intent={loginPrompt.intent}
+          error={loginError}
+          isSubmitting={loginSubmitting}
+          onCancel={handleCancelLogin}
+          onLogin={() => void handleGoogleLogin()}
+        />
+      )}
     </main>
   );
 }
@@ -330,10 +637,13 @@ function SearchState({
   results,
   suggestions,
   expandedSongIds,
+  favoriteSongIds,
+  pendingFavoriteSongIds,
   error,
   onToggleExpanded,
   onRetry,
-  onSearchSuggestion
+  onSearchSuggestion,
+  onToggleFavorite
 }: {
   status: RequestState;
   submittedQuery: string;
@@ -344,10 +654,13 @@ function SearchState({
   results: SearchResultItem[];
   suggestions: string[];
   expandedSongIds: Set<string>;
+  favoriteSongIds: Set<string>;
+  pendingFavoriteSongIds: Set<string>;
   error: string | null;
   onToggleExpanded: (songId: string) => void;
   onRetry: () => void;
   onSearchSuggestion: (suggestion: string) => void;
+  onToggleFavorite: (songId: string) => void;
 }) {
   const hasResults = results.length > 0;
 
@@ -446,7 +759,10 @@ function SearchState({
             providers={providers}
             selectedProviderId={selectedProviderId}
             isExpanded={expandedSongIds.has(item.song.id)}
+            isFavorite={favoriteSongIds.has(item.song.id)}
+            isFavoritePending={pendingFavoriteSongIds.has(item.song.id)}
             onToggleExpanded={() => onToggleExpanded(item.song.id)}
+            onToggleFavorite={() => onToggleFavorite(item.song.id)}
           />
         ))}
       </ul>

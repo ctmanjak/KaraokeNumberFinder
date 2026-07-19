@@ -140,6 +140,7 @@ describe("MobileSearchPage", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   afterEach(() => {
@@ -153,8 +154,9 @@ describe("MobileSearchPage", () => {
     render(<MobileSearchPage />);
 
     const select = await screen.findByLabelText("제공사");
-
-    expect((select as HTMLSelectElement).value).toBe("provider_default");
+    await waitFor(() => {
+      expect((select as HTMLSelectElement).value).toBe("provider_default");
+    });
   });
 
   it("falls back to the first active provider in operational order when no default exists", async () => {
@@ -173,8 +175,9 @@ describe("MobileSearchPage", () => {
     render(<MobileSearchPage />);
 
     const select = await screen.findByLabelText("제공사");
-
-    expect((select as HTMLSelectElement).value).toBe("provider_default");
+    await waitFor(() => {
+      expect((select as HTMLSelectElement).value).toBe("provider_default");
+    });
   });
 
   it("restores a guest provider selection on a later browser visit", async () => {
@@ -307,7 +310,8 @@ describe("MobileSearchPage", () => {
 
     await screen.findByText("Sample Display Title");
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/search?q=sample+title&provider_id=provider_secondary"
+      "/api/search?q=sample+title&provider_id=provider_secondary",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
   });
 
@@ -398,7 +402,8 @@ describe("MobileSearchPage", () => {
 
     await screen.findByText("Sample Display Title");
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/search?q=sample+title&provider_id=provider_default"
+      "/api/search?q=sample+title&provider_id=provider_default",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
   });
 
@@ -436,7 +441,8 @@ describe("MobileSearchPage", () => {
     await screen.findByText("Sample Display Title");
 
     expect(fetchMock).toHaveBeenLastCalledWith(
-      "/api/search?q=sample+title&provider_id=provider_default"
+      "/api/search?q=sample+title&provider_id=provider_default",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
   });
 
@@ -457,7 +463,8 @@ describe("MobileSearchPage", () => {
     await screen.findByText("Sample Display Title");
 
     expect(fetchMock).toHaveBeenLastCalledWith(
-      "/api/search?q=sample+title&provider_id=provider_default"
+      "/api/search?q=sample+title&provider_id=provider_default",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
   });
 
@@ -497,7 +504,8 @@ describe("MobileSearchPage", () => {
     await screen.findByText("Sample Display Title");
 
     expect(fetchMock).toHaveBeenLastCalledWith(
-      "/api/search?q=sample+title&provider_id=provider_secondary"
+      "/api/search?q=sample+title&provider_id=provider_secondary",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
   });
 
@@ -558,7 +566,8 @@ describe("MobileSearchPage", () => {
     fireEvent.submit(screen.getByRole("search"));
     await waitFor(() => {
       expect(fetchMock).toHaveBeenLastCalledWith(
-        "/api/search?q=sample+title&provider_id=provider_secondary"
+        "/api/search?q=sample+title&provider_id=provider_secondary",
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
       );
     });
   });
@@ -566,7 +575,8 @@ describe("MobileSearchPage", () => {
   it("ignores stale search responses when requests resolve out of order", async () => {
     const slowSearch = deferred<Response>();
     const fastSearch = deferred<Response>();
-    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      void init;
       const url = input.toString();
 
       if (url === "/api/providers") {
@@ -600,6 +610,13 @@ describe("MobileSearchPage", () => {
       target: { value: "fast" }
     });
     fireEvent.submit(screen.getByRole("search"));
+
+    const slowCall = fetchMock.mock.calls.find(([input]) =>
+      input.toString().startsWith("/api/search?q=slow")
+    );
+    expect((slowCall?.[1]?.signal as AbortSignal | undefined)?.aborted).toBe(
+      true
+    );
 
     fastSearch.resolve(
       jsonResponse(
@@ -973,7 +990,8 @@ describe("MobileSearchPage", () => {
     expect(screen.getByText("Sample Display Title")).toBeTruthy();
     expect(screen.getByRole("button", { name: "다시 시도" })).toBeTruthy();
     expect(fetchMock).toHaveBeenLastCalledWith(
-      "/api/search?q=second&provider_id=provider_default"
+      "/api/search?q=second&provider_id=provider_default",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
   });
 
@@ -1001,7 +1019,8 @@ describe("MobileSearchPage", () => {
     await screen.findByText("Sample Display Title");
 
     expect(fetchMock).toHaveBeenLastCalledWith(
-      "/api/search?q=retry+query&provider_id=provider_secondary"
+      "/api/search?q=retry+query&provider_id=provider_secondary",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
   });
 
@@ -1139,7 +1158,8 @@ describe("MobileSearchPage", () => {
     );
     await screen.findByText("Sample Display Title");
     expect(fetchMock).toHaveBeenLastCalledWith(
-      "/api/search?q=Suggestion+One&provider_id=provider_default"
+      "/api/search?q=Suggestion+One&provider_id=provider_default",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
   });
 
@@ -1168,7 +1188,10 @@ describe("MobileSearchPage", () => {
 
     await screen.findByText("Sample Display Title");
 
-    expect(fetchMock).toHaveBeenLastCalledWith("/api/search?q=sample+title");
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/search?q=sample+title",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
   });
 });
 
@@ -1176,6 +1199,10 @@ function mockFetch(
   responses: Array<{ ok: boolean; status?: number; body: unknown }>
 ) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    if (input.toString() === "/api/auth/get-session") {
+      return jsonResponse(null);
+    }
+
     if (input.toString() === "/api/user-preference") {
       return unauthenticatedResponse();
     }
@@ -1208,6 +1235,10 @@ function mockFetchWithPreference(
   const fetchMock = vi.fn(
     async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString();
+      if (url === "/api/auth/get-session") {
+        return jsonResponse(null);
+      }
+
       if (url === "/api/user-preference") {
         return queuedResponse(preference.get);
       }
