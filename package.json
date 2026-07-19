@@ -15,6 +15,7 @@
     "format:write": "prettier --write .",
     "pretest": "npm run db:generate",
     "test": "vitest run",
+    "test:m3-db": "vite-node scripts/m3/test-db.ts",
     "seed:validate": "vite-node scripts/seed/validate.ts",
     "seed:import": "vite-node scripts/seed/import.ts",
     "seed:search-smoke": "vite-node scripts/seed/search-smoke.ts",
@@ -32,13 +33,16 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@better-auth/prisma-adapter": "1.6.23",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "better-auth": "1.6.23",
     "dotenv": "^17.4.2",
     "next": "^16.2.9",
     "pg": "^8.22.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "server-only": "^0.0.1"
   },
   "overrides": {
     "@hono/node-server": "1.19.13",
@@ -46,6 +50,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "@testing-library/dom": "10.4.1",
     "@testing-library/react": "^16.3.0",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.20.0",
