@@ -16,6 +16,7 @@ export function AuthHeader({
   const [loginPending, setLoginPending] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [callbackMessage, setCallbackMessage] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -42,8 +43,20 @@ export function AuthHeader({
       }
     }
 
+    function handleOutsideInteraction(event: Event): void {
+      if (!menuRef.current?.contains(event.target as Node | null)) {
+        setMenuOpen(false);
+      }
+    }
+
     document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
+    document.addEventListener("pointerdown", handleOutsideInteraction);
+    document.addEventListener("focusin", handleOutsideInteraction);
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("pointerdown", handleOutsideInteraction);
+      document.removeEventListener("focusin", handleOutsideInteraction);
+    };
   }, [menuOpen]);
 
   async function handleLogin(): Promise<void> {
@@ -121,12 +134,13 @@ export function AuthHeader({
           ) : null}
 
           {auth.state.status === "authenticated" ? (
-            <div className="user-menu">
+            <div ref={menuRef} className="user-menu">
               <button
                 ref={menuButtonRef}
                 className="user-menu-button"
                 type="button"
                 aria-expanded={menuOpen}
+                aria-haspopup="menu"
                 aria-controls="global-user-menu"
                 aria-label={`${displayName} 사용자 메뉴`}
                 onClick={() => setMenuOpen((current) => !current)}

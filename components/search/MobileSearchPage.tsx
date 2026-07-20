@@ -9,6 +9,7 @@ import {
   type FormEvent
 } from "react";
 import { useOptionalAuth } from "@/components/auth/AuthProvider";
+import { isCurrentSharedAuthUser } from "@/components/auth/shared-auth-user";
 import { GoogleLoginDialog } from "@/components/auth/GoogleLoginDialog";
 import {
   fetchProviders,
@@ -169,6 +170,7 @@ export function MobileSearchPage({
   const providerBootstrapVersion = useRef(0);
   const activeProviderRequest = useRef<AbortController | null>(null);
   const preferenceWriteVersion = useRef(0);
+  const loadedPersonalizationAuthKey = useRef<string | null>(null);
   const sharedAuth = useOptionalAuth();
   const sharedAuthRef = useRef(sharedAuth);
 
@@ -644,18 +646,43 @@ export function MobileSearchPage({
       return;
     }
 
+    const authKey =
+      sharedAuthStatus === "authenticated"
+        ? `authenticated:${sharedAuthUserId}`
+        : sharedAuthStatus;
+    if (loadedPersonalizationAuthKey.current === authKey) {
+      return;
+    }
+    loadedPersonalizationAuthKey.current = authKey;
     preferenceWriteVersion.current += 1;
     queueMicrotask(() => {
       void loadSearchHistoryPersonalization();
       void loadFavoritePersonalization();
-      if (providers.length > 0) {
-        void loadDefaultProviderPersonalization(providers);
-      }
+    });
+  }, [
+    loadFavoritePersonalization,
+    loadSearchHistoryPersonalization,
+    hasSharedAuth,
+    sharedAuthStatus,
+    sharedAuthUserId
+  ]);
+
+  useEffect(() => {
+    if (
+      !hasSharedAuth ||
+      sharedAuthStatus === undefined ||
+      sharedAuthStatus === "loading" ||
+      providers.length === 0
+    ) {
+      return;
+    }
+
+    preferenceWriteVersion.current += 1;
+    queueMicrotask(() => {
+      void loadDefaultProviderPersonalization(providers);
     });
   }, [
     loadDefaultProviderPersonalization,
-    loadFavoritePersonalization,
-    loadSearchHistoryPersonalization,
     hasSharedAuth,
     providers,
     sharedAuthStatus,
@@ -1335,17 +1362,6 @@ function authIdentity(auth: ReturnType<typeof useOptionalAuth>): string {
     : auth.state.status === "authenticated"
       ? `authenticated:${auth.state.user.id}`
       : auth.state.status;
-}
-
-function isCurrentSharedAuthUser(
-  auth: ReturnType<typeof useOptionalAuth>,
-  expectedUserId: string
-): boolean {
-  return (
-    auth === null ||
-    (auth.state.status === "authenticated" &&
-      auth.state.user.id === expectedUserId)
-  );
 }
 
 function enqueueSearchHistoryOperation<T>(

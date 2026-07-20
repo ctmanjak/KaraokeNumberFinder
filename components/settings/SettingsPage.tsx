@@ -197,19 +197,23 @@ export function SettingsPage() {
     setSavePending(true);
     setPreferenceStatus("loading");
     const expectedAuthIdentity = authIdentity(authRef.current);
-    const result = await syncDefaultProviderSelectionResult({
-      providerId,
-      shouldApplyStorageMutation: () =>
-        selectionVersion.current === requestVersion &&
-        authIdentity(authRef.current) === expectedAuthIdentity
-    });
+    let result: "succeeded" | "guest" | "unavailable";
+    try {
+      result = await syncDefaultProviderSelectionResult({
+        providerId,
+        shouldApplyStorageMutation: () =>
+          selectionVersion.current === requestVersion &&
+          authIdentity(authRef.current) === expectedAuthIdentity
+      });
+    } finally {
+      setSavePending(false);
+    }
     if (
       selectionVersion.current !== requestVersion ||
       authIdentity(authRef.current) !== expectedAuthIdentity
     ) {
       return;
     }
-    setSavePending(false);
 
     if (result === "succeeded") {
       setPersistenceMode("authenticated");

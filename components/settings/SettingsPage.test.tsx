@@ -168,6 +168,58 @@ describe("SettingsPage", () => {
     preferenceWrite.resolve(jsonResponse(preference("provider-a")));
     await waitFor(() => expect(readLocalProvider()).toBe("provider-a"));
   });
+
+  it("clears save pending when an auth refresh makes the response stale", async () => {
+    const refreshedSession = deferred<Response>();
+    const preferenceWrite = deferred<Response>();
+    let sessionRequestCount = 0;
+    const fetcher = vi.fn(
+      async (
+        input: RequestInfo | URL,
+        init?: RequestInit
+      ): Promise<Response> => {
+        const url = input.toString();
+        if (url === "/api/auth/get-session") {
+          sessionRequestCount += 1;
+          return sessionRequestCount === 1
+            ? jsonResponse({ user: { id: "user-a" } })
+            : refreshedSession.promise;
+        }
+        if (url === "/api/providers") {
+          return jsonResponse({ items: providers });
+        }
+        if (url === "/api/user-preference") {
+          return jsonResponse(preference("provider-b"));
+        }
+        if (
+          url === "/api/user-preference/default-provider" &&
+          init?.method === "PUT"
+        ) {
+          return preferenceWrite.promise;
+        }
+        throw new Error(`Unexpected fetch: ${url}`);
+      }
+    );
+    vi.stubGlobal("fetch", fetcher);
+    render(
+      <AuthProvider>
+        <SettingsPage />
+        <RefreshControl />
+      </AuthProvider>
+    );
+
+    const select = (await screen.findByLabelText(
+      "제공사"
+    )) as HTMLSelectElement;
+    await waitFor(() => expect(select.value).toBe("provider-b"));
+    fireEvent.change(select, { target: { value: "provider-a" } });
+    await waitFor(() => expect(select.disabled).toBe(true));
+
+    fireEvent.click(screen.getByRole("button", { name: "세션 새로고침" }));
+    preferenceWrite.resolve(jsonResponse(preference("provider-a")));
+
+    await waitFor(() => expect(select.disabled).toBe(false));
+  });
 });
 
 function ExpireControl() {
@@ -175,6 +227,15 @@ function ExpireControl() {
   return (
     <button type="button" onClick={auth.markExpired}>
       세션 만료 처리
+    </button>
+  );
+}
+
+function RefreshControl() {
+  const auth = useAuth();
+  return (
+    <button type="button" onClick={() => void auth.refresh()}>
+      세션 새로고침
     </button>
   );
 }

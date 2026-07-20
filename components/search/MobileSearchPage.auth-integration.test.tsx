@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -161,6 +162,64 @@ describe("MobileSearchPage shared auth integration", () => {
       jsonResponse({ items: [historyItem("user b recent")] })
     );
     expect(await screen.findByText("user b recent")).toBeTruthy();
+  });
+
+  it("does not reload favorites or history when providers arrive later", async () => {
+    const providerResponse = deferred<Response>();
+    let favoriteRequestCount = 0;
+    let historyRequestCount = 0;
+    const fetcher = vi.fn(
+      async (
+        input: RequestInfo | URL,
+        init?: RequestInit
+      ): Promise<Response> => {
+        const url = input.toString();
+        if (url === "/api/auth/get-session") {
+          return jsonResponse({ user: { id: "user-a", name: "Alice" } });
+        }
+        if (url === "/api/providers") {
+          return providerResponse.promise;
+        }
+        if (url === "/api/user-preference") {
+          return jsonResponse({ default_provider: provider, source: "user" });
+        }
+        if (url.startsWith("/api/favorites?")) {
+          favoriteRequestCount += 1;
+          return jsonResponse({ items: [], next_cursor: null });
+        }
+        if (url === "/api/search-history" && init?.method === undefined) {
+          historyRequestCount += 1;
+          return jsonResponse({ items: [] });
+        }
+        throw new Error(`Unexpected fetch: ${url} (${init?.method})`);
+      }
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    render(
+      <AuthProvider>
+        <MobileSearchPage />
+      </AuthProvider>
+    );
+    await waitFor(() => {
+      expect(favoriteRequestCount).toBe(1);
+      expect(historyRequestCount).toBe(1);
+    });
+
+    await act(async () => {
+      providerResponse.resolve(jsonResponse({ items: [provider] }));
+      await providerResponse.promise;
+    });
+    expect(await screen.findByLabelText("제공사")).toBeTruthy();
+    await waitFor(() =>
+      expect(
+        fetcher.mock.calls.some(
+          ([input]) => input.toString() === "/api/user-preference"
+        )
+      ).toBe(true)
+    );
+    expect(favoriteRequestCount).toBe(1);
+    expect(historyRequestCount).toBe(1);
   });
 });
 

@@ -99,11 +99,21 @@ describe("global auth header", () => {
       name: "Alice 사용자 메뉴"
     });
     expect(menuButton.getAttribute("aria-expanded")).toBe("false");
+    expect(menuButton.getAttribute("aria-haspopup")).toBe("menu");
     expect(menuButton.getAttribute("aria-controls")).toBe("global-user-menu");
 
     fireEvent.click(menuButton);
     expect(menuButton.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("link", { name: "설정" })).toBeTruthy();
+    const outsideButton = screen.getByRole("button", { name: "세션 만료" });
+    fireEvent.pointerDown(outsideButton);
+    expect(menuButton.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(menuButton);
+    fireEvent.focusIn(outsideButton);
+    expect(menuButton.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(menuButton);
     fireEvent.keyDown(document, { key: "Escape" });
     expect(menuButton.getAttribute("aria-expanded")).toBe("false");
     expect(document.activeElement).toBe(menuButton);

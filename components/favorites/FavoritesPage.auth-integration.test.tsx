@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -51,10 +52,13 @@ describe("FavoritesPage shared auth integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "세션 만료 처리" }));
     expect(await screen.findByText("세션이 만료되었습니다")).toBeTruthy();
 
-    favoriteResponse.resolve(
-      jsonResponse({ items: [favoriteItem()], next_cursor: null })
-    );
-    await Promise.resolve();
+    await act(async () => {
+      favoriteResponse.resolve(
+        jsonResponse({ items: [favoriteItem()], next_cursor: null })
+      );
+      await favoriteResponse.promise;
+      await flushAsyncWork();
+    });
     expect(screen.queryByText("Private Favorite")).toBeNull();
   });
 
@@ -167,4 +171,8 @@ function deferred<T>() {
     resolve = resolvePromise;
   });
   return { promise, resolve };
+}
+
+function flushAsyncWork(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }

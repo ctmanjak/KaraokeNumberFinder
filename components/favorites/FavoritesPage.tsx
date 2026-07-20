@@ -8,6 +8,7 @@ import {
   useState
 } from "react";
 import { useOptionalAuth } from "@/components/auth/AuthProvider";
+import { isCurrentSharedAuthUser } from "@/components/auth/shared-auth-user";
 import {
   createGoogleSignInUrl,
   fetchBrowserAuthState
@@ -621,17 +622,6 @@ function StatusBox({
     <div className="status-box" role={role}>
       <p>{message}</p>
     </div>
-  );
-}
-
-function isCurrentSharedAuthUser(
-  auth: ReturnType<typeof useOptionalAuth>,
-  expectedUserId: string
-): boolean {
-  return (
-    auth === null ||
-    (auth.state.status === "authenticated" &&
-      auth.state.user.id === expectedUserId)
   );
 }
 
