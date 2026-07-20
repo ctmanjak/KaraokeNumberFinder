@@ -29,6 +29,177 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+.global-header-shell {
+  width: min(calc(100% - 32px), 430px);
+  margin: 0 auto;
+  padding-top: 12px;
+}
+
+.auth-header {
+  display: flex;
+  min-height: 48px;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--surface);
+}
+
+.auth-primary-nav {
+  display: flex;
+  min-width: 0;
+  gap: 10px;
+  align-items: center;
+}
+
+.brand-link,
+.header-link,
+.user-menu-panel a {
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+.brand-link {
+  max-width: 36px;
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.header-link {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.brand-link:focus-visible,
+.header-link:focus-visible,
+.auth-header button:focus-visible,
+.user-menu-panel a:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.auth-header-account {
+  position: relative;
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  align-items: center;
+}
+
+.auth-loading {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.header-login-button,
+.header-retry-button,
+.user-menu-button {
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 0 9px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.header-login-button {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.header-login-button:disabled,
+.user-menu-button:disabled,
+.header-retry-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.user-menu-button {
+  overflow: hidden;
+  max-width: 130px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-menu-panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  width: 150px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(25, 25, 24, 0.12);
+}
+
+.user-menu-panel a,
+.user-menu-panel button {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.user-menu-panel > :last-child {
+  border-bottom: 0;
+}
+
+.user-menu-panel a:hover,
+.user-menu-panel button:hover {
+  background: var(--state-accent-surface);
+}
+
+.auth-header-notice,
+.auth-header-error {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  border-radius: 7px;
+  padding: 7px 9px;
+  background: var(--state-accent-surface);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.auth-header-error {
+  background: var(--danger-surface);
+  color: var(--danger);
+}
+
+.auth-header-error button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .search-shell {
   min-height: 100vh;
   padding: 0 16px 32px;
@@ -123,6 +294,11 @@ h1 {
   padding: 0 10px;
 }
 
+.provider-select-loading {
+  background: linear-gradient(90deg, #ffffff 0%, #f1f0eb 50%, #ffffff 100%);
+  background-size: 200% 100%;
+}
+
 .search-input:focus,
 .provider-select:focus {
   border-color: var(--accent);
@@ -192,6 +368,47 @@ h1 {
 
 .form-note-error {
   color: var(--danger);
+}
+
+.form-retry-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.settings-hero {
+  padding: 28px 0 18px;
+}
+
+.settings-description {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.settings-section {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  background: var(--surface);
+}
+
+.settings-section h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.settings-field {
+  display: grid;
+  gap: 8px;
 }
 
 .recent-searches {

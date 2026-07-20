@@ -1,4 +1,5 @@
 import type { ProviderListItem } from "../providers/providers";
+import { createRequestTimeout, readJson } from "../http/client";
 import {
   findActiveProviderById,
   isDefaultProviderId,
@@ -29,6 +30,8 @@ export type UserPreferenceFetchResult =
     }>
   | Readonly<{ status: "guest" | "unavailable" }>;
 
+export type UserPreferenceMutationResult = UserPreferenceFetchResult;
+
 export type DefaultProviderBootstrapDecision = Readonly<{
   mode: DefaultProviderPersistenceMode;
   selectedProviderId: string | undefined;
@@ -44,9 +47,11 @@ export type DefaultProviderBootstrapResult = Readonly<{
 
 export async function bootstrapDefaultProvider(options: {
   providers: readonly ProviderListItem[];
+  authStatus?: "authenticated" | "guest" | "unavailable" | "expired";
   fetcher?: typeof fetch;
   storage?: DefaultProviderStorage;
   requestTimeoutMs?: number;
+  shouldApplyStorageMutation?: () => boolean;
 }): Promise<DefaultProviderBootstrapResult> {
   const fetcher = options.fetcher ?? fetch;
   const storage = options.storage ?? getBrowserDefaultProviderStorage();
@@ -61,17 +66,25 @@ export async function bootstrapDefaultProvider(options: {
   }
 
   const activeLocalProviderId = activeStoredProvider?.id;
-  const server = await fetchUserPreference(
-    fetcher,
-    options.requestTimeoutMs ?? DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS
-  );
+  const server =
+    options.authStatus === "guest" || options.authStatus === "expired"
+      ? ({ status: "guest" } as const)
+      : options.authStatus === "unavailable"
+        ? ({ status: "unavailable" } as const)
+        : await fetchUserPreference(
+            fetcher,
+            options.requestTimeoutMs ?? DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS
+          );
   const decision = resolveDefaultProviderBootstrap({
     providers: options.providers,
     localProviderId: activeLocalProviderId,
     server
   });
 
-  if (decision.removeLocalProviderId !== undefined) {
+  if (
+    decision.removeLocalProviderId !== undefined &&
+    (options.shouldApplyStorageMutation?.() ?? true)
+  ) {
     removeStoredDefaultProvider(storage, decision.removeLocalProviderId);
   }
 
@@ -83,18 +96,21 @@ export async function bootstrapDefaultProvider(options: {
     };
   }
 
-  const persisted = await putDefaultProviderPreference(
+  const persisted = await putDefaultProviderPreferenceResult(
     decision.persistLocalProviderId,
     fetcher,
     options.requestTimeoutMs ?? DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS
   );
 
   if (
-    persisted !== undefined &&
-    persisted.source === "user" &&
-    persisted.default_provider?.id === decision.persistLocalProviderId
+    persisted.status === "authenticated" &&
+    persisted.preference.source === "user" &&
+    persisted.preference.default_provider?.id ===
+      decision.persistLocalProviderId
   ) {
-    removeStoredDefaultProvider(storage, decision.persistLocalProviderId);
+    if (options.shouldApplyStorageMutation?.() ?? true) {
+      removeStoredDefaultProvider(storage, decision.persistLocalProviderId);
+    }
     return {
       mode: "authenticated",
       selectedProviderId: decision.persistLocalProviderId,
@@ -103,7 +119,7 @@ export async function bootstrapDefaultProvider(options: {
   }
 
   return {
-    mode: "authenticated",
+    mode: persisted.status === "guest" ? "guest" : "authenticated",
     selectedProviderId: decision.persistLocalProviderId,
     serverSync: "failed"
   };
@@ -201,22 +217,38 @@ export async function syncDefaultProviderSelection(options: {
   fetcher?: typeof fetch;
   storage?: DefaultProviderStorage;
   requestTimeoutMs?: number;
+  shouldApplyStorageMutation?: () => boolean;
 }): Promise<boolean> {
+  return (await syncDefaultProviderSelectionResult(options)) === "succeeded";
+}
+
+export async function syncDefaultProviderSelectionResult(options: {
+  providerId: string;
+  fetcher?: typeof fetch;
+  storage?: DefaultProviderStorage;
+  requestTimeoutMs?: number;
+  shouldApplyStorageMutation?: () => boolean;
+}): Promise<"succeeded" | "guest" | "unavailable"> {
   const storage = options.storage ?? getBrowserDefaultProviderStorage();
-  const persisted = await putDefaultProviderPreference(
+  const persisted = await putDefaultProviderPreferenceResult(
     options.providerId,
     options.fetcher ?? fetch,
     options.requestTimeoutMs ?? DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS
   );
   const succeeded =
-    persisted?.source === "user" &&
-    persisted.default_provider?.id === options.providerId;
+    persisted.status === "authenticated" &&
+    persisted.preference.source === "user" &&
+    persisted.preference.default_provider?.id === options.providerId;
 
-  if (succeeded) {
+  if (succeeded && (options.shouldApplyStorageMutation?.() ?? true)) {
     removeStoredDefaultProvider(storage, options.providerId);
   }
 
-  return succeeded;
+  return succeeded
+    ? "succeeded"
+    : persisted.status === "guest"
+      ? "guest"
+      : "unavailable";
 }
 
 export async function fetchUserPreference(
@@ -256,6 +288,19 @@ export async function putDefaultProviderPreference(
   fetcher: typeof fetch = fetch,
   requestTimeoutMs = DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS
 ): Promise<UserPreferenceReadModel | undefined> {
+  const result = await putDefaultProviderPreferenceResult(
+    providerId,
+    fetcher,
+    requestTimeoutMs
+  );
+  return result.status === "authenticated" ? result.preference : undefined;
+}
+
+export async function putDefaultProviderPreferenceResult(
+  providerId: string | null,
+  fetcher: typeof fetch = fetch,
+  requestTimeoutMs = DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS
+): Promise<UserPreferenceMutationResult> {
   const request = createRequestTimeout(requestTimeoutMs);
 
   try {
@@ -269,30 +314,23 @@ export async function putDefaultProviderPreference(
       signal: request.signal
     });
 
+    if (response.status === 401) {
+      return { status: "guest" };
+    }
+
     if (!response.ok) {
-      return undefined;
+      return { status: "unavailable" };
     }
 
     const payload = await readJson(response);
-    return isUserPreferenceReadModel(payload) ? payload : undefined;
+    return isUserPreferenceReadModel(payload)
+      ? { status: "authenticated", preference: payload }
+      : { status: "unavailable" };
   } catch {
-    return undefined;
+    return { status: "unavailable" };
   } finally {
     request.clear();
   }
-}
-
-function createRequestTimeout(timeoutMs: number): Readonly<{
-  clear: () => void;
-  signal: AbortSignal;
-}> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  return {
-    clear: () => clearTimeout(timeoutId),
-    signal: controller.signal
-  };
 }
 
 function isUserPreferenceReadModel(
@@ -339,12 +377,4 @@ function isProvider(value: unknown): value is ProviderListItem {
       (typeof provider.last_catalog_updated_at === "string" &&
         /^\d{4}-\d{2}-\d{2}$/u.test(provider.last_catalog_updated_at)))
   );
-}
-
-async function readJson(response: Response): Promise<unknown> {
-  try {
-    return await response.json();
-  } catch {
-    return undefined;
-  }
 }
