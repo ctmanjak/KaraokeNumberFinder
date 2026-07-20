@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { AuthEnvironment } from "./env";
 import type { OAuthFlowStore } from "./oauth-flow-store";
-import { authCookiePolicy } from "./policy";
+import { authCookiePolicy, SESSION_IDLE_TTL_SECONDS } from "./policy";
 import { createAuthRuntime, type AuthRuntime } from "./runtime";
 import {
   createPersonalizationHandler,
@@ -62,9 +62,13 @@ describe("Better Auth Google OAuth integration", () => {
 
     const session = harness.db.session[0];
     expect(session.token).toBeTypeOf("string");
-    expect(session.expiresAt.getTime() - session.createdAt.getTime()).toBe(
-      7 * 24 * 60 * 60 * 1_000
+    const sessionLifetimeMs =
+      session.expiresAt.getTime() - session.createdAt.getTime();
+    const configuredLifetimeMs = SESSION_IDLE_TTL_SECONDS * 1_000;
+    expect(sessionLifetimeMs).toBeGreaterThanOrEqual(
+      configuredLifetimeMs - 1_000
     );
+    expect(sessionLifetimeMs).toBeLessThanOrEqual(configuredLifetimeMs);
 
     const sessionCookie = cookieFromResponse(
       callback,
