@@ -1,7 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState
+} from "react";
+import { useOptionalAuth } from "@/components/auth/AuthProvider";
 import {
   createGoogleSignInUrl,
   fetchBrowserAuthState
@@ -33,8 +39,12 @@ export function FavoritesPage({
   navigateToAuth?: (url: string) => void;
 } = {}) {
   const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
+  const [authenticatedUserId, setAuthenticatedUserId] = useState<string | null>(
+    null
+  );
   const [listStatus, setListStatus] = useState<RequestStatus>("idle");
   const [items, setItems] = useState<FavoriteListItem[]>([]);
+  const [itemsOwnerUserId, setItemsOwnerUserId] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadMoreStatus, setLoadMoreStatus] = useState<RequestStatus>("idle");
   const [pendingIntent, setPendingIntent] =
@@ -50,19 +60,54 @@ export function FavoritesPage({
   const [loginSubmitting, setLoginSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const bootstrapVersion = useRef(0);
+  const listRequestVersion = useRef(0);
+  const loadMoreRequestVersion = useRef(0);
+  const pendingIntentVersion = useRef(0);
   const pendingAddSongId = useRef<string | null>(null);
+  const authenticatedUserIdRef = useRef<string | null>(null);
+  const itemsOwnerUserIdRef = useRef<string | null>(null);
+  const sharedAuth = useOptionalAuth();
+  const sharedAuthRef = useRef(sharedAuth);
+
+  useLayoutEffect(() => {
+    sharedAuthRef.current = sharedAuth;
+  }, [sharedAuth]);
 
   const loadFirstPage = useCallback(async (): Promise<void> => {
+    const expectedUserId = authenticatedUserIdRef.current;
+    if (expectedUserId === null) {
+      return;
+    }
+
+    const requestVersion = listRequestVersion.current + 1;
+    listRequestVersion.current = requestVersion;
     setListStatus("loading");
     try {
       const page = await fetchFavoritePage({ limit: 20 });
+      if (
+        listRequestVersion.current !== requestVersion ||
+        authenticatedUserIdRef.current !== expectedUserId ||
+        !isCurrentSharedAuthUser(sharedAuthRef.current, expectedUserId)
+      ) {
+        return;
+      }
       setItems(page.items);
+      itemsOwnerUserIdRef.current = expectedUserId;
+      setItemsOwnerUserId(expectedUserId);
       setNextCursor(page.next_cursor);
       setListStatus("success");
     } catch (error) {
+      if (listRequestVersion.current !== requestVersion) {
+        return;
+      }
       if (isUnauthenticatedFavoriteError(error)) {
+        sharedAuthRef.current?.markExpired();
         setAuthStatus("expired");
         setListStatus("idle");
+        setItems([]);
+        itemsOwnerUserIdRef.current = null;
+        setItemsOwnerUserId(null);
+        setNextCursor(null);
       } else {
         setListStatus("error");
       }
@@ -78,12 +123,17 @@ export function FavoritesPage({
       }
 
       pendingAddSongId.current = intent.song_id;
+      const requestVersion = pendingIntentVersion.current + 1;
+      pendingIntentVersion.current = requestVersion;
       setPendingIntent(intent);
       setPendingStatus("adding");
       setPendingMessage("로그인 전에 선택한 곡을 추가하는 중입니다.");
 
       try {
         await putFavorite(intent.song_id);
+        if (pendingIntentVersion.current !== requestVersion) {
+          return "retryable";
+        }
         if (!clearPendingFavoriteIntent()) {
           setPendingStatus("cleanup-error");
           setPendingMessage(
@@ -96,7 +146,11 @@ export function FavoritesPage({
         setPendingMessage("로그인 전에 선택한 곡을 즐겨찾기에 추가했습니다.");
         return "complete";
       } catch (error) {
+        if (pendingIntentVersion.current !== requestVersion) {
+          return "retryable";
+        }
         if (isUnauthenticatedFavoriteError(error)) {
+          sharedAuthRef.current?.markExpired();
           setAuthStatus("expired");
           setPendingStatus("retryable");
           setPendingMessage(
@@ -134,20 +188,49 @@ export function FavoritesPage({
   const bootstrap = useCallback(async (): Promise<void> => {
     const requestVersion = bootstrapVersion.current + 1;
     bootstrapVersion.current = requestVersion;
+    listRequestVersion.current += 1;
+    loadMoreRequestVersion.current += 1;
+    pendingIntentVersion.current += 1;
     setAuthStatus("loading");
     setLoginError(null);
 
-    const auth = await fetchBrowserAuthState();
+    const authContext = sharedAuthRef.current;
+    const auth =
+      authContext === null ? await fetchBrowserAuthState() : authContext.state;
     if (bootstrapVersion.current !== requestVersion) {
       return;
     }
 
-    if (auth.status !== "authenticated") {
-      setAuthStatus(auth.status);
-      setListStatus("idle");
+    if (auth.status === "loading") {
       return;
     }
 
+    if (auth.status !== "authenticated") {
+      authenticatedUserIdRef.current = null;
+      setAuthenticatedUserId(null);
+      setAuthStatus(auth.status);
+      setListStatus("idle");
+      setItems([]);
+      itemsOwnerUserIdRef.current = null;
+      setItemsOwnerUserId(null);
+      setNextCursor(null);
+      setLoadMoreStatus("idle");
+      setDeletingSongId(null);
+      setDeleteFailureSongId(null);
+      return;
+    }
+
+    authenticatedUserIdRef.current = auth.user.id;
+    setAuthenticatedUserId(auth.user.id);
+    if (itemsOwnerUserIdRef.current !== auth.user.id) {
+      setItems([]);
+      itemsOwnerUserIdRef.current = null;
+      setItemsOwnerUserId(null);
+      setNextCursor(null);
+      setLoadMoreStatus("idle");
+      setDeletingSongId(null);
+      setDeleteFailureSongId(null);
+    }
     setAuthStatus("authenticated");
     const intent = readPendingFavoriteIntent();
     if (intent !== null) {
@@ -164,20 +247,72 @@ export function FavoritesPage({
   }, [addPendingFavorite, loadFirstPage]);
 
   useEffect(() => {
-    queueMicrotask(() => void bootstrap());
+    if (sharedAuthRef.current === null) {
+      queueMicrotask(() => void bootstrap());
+    }
     return () => {
       bootstrapVersion.current += 1;
+      listRequestVersion.current += 1;
+      loadMoreRequestVersion.current += 1;
+      pendingIntentVersion.current += 1;
     };
   }, [bootstrap]);
 
+  const sharedAuthStatus = sharedAuth?.state.status;
+  const sharedAuthUserId =
+    sharedAuth?.state.status === "authenticated"
+      ? sharedAuth.state.user.id
+      : undefined;
+  const hasSharedAuth = sharedAuth !== null;
+
+  useEffect(() => {
+    if (
+      !hasSharedAuth ||
+      sharedAuthStatus === undefined ||
+      sharedAuthStatus === "loading"
+    ) {
+      return;
+    }
+    queueMicrotask(() => void bootstrap());
+  }, [bootstrap, hasSharedAuth, sharedAuthStatus, sharedAuthUserId]);
+
+  const effectiveAuthStatus = sharedAuth?.state.status ?? authStatus;
+  const effectiveAuthenticatedUserId =
+    sharedAuth?.state.status === "authenticated"
+      ? sharedAuth.state.user.id
+      : sharedAuth === null && effectiveAuthStatus === "authenticated"
+        ? authenticatedUserId
+        : null;
+  const visibleItems =
+    itemsOwnerUserId === effectiveAuthenticatedUserId ? items : [];
+  const visibleNextCursor =
+    itemsOwnerUserId === effectiveAuthenticatedUserId ? nextCursor : null;
+
   async function handleLoadMore(): Promise<void> {
-    if (nextCursor === null || loadMoreStatus === "loading") {
+    const expectedUserId = effectiveAuthenticatedUserId;
+    if (
+      expectedUserId === null ||
+      visibleNextCursor === null ||
+      loadMoreStatus === "loading"
+    ) {
       return;
     }
 
+    const requestVersion = loadMoreRequestVersion.current + 1;
+    loadMoreRequestVersion.current = requestVersion;
     setLoadMoreStatus("loading");
     try {
-      const page = await fetchFavoritePage({ cursor: nextCursor, limit: 20 });
+      const page = await fetchFavoritePage({
+        cursor: visibleNextCursor,
+        limit: 20
+      });
+      if (
+        loadMoreRequestVersion.current !== requestVersion ||
+        authenticatedUserIdRef.current !== expectedUserId ||
+        !isCurrentSharedAuthUser(sharedAuthRef.current, expectedUserId)
+      ) {
+        return;
+      }
       setItems((current) => {
         const seen = new Set(current.map((item) => item.song_id));
         return [
@@ -188,8 +323,16 @@ export function FavoritesPage({
       setNextCursor(page.next_cursor);
       setLoadMoreStatus("success");
     } catch (error) {
+      if (loadMoreRequestVersion.current !== requestVersion) {
+        return;
+      }
       if (isUnauthenticatedFavoriteError(error)) {
+        sharedAuthRef.current?.markExpired();
         setAuthStatus("expired");
+        setItems([]);
+        itemsOwnerUserIdRef.current = null;
+        setItemsOwnerUserId(null);
+        setNextCursor(null);
       }
       setLoadMoreStatus("error");
     }
@@ -200,19 +343,23 @@ export function FavoritesPage({
       return;
     }
 
-    const index = items.findIndex((item) => item.song_id === songId);
-    const item = items[index];
+    const index = visibleItems.findIndex((item) => item.song_id === songId);
+    const item = visibleItems[index];
     if (item === undefined) {
       return;
     }
 
     setDeletingSongId(songId);
+    const operationVersion = bootstrapVersion.current;
     setDeleteFailureSongId(null);
     setItems((current) => current.filter((entry) => entry.song_id !== songId));
 
     try {
       await deleteFavorite(songId);
     } catch (error) {
+      if (bootstrapVersion.current !== operationVersion) {
+        return;
+      }
       setItems((current) => {
         if (current.some((entry) => entry.song_id === songId)) {
           return current;
@@ -224,7 +371,12 @@ export function FavoritesPage({
       });
       setDeleteFailureSongId(songId);
       if (isUnauthenticatedFavoriteError(error)) {
+        sharedAuthRef.current?.markExpired();
         setAuthStatus("expired");
+        setItems([]);
+        itemsOwnerUserIdRef.current = null;
+        setItemsOwnerUserId(null);
+        setNextCursor(null);
       }
     } finally {
       setDeletingSongId(null);
@@ -292,22 +444,19 @@ export function FavoritesPage({
     <main className="search-shell">
       <div className="mobile-frame">
         <header className="favorites-hero">
-          <Link className="back-link" href="/">
-            검색으로 돌아가기
-          </Link>
           <p className="eyebrow">KaraokeNumberFinder</p>
           <h1>즐겨찾기</h1>
         </header>
 
         <section className="favorites-section" aria-live="polite">
-          {authStatus === "loading" ? (
+          {effectiveAuthStatus === "loading" ? (
             <StatusBox
               role="status"
               message="로그인 상태를 확인하는 중입니다."
             />
           ) : null}
 
-          {authStatus === "guest" ? (
+          {effectiveAuthStatus === "guest" ? (
             <LoginState
               title="로그인이 필요합니다"
               message="즐겨찾기는 로그인한 사용자에게만 저장됩니다."
@@ -317,7 +466,7 @@ export function FavoritesPage({
             />
           ) : null}
 
-          {authStatus === "unavailable" ? (
+          {effectiveAuthStatus === "unavailable" ? (
             <div className="status-box status-box-error" role="alert">
               <p>인증 시스템에 일시적으로 연결할 수 없습니다.</p>
               <button
@@ -330,7 +479,7 @@ export function FavoritesPage({
             </div>
           ) : null}
 
-          {authStatus === "expired" ? (
+          {effectiveAuthStatus === "expired" ? (
             <LoginState
               title="세션이 만료되었습니다"
               message="다시 로그인하면 남아 있는 자동 추가 요청을 이어서 처리합니다."
@@ -340,7 +489,7 @@ export function FavoritesPage({
             />
           ) : null}
 
-          {authStatus === "authenticated" ? (
+          {effectiveAuthStatus === "authenticated" ? (
             <>
               {pendingMessage === null ? null : (
                 <div
@@ -418,7 +567,7 @@ export function FavoritesPage({
                   </button>
                 </div>
               ) : null}
-              {listStatus === "success" && items.length === 0 ? (
+              {listStatus === "success" && visibleItems.length === 0 ? (
                 <div className="empty-state">
                   <p className="empty-title">아직 즐겨찾기가 없습니다.</p>
                   <p className="empty-copy">
@@ -426,9 +575,9 @@ export function FavoritesPage({
                   </p>
                 </div>
               ) : null}
-              {items.length > 0 ? (
+              {visibleItems.length > 0 ? (
                 <ul className="result-list" aria-label="즐겨찾기 목록">
-                  {items.map((item) => (
+                  {visibleItems.map((item) => (
                     <FavoriteCard
                       key={item.song_id}
                       item={item}
@@ -439,7 +588,7 @@ export function FavoritesPage({
                 </ul>
               ) : null}
 
-              {nextCursor === null ? null : (
+              {visibleNextCursor === null ? null : (
                 <div className="load-more-panel">
                   {loadMoreStatus === "error" ? (
                     <p className="form-note form-note-error" role="alert">
@@ -472,6 +621,17 @@ function StatusBox({
     <div className="status-box" role={role}>
       <p>{message}</p>
     </div>
+  );
+}
+
+function isCurrentSharedAuthUser(
+  auth: ReturnType<typeof useOptionalAuth>,
+  expectedUserId: string
+): boolean {
+  return (
+    auth === null ||
+    (auth.state.status === "authenticated" &&
+      auth.state.user.id === expectedUserId)
   );
 }
 

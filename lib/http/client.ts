@@ -8,12 +8,27 @@ export type RequestTimeout = Readonly<{
   signal: AbortSignal;
 }>;
 
-export function createRequestTimeout(timeoutMs: number): RequestTimeout {
+export function createRequestTimeout(
+  timeoutMs: number,
+  externalSignal?: AbortSignal
+): RequestTimeout {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const abortFromExternalSignal = () => controller.abort();
+
+  if (externalSignal?.aborted) {
+    controller.abort();
+  } else {
+    externalSignal?.addEventListener("abort", abortFromExternalSignal, {
+      once: true
+    });
+  }
 
   return {
-    clear: () => clearTimeout(timeoutId),
+    clear: () => {
+      clearTimeout(timeoutId);
+      externalSignal?.removeEventListener("abort", abortFromExternalSignal);
+    },
     signal: controller.signal
   };
 }

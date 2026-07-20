@@ -3,11 +3,12 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent
 } from "react";
-import Link from "next/link";
+import { useOptionalAuth } from "@/components/auth/AuthProvider";
 import { GoogleLoginDialog } from "@/components/auth/GoogleLoginDialog";
 import {
   fetchProviders,
@@ -31,7 +32,7 @@ import {
 import {
   bootstrapDefaultProvider,
   saveDefaultProviderSelectionLocally,
-  syncDefaultProviderSelection,
+  syncDefaultProviderSelectionResult,
   type DefaultProviderPersistenceMode
 } from "@/lib/preferences/default-provider-client";
 import type { ProviderListItem } from "@/lib/providers/providers";
@@ -70,6 +71,7 @@ type SearchHistoryNotice = Readonly<{
   retry: "load" | "merge" | null;
 }>;
 const SEARCH_REQUEST_TIMEOUT_MS = 8_000;
+const LOCAL_SEARCH_HISTORY_OWNER = "local";
 
 export function MobileSearchPage({
   navigateToAuth = (url) => window.location.assign(url)
@@ -80,6 +82,9 @@ export function MobileSearchPage({
   const [providersStatus, setProvidersStatus] =
     useState<RequestState>("loading");
   const [providerError, setProviderError] = useState<string | null>(null);
+  const [preferenceStatus, setPreferenceStatus] =
+    useState<RequestState>("loading");
+  const [preferenceError, setPreferenceError] = useState<string | null>(null);
   const [selectedProviderId, setSelectedProviderId] = useState<
     string | undefined
   >();
@@ -105,6 +110,9 @@ export function MobileSearchPage({
   const [favoriteSongIds, setFavoriteSongIds] = useState<Set<string>>(
     () => new Set()
   );
+  const [favoriteOwnerUserId, setFavoriteOwnerUserId] = useState<string | null>(
+    null
+  );
   const [pendingFavoriteSongIds, setPendingFavoriteSongIds] = useState<
     Set<string>
   >(() => new Set());
@@ -124,6 +132,9 @@ export function MobileSearchPage({
   const [searchHistoryStatus, setSearchHistoryStatus] =
     useState<RequestState>("loading");
   const [recentSearches, setRecentSearches] = useState<RecentSearchItem[]>([]);
+  const [searchHistoryOwner, setSearchHistoryOwner] = useState<string | null>(
+    null
+  );
   const [searchHistoryNotice, setSearchHistoryNotice] =
     useState<SearchHistoryNotice | null>(null);
   const [searchHistoryMutationPending, setSearchHistoryMutationPending] =
@@ -143,8 +154,10 @@ export function MobileSearchPage({
   );
   const preferenceWriteQueue = useRef<Promise<void>>(Promise.resolve());
   const favoriteBootstrapVersion = useRef(0);
+  const favoriteOwnerUserIdRef = useRef<string | null>(null);
   const pendingFavoriteSongIdsRef = useRef<Set<string>>(new Set());
   const searchHistoryModeRef = useRef<SearchHistoryMode>("loading");
+  const searchHistoryAuthenticatedUserIdRef = useRef<string | null>(null);
   const searchHistoryBootstrapVersion = useRef(0);
   const searchHistoryMergeAttempt = useRef<{
     mergeId: string;
@@ -152,6 +165,16 @@ export function MobileSearchPage({
   } | null>(null);
   const searchHistoryOperationQueue = useRef<Promise<void>>(Promise.resolve());
   const pendingSearchHistoryWrites = useRef(0);
+  const preferenceBootstrapVersion = useRef(0);
+  const providerBootstrapVersion = useRef(0);
+  const activeProviderRequest = useRef<AbortController | null>(null);
+  const preferenceWriteVersion = useRef(0);
+  const sharedAuth = useOptionalAuth();
+  const sharedAuthRef = useRef(sharedAuth);
+
+  useLayoutEffect(() => {
+    sharedAuthRef.current = sharedAuth;
+  }, [sharedAuth]);
 
   const updateSearchHistoryMode = useCallback(
     (mode: SearchHistoryMode): void => {
@@ -169,23 +192,35 @@ export function MobileSearchPage({
       setSearchHistoryStatus("loading");
       setSearchHistoryNotice(null);
 
-      const auth = await fetchBrowserAuthState();
+      const authContext = sharedAuthRef.current;
+      const auth =
+        authContext === null
+          ? await fetchBrowserAuthState()
+          : authContext.state;
       if (searchHistoryBootstrapVersion.current !== requestVersion) {
         return;
       }
 
+      if (auth.status === "loading") {
+        return;
+      }
+
       const localSearches = readStoredSearchHistory();
-      if (auth.status === "guest") {
+      if (auth.status === "guest" || auth.status === "expired") {
+        searchHistoryAuthenticatedUserIdRef.current = null;
         searchHistoryMergeAttempt.current = null;
-        updateSearchHistoryMode("guest");
+        updateSearchHistoryMode(auth.status);
         setRecentSearches(localSearches);
+        setSearchHistoryOwner(LOCAL_SEARCH_HISTORY_OWNER);
         setSearchHistoryStatus("success");
         return;
       }
 
       if (auth.status === "unavailable") {
+        searchHistoryAuthenticatedUserIdRef.current = null;
         updateSearchHistoryMode("unavailable");
-        setRecentSearches([]);
+        setRecentSearches(localSearches);
+        setSearchHistoryOwner(LOCAL_SEARCH_HISTORY_OWNER);
         setSearchHistoryStatus("error");
         setSearchHistoryNotice({
           message:
@@ -195,7 +230,14 @@ export function MobileSearchPage({
         return;
       }
 
+      if (auth.status !== "authenticated") {
+        return;
+      }
+
       updateSearchHistoryMode("authenticated");
+      const authenticatedUserId = auth.user.id;
+      searchHistoryAuthenticatedUserIdRef.current = authenticatedUserId;
+      const authenticatedOwner = searchHistoryUserOwner(authenticatedUserId);
 
       try {
         if (localSearches.length > 0) {
@@ -221,11 +263,15 @@ export function MobileSearchPage({
               })
           );
 
-          if (searchHistoryBootstrapVersion.current !== requestVersion) {
+          if (
+            searchHistoryBootstrapVersion.current !== requestVersion ||
+            !isCurrentSharedAuthUser(sharedAuthRef.current, authenticatedUserId)
+          ) {
             return;
           }
 
           setRecentSearches(items);
+          setSearchHistoryOwner(authenticatedOwner);
           if (
             !areStoredSearchHistoriesEqual(
               readStoredSearchHistory(),
@@ -253,10 +299,14 @@ export function MobileSearchPage({
           searchHistoryOperationQueue,
           () => fetchServerSearchHistory()
         );
-        if (searchHistoryBootstrapVersion.current !== requestVersion) {
+        if (
+          searchHistoryBootstrapVersion.current !== requestVersion ||
+          !isCurrentSharedAuthUser(sharedAuthRef.current, authenticatedUserId)
+        ) {
           return;
         }
         setRecentSearches(items);
+        setSearchHistoryOwner(authenticatedOwner);
         setSearchHistoryStatus("success");
         setSearchHistoryNotice(null);
       } catch (error) {
@@ -265,8 +315,11 @@ export function MobileSearchPage({
         }
 
         if (isUnauthenticatedSearchHistoryError(error)) {
+          sharedAuthRef.current?.markExpired();
+          searchHistoryAuthenticatedUserIdRef.current = null;
           updateSearchHistoryMode("expired");
           setRecentSearches(localSearches);
+          setSearchHistoryOwner(LOCAL_SEARCH_HISTORY_OWNER);
           setSearchHistoryNotice({
             message:
               "로그인 세션이 만료되어 최근 검색어를 동기화하지 못했습니다. 검색은 계속 사용할 수 있습니다.",
@@ -274,6 +327,7 @@ export function MobileSearchPage({
           });
         } else {
           setRecentSearches(localSearches);
+          setSearchHistoryOwner(LOCAL_SEARCH_HISTORY_OWNER);
           setSearchHistoryNotice({
             message:
               localSearches.length > 0
@@ -292,27 +346,51 @@ export function MobileSearchPage({
     setFavoriteSessionStatus("loading");
     setFavoritesStatus("idle");
 
-    const auth = await fetchBrowserAuthState();
+    const authContext = sharedAuthRef.current;
+    const auth =
+      authContext === null ? await fetchBrowserAuthState() : authContext.state;
     if (favoriteBootstrapVersion.current !== requestVersion) {
+      return;
+    }
+
+    if (auth.status === "loading") {
       return;
     }
 
     if (auth.status !== "authenticated") {
       setFavoriteSessionStatus(auth.status);
       setFavoritesStatus("idle");
+      setFavoriteSongIds(new Set());
+      favoriteOwnerUserIdRef.current = null;
+      setFavoriteOwnerUserId(null);
+      pendingFavoriteSongIdsRef.current.clear();
+      setPendingFavoriteSongIds(new Set());
       return;
     }
 
+    const authenticatedUserId = auth.user.id;
+    if (favoriteOwnerUserIdRef.current !== authenticatedUserId) {
+      setFavoriteSongIds(new Set());
+      favoriteOwnerUserIdRef.current = null;
+      setFavoriteOwnerUserId(null);
+      pendingFavoriteSongIdsRef.current.clear();
+      setPendingFavoriteSongIds(new Set());
+    }
     setFavoriteSessionStatus("authenticated");
     setFavoritesStatus("loading");
 
     try {
       const songIds = await fetchAllFavoriteSongIds();
-      if (favoriteBootstrapVersion.current !== requestVersion) {
+      if (
+        favoriteBootstrapVersion.current !== requestVersion ||
+        !isCurrentSharedAuthUser(sharedAuthRef.current, authenticatedUserId)
+      ) {
         return;
       }
 
       setFavoriteSongIds(songIds);
+      favoriteOwnerUserIdRef.current = authenticatedUserId;
+      setFavoriteOwnerUserId(authenticatedUserId);
       setFavoritesStatus("success");
       setFavoriteNotice(null);
     } catch (error) {
@@ -321,8 +399,12 @@ export function MobileSearchPage({
       }
 
       if (isUnauthenticatedFavoriteError(error)) {
+        sharedAuthRef.current?.markExpired();
         setFavoriteSessionStatus("expired");
         setFavoritesStatus("idle");
+        setFavoriteSongIds(new Set());
+        favoriteOwnerUserIdRef.current = null;
+        setFavoriteOwnerUserId(null);
       } else {
         setFavoritesStatus("error");
       }
@@ -348,95 +430,269 @@ export function MobileSearchPage({
         return;
       }
 
+      const writeVersion = preferenceWriteVersion.current;
+      const selectionVersion = providerSelectionVersion.current;
+      const expectedAuthIdentity = authIdentity(sharedAuthRef.current);
       preferenceWriteQueue.current = preferenceWriteQueue.current
         .catch(() => undefined)
         .then(async () => {
-          await syncDefaultProviderSelection({ providerId });
+          if (
+            preferenceWriteVersion.current !== writeVersion ||
+            providerSelectionVersion.current !== selectionVersion ||
+            authIdentity(sharedAuthRef.current) !== expectedAuthIdentity
+          ) {
+            return;
+          }
+          const result = await syncDefaultProviderSelectionResult({
+            providerId,
+            shouldApplyStorageMutation: () =>
+              preferenceWriteVersion.current === writeVersion &&
+              providerSelectionVersion.current === selectionVersion &&
+              authIdentity(sharedAuthRef.current) === expectedAuthIdentity
+          });
+          if (
+            preferenceWriteVersion.current !== writeVersion ||
+            providerSelectionVersion.current !== selectionVersion ||
+            authIdentity(sharedAuthRef.current) !== expectedAuthIdentity
+          ) {
+            return;
+          }
+          if (
+            result === "guest" &&
+            sharedAuthRef.current?.state.status === "authenticated"
+          ) {
+            sharedAuthRef.current?.markExpired();
+          }
+          if (result !== "succeeded") {
+            setPreferenceStatus("error");
+            setPreferenceError(
+              "기본 제공사를 서버에 저장하지 못했습니다. 검색은 계속 사용할 수 있습니다."
+            );
+          } else {
+            setPreferenceStatus("success");
+            setPreferenceError(null);
+          }
         });
     },
     []
   );
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadDefaultProviderPersonalization = useCallback(
+    async (
+      items: ProviderListItem[],
+      selectionVersion = providerSelectionVersion.current
+    ): Promise<void> => {
+      const requestVersion = preferenceBootstrapVersion.current + 1;
+      preferenceBootstrapVersion.current = requestVersion;
+      const expectedAuthIdentity = authIdentity(sharedAuthRef.current);
+      setPreferenceStatus("loading");
+      setPreferenceError(null);
 
+      const authStatus = sharedAuthRef.current?.state.status;
+      const result = await bootstrapDefaultProvider({
+        providers: items,
+        ...(authStatus === undefined || authStatus === "loading"
+          ? {}
+          : { authStatus }),
+        shouldApplyStorageMutation: () =>
+          preferenceBootstrapVersion.current === requestVersion &&
+          providerSelectionVersion.current === selectionVersion &&
+          authIdentity(sharedAuthRef.current) === expectedAuthIdentity
+      });
+      if (
+        preferenceBootstrapVersion.current !== requestVersion ||
+        authIdentity(sharedAuthRef.current) !== expectedAuthIdentity
+      ) {
+        return;
+      }
+
+      preferenceMode.current = result.mode;
+      if (
+        sharedAuthRef.current?.state.status === "authenticated" &&
+        result.mode === "guest"
+      ) {
+        sharedAuthRef.current.markExpired();
+      }
+
+      if (
+        providerSelectionVersion.current === selectionVersion &&
+        lastUserSelectedProviderId.current === undefined
+      ) {
+        updateSelectedProvider(result.selectedProviderId);
+      } else {
+        const latestProviderId = selectedProviderIdRef.current;
+        if (result.mode === "authenticated" && latestProviderId !== undefined) {
+          persistProviderSelection(latestProviderId, result.mode);
+        }
+      }
+
+      if (result.mode === "unavailable" || result.serverSync === "failed") {
+        setPreferenceStatus("error");
+        setPreferenceError(
+          result.serverSync === "failed"
+            ? "로컬 기본 제공사는 유지했지만 서버 동기화에 실패했습니다."
+            : "기본 제공사 설정을 불러오지 못했습니다. 로컬 선택은 유지됩니다."
+        );
+      } else {
+        setPreferenceStatus("success");
+      }
+    },
+    [persistProviderSelection, updateSelectedProvider]
+  );
+
+  const loadProviders = useCallback(async (): Promise<void> => {
+    const requestVersion = providerBootstrapVersion.current + 1;
+    providerBootstrapVersion.current = requestVersion;
+    activeProviderRequest.current?.abort();
+    const controller = new AbortController();
+    activeProviderRequest.current = controller;
+    setProvidersStatus("loading");
+    setProviderError(null);
+
+    try {
+      const items = await fetchProviders(fetch, { signal: controller.signal });
+      if (providerBootstrapVersion.current !== requestVersion) {
+        return;
+      }
+
+      const operationalDefaultId = selectInitialProvider(items);
+      const bootstrapSelectionVersion = providerSelectionVersion.current;
+      const latestUserSelection = items.find(
+        ({ id }) => id === lastUserSelectedProviderId.current
+      )?.id;
+      setProviders(items);
+      updateSelectedProvider(latestUserSelection ?? operationalDefaultId);
+      setProvidersStatus("success");
+
+      if (sharedAuthRef.current === null) {
+        await loadDefaultProviderPersonalization(
+          items,
+          bootstrapSelectionVersion
+        );
+        if (providerBootstrapVersion.current === requestVersion) {
+          void loadFavoritePersonalization();
+        }
+      } else {
+        setPreferenceStatus("idle");
+      }
+    } catch (error) {
+      if (providerBootstrapVersion.current !== requestVersion) {
+        return;
+      }
+
+      setProviders([]);
+      updateSelectedProvider(undefined);
+      setProvidersStatus("error");
+      setProviderError(
+        error instanceof Error
+          ? error.message
+          : "제공사 목록을 불러오지 못했습니다."
+      );
+      setPreferenceStatus("idle");
+      if (sharedAuthRef.current === null) {
+        void loadFavoritePersonalization();
+      }
+    } finally {
+      if (activeProviderRequest.current === controller) {
+        activeProviderRequest.current = null;
+      }
+    }
+  }, [
+    loadDefaultProviderPersonalization,
+    loadFavoritePersonalization,
+    updateSelectedProvider
+  ]);
+
+  useEffect(() => {
     void Promise.resolve().then(() => {
-      if (isMounted) {
+      if (sharedAuthRef.current === null) {
         return loadSearchHistoryPersonalization();
       }
     });
-
-    fetchProviders()
-      .then((items) => {
-        if (!isMounted) {
-          return;
-        }
-
-        const operationalDefaultId = selectInitialProvider(items);
-        const bootstrapSelectionVersion = providerSelectionVersion.current;
-
-        setProviders(items);
-        updateSelectedProvider(operationalDefaultId);
-        setProvidersStatus("success");
-        setProviderError(null);
-
-        void bootstrapDefaultProvider({ providers: items }).then((result) => {
-          preferenceMode.current = result.mode;
-
-          if (!isMounted) {
-            return;
-          }
-
-          if (
-            providerSelectionVersion.current === bootstrapSelectionVersion &&
-            lastUserSelectedProviderId.current === undefined
-          ) {
-            updateSelectedProvider(result.selectedProviderId);
-          } else {
-            const latestProviderId = selectedProviderIdRef.current;
-            if (
-              result.mode === "authenticated" &&
-              latestProviderId !== undefined
-            ) {
-              persistProviderSelection(latestProviderId, result.mode);
-            }
-          }
-
-          void loadFavoritePersonalization();
-        });
-      })
-      .catch((error: unknown) => {
-        if (!isMounted) {
-          return;
-        }
-
-        setProviders([]);
-        setSelectedProviderId(undefined);
-        setProvidersStatus("error");
-        setProviderError(
-          error instanceof Error
-            ? error.message
-            : "제공사 목록을 불러오지 못했습니다."
-        );
-        void loadFavoritePersonalization();
-      });
+    queueMicrotask(() => void loadProviders());
 
     return () => {
-      isMounted = false;
       favoriteBootstrapVersion.current += 1;
       searchHistoryBootstrapVersion.current += 1;
+      preferenceBootstrapVersion.current += 1;
+      providerBootstrapVersion.current += 1;
+      preferenceWriteVersion.current += 1;
+      activeProviderRequest.current?.abort();
+      activeProviderRequest.current = null;
       if (activeSearchRequest.current !== null) {
         clearTimeout(activeSearchRequest.current.timeoutId);
         activeSearchRequest.current.controller.abort();
         activeSearchRequest.current = null;
       }
     };
+  }, [loadProviders, loadSearchHistoryPersonalization]);
+
+  const sharedAuthStatus = sharedAuth?.state.status;
+  const sharedAuthUserId =
+    sharedAuth?.state.status === "authenticated"
+      ? sharedAuth.state.user.id
+      : undefined;
+
+  const hasSharedAuth = sharedAuth !== null;
+
+  useEffect(() => {
+    if (
+      !hasSharedAuth ||
+      sharedAuthStatus === undefined ||
+      sharedAuthStatus === "loading"
+    ) {
+      return;
+    }
+
+    preferenceWriteVersion.current += 1;
+    queueMicrotask(() => {
+      void loadSearchHistoryPersonalization();
+      void loadFavoritePersonalization();
+      if (providers.length > 0) {
+        void loadDefaultProviderPersonalization(providers);
+      }
+    });
   }, [
+    loadDefaultProviderPersonalization,
     loadFavoritePersonalization,
     loadSearchHistoryPersonalization,
-    persistProviderSelection,
-    updateSelectedProvider
+    hasSharedAuth,
+    providers,
+    sharedAuthStatus,
+    sharedAuthUserId
   ]);
+
+  const currentSharedAuthUserId =
+    sharedAuth?.state.status === "authenticated"
+      ? sharedAuth.state.user.id
+      : null;
+  const visibleFavoriteSongIds =
+    sharedAuth === null
+      ? favoriteSongIds
+      : favoriteOwnerUserId === currentSharedAuthUserId
+        ? favoriteSongIds
+        : new Set<string>();
+  const visiblePendingFavoriteSongIds =
+    sharedAuth === null
+      ? pendingFavoriteSongIds
+      : favoriteOwnerUserId === currentSharedAuthUserId
+        ? pendingFavoriteSongIds
+        : new Set<string>();
+  const expectedSearchHistoryOwner =
+    sharedAuth?.state.status === "authenticated"
+      ? searchHistoryUserOwner(sharedAuth.state.user.id)
+      : sharedAuth !== null && sharedAuth.state.status !== "loading"
+        ? LOCAL_SEARCH_HISTORY_OWNER
+        : null;
+  const canShowLocalSearchHistory =
+    searchHistoryOwner === LOCAL_SEARCH_HISTORY_OWNER &&
+    sharedAuth?.state.status === "authenticated";
+  const visibleRecentSearches =
+    sharedAuth === null ||
+    searchHistoryOwner === expectedSearchHistoryOwner ||
+    canShowLocalSearchHistory
+      ? recentSearches
+      : [];
 
   async function handleToggleFavorite(songId: string): Promise<void> {
     if (
@@ -461,7 +717,10 @@ export function MobileSearchPage({
       return;
     }
 
-    if (favoritesStatus !== "success") {
+    if (
+      favoritesStatus !== "success" ||
+      (sharedAuth !== null && favoriteOwnerUserId !== currentSharedAuthUserId)
+    ) {
       setFavoriteNotice({
         message:
           "즐겨찾기 상태를 불러오지 못했습니다. 확인 후 다시 시도해 주세요.",
@@ -474,7 +733,8 @@ export function MobileSearchPage({
       return;
     }
 
-    const wasFavorite = favoriteSongIds.has(songId);
+    const wasFavorite = visibleFavoriteSongIds.has(songId);
+    const operationVersion = favoriteBootstrapVersion.current;
     pendingFavoriteSongIdsRef.current.add(songId);
     setPendingFavoriteSongIds((current) => new Set(current).add(songId));
     setFavoriteSongIds((current) => {
@@ -495,6 +755,9 @@ export function MobileSearchPage({
         await putFavorite(songId);
       }
     } catch (error) {
+      if (favoriteBootstrapVersion.current !== operationVersion) {
+        return;
+      }
       setFavoriteSongIds((current) => {
         const next = new Set(current);
         if (wasFavorite) {
@@ -506,6 +769,7 @@ export function MobileSearchPage({
       });
 
       if (isUnauthenticatedFavoriteError(error)) {
+        sharedAuthRef.current?.markExpired();
         setFavoriteSessionStatus("expired");
         setLoginPrompt({
           songId,
@@ -599,6 +863,7 @@ export function MobileSearchPage({
 
       searchHistoryMergeAttempt.current = null;
       setRecentSearches(items);
+      setSearchHistoryOwner(LOCAL_SEARCH_HISTORY_OWNER);
       setSearchHistoryStatus("success");
       return;
     }
@@ -612,6 +877,21 @@ export function MobileSearchPage({
       return;
     }
 
+    const authenticatedUserId =
+      currentAuthenticatedUserId(sharedAuthRef.current) ??
+      (sharedAuthRef.current === null
+        ? searchHistoryAuthenticatedUserIdRef.current
+        : null);
+    if (authenticatedUserId === null) {
+      setSearchHistoryNotice({
+        message:
+          "검색 결과는 표시했지만 로그인 전환 중이라 최근 검색어를 기록하지 못했습니다.",
+        retry: "load"
+      });
+      return;
+    }
+
+    const authenticatedOwner = searchHistoryUserOwner(authenticatedUserId);
     pendingSearchHistoryWrites.current += 1;
     setSearchHistoryRecordingPending(true);
     void enqueueSearchHistoryOperation(
@@ -619,17 +899,23 @@ export function MobileSearchPage({
       async () => {
         try {
           const item = await postServerSearchHistory(queryToRecord);
-          if (searchHistoryModeRef.current !== "authenticated") {
+          if (
+            searchHistoryModeRef.current !== "authenticated" ||
+            !isCurrentSharedAuthUser(sharedAuthRef.current, authenticatedUserId)
+          ) {
             return;
           }
           setRecentSearches((current) => upsertRecentSearch(current, item));
+          setSearchHistoryOwner(authenticatedOwner);
         } catch (error) {
           if (isUnauthenticatedSearchHistoryError(error)) {
+            sharedAuthRef.current?.markExpired();
             updateSearchHistoryMode("expired");
             const items = addStoredSearchHistory(queryToRecord);
             if (items !== undefined) {
               searchHistoryMergeAttempt.current = null;
               setRecentSearches(items);
+              setSearchHistoryOwner(LOCAL_SEARCH_HISTORY_OWNER);
               setSearchHistoryStatus("success");
             }
             setSearchHistoryNotice({
@@ -682,6 +968,7 @@ export function MobileSearchPage({
     }
 
     const previous = recentSearches;
+    const operationVersion = searchHistoryBootstrapVersion.current;
     setSearchHistoryMutationPending(true);
     setRecentSearches((current) => current.filter((entry) => entry !== item));
     setSearchHistoryNotice(null);
@@ -690,12 +977,16 @@ export function MobileSearchPage({
         deleteServerSearchHistoryItem(item.id)
       );
     } catch (error) {
+      if (searchHistoryBootstrapVersion.current !== operationVersion) {
+        return;
+      }
       setRecentSearches(previous);
       setSearchHistoryNotice({
         message: "최근 검색어 삭제에 실패해 이전 목록과 순서로 복구했습니다.",
         retry: null
       });
       if (isUnauthenticatedSearchHistoryError(error)) {
+        sharedAuthRef.current?.markExpired();
         updateSearchHistoryMode("expired");
         setSearchHistoryStatus("error");
       }
@@ -729,6 +1020,7 @@ export function MobileSearchPage({
     }
 
     const previous = recentSearches;
+    const operationVersion = searchHistoryBootstrapVersion.current;
     setSearchHistoryMutationPending(true);
     setRecentSearches([]);
     setSearchHistoryNotice(null);
@@ -737,6 +1029,9 @@ export function MobileSearchPage({
         clearServerSearchHistory()
       );
     } catch (error) {
+      if (searchHistoryBootstrapVersion.current !== operationVersion) {
+        return;
+      }
       setRecentSearches(previous);
       setSearchHistoryNotice({
         message:
@@ -744,6 +1039,7 @@ export function MobileSearchPage({
         retry: null
       });
       if (isUnauthenticatedSearchHistoryError(error)) {
+        sharedAuthRef.current?.markExpired();
         updateSearchHistoryMode("expired");
         setSearchHistoryStatus("error");
       }
@@ -847,12 +1143,7 @@ export function MobileSearchPage({
     <main className="search-shell">
       <div className="mobile-frame">
         <section className="search-hero" aria-labelledby="page-title">
-          <div className="hero-navigation">
-            <p className="eyebrow">KaraokeNumberFinder</p>
-            <Link className="back-link" href="/favorites">
-              즐겨찾기
-            </Link>
-          </div>
+          <p className="eyebrow">KaraokeNumberFinder</p>
           <h1 id="page-title">노래방 번호 검색</h1>
         </section>
 
@@ -885,33 +1176,62 @@ export function MobileSearchPage({
             <label className="field-label" htmlFor="provider-select">
               제공사
             </label>
-            <select
-              id="provider-select"
-              className="provider-select"
-              value={selectedProviderId ?? ""}
-              disabled={providers.length === 0}
-              onChange={(event) =>
-                handleProviderChange(event.target.value || undefined)
-              }
-            >
-              {providers.length === 0 ? (
-                <option value="">제공사 미선택</option>
-              ) : (
-                providers.map((provider) => (
-                  <option key={provider.id} value={provider.id}>
-                    {provider.name}
-                  </option>
-                ))
-              )}
-            </select>
+            {providersStatus === "loading" ? (
+              <div className="provider-select provider-select-loading" />
+            ) : (
+              <select
+                id="provider-select"
+                className="provider-select"
+                value={selectedProviderId ?? ""}
+                disabled={providers.length === 0}
+                onChange={(event) =>
+                  handleProviderChange(event.target.value || undefined)
+                }
+              >
+                {providers.length === 0 ? (
+                  <option value="">제공사 미선택</option>
+                ) : (
+                  providers.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.name}
+                    </option>
+                  ))
+                )}
+              </select>
+            )}
 
             {providersStatus === "loading" ? (
               <p className="form-note">제공사 목록을 불러오는 중입니다.</p>
             ) : null}
             {providersStatus === "error" ? (
-              <p className="form-note form-note-error">
-                {providerError} 제공사 없이도 검색할 수 있습니다.
-              </p>
+              <div className="form-retry-note form-note-error">
+                <span>{providerError} 제공사 없이도 검색할 수 있습니다.</span>
+                <button
+                  className="link-button"
+                  type="button"
+                  onClick={() => void loadProviders()}
+                >
+                  제공사 다시 시도
+                </button>
+              </div>
+            ) : null}
+            {preferenceStatus === "loading" && providersStatus === "success" ? (
+              <p className="form-note">기본 제공사 설정을 확인하는 중입니다.</p>
+            ) : null}
+            {preferenceStatus === "error" ? (
+              <div className="form-retry-note form-note-error">
+                <span>{preferenceError}</span>
+                <button
+                  className="link-button"
+                  type="button"
+                  disabled={providers.length === 0}
+                  onClick={() =>
+                    void loadDefaultProviderPersonalization(providers)
+                  }
+                >
+                  설정 다시 시도
+                </button>
+              </div>
             ) : null}
           </form>
         </section>
@@ -919,7 +1239,7 @@ export function MobileSearchPage({
         <RecentSearchesPanel
           mode={searchHistoryMode}
           status={searchHistoryStatus}
-          items={recentSearches}
+          items={visibleRecentSearches}
           notice={searchHistoryNotice}
           mutationPending={searchHistoryMutationPending}
           recordingPending={searchHistoryRecordingPending}
@@ -963,8 +1283,8 @@ export function MobileSearchPage({
             results={results}
             suggestions={suggestions}
             expandedSongIds={expandedSongIds}
-            favoriteSongIds={favoriteSongIds}
-            pendingFavoriteSongIds={pendingFavoriteSongIds}
+            favoriteSongIds={visibleFavoriteSongIds}
+            pendingFavoriteSongIds={visiblePendingFavoriteSongIds}
             error={searchError}
             onToggleExpanded={(songId) =>
               setExpandedSongIds((current) => {
@@ -996,6 +1316,35 @@ export function MobileSearchPage({
         />
       )}
     </main>
+  );
+}
+
+function searchHistoryUserOwner(userId: string): string {
+  return `user:${userId}`;
+}
+
+function currentAuthenticatedUserId(
+  auth: ReturnType<typeof useOptionalAuth>
+): string | null {
+  return auth?.state.status === "authenticated" ? auth.state.user.id : null;
+}
+
+function authIdentity(auth: ReturnType<typeof useOptionalAuth>): string {
+  return auth === null
+    ? "standalone"
+    : auth.state.status === "authenticated"
+      ? `authenticated:${auth.state.user.id}`
+      : auth.state.status;
+}
+
+function isCurrentSharedAuthUser(
+  auth: ReturnType<typeof useOptionalAuth>,
+  expectedUserId: string
+): boolean {
+  return (
+    auth === null ||
+    (auth.state.status === "authenticated" &&
+      auth.state.user.id === expectedUserId)
   );
 }
 

@@ -6,7 +6,8 @@ import {
   fetchUserPreference,
   putDefaultProviderPreference,
   resolveDefaultProviderBootstrap,
-  saveDefaultProviderSelection
+  saveDefaultProviderSelection,
+  syncDefaultProviderSelectionResult
 } from "./default-provider-client";
 import {
   DEFAULT_PROVIDER_STORAGE_KEY,
@@ -227,6 +228,26 @@ describe("default provider client", () => {
       vi.useRealTimers();
     }
   });
+
+  it("does not let a stale successful write remove local state", async () => {
+    const storage = memoryStorage();
+    writeStoredDefaultProvider(storage, "provider-server");
+    const response = deferred<Response>();
+    const fetcher = vi.fn(() => response.promise) as typeof fetch;
+    let isCurrentRequest = true;
+
+    const result = syncDefaultProviderSelectionResult({
+      providerId: "provider-server",
+      fetcher,
+      storage,
+      shouldApplyStorageMutation: () => isCurrentRequest
+    });
+    isCurrentRequest = false;
+    response.resolve(jsonResponse(preference("provider-server", "user")));
+
+    await expect(result).resolves.toBe("succeeded");
+    expect(storage.getItem(DEFAULT_PROVIDER_STORAGE_KEY)).not.toBeNull();
+  });
 });
 
 function provider(
@@ -261,6 +282,14 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     headers: { "content-type": "application/json" }
   });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
 }
 
 function memoryStorage(): DefaultProviderStorage {
