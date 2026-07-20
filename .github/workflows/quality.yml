@@ -1,0 +1,49 @@
+name: Quality
+
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: karaoke_number_finder_ci
+          POSTGRES_PASSWORD: prisma
+          POSTGRES_USER: prisma
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U prisma -d karaoke_number_finder_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://prisma:prisma@127.0.0.1:5432/karaoke_number_finder_ci
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run seed:validate
+      - run: npx prisma migrate deploy
+      - run: npm run seed:import
+      - run: npm run seed:search-smoke
