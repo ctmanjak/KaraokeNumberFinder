@@ -180,7 +180,7 @@ describe("MobileSearchPage shared auth integration", () => {
         if (url === "/api/providers") {
           return providerResponse.promise;
         }
-        if (url === "/api/user-preference") {
+        if (url === "/api/user-preference" && init?.method === undefined) {
           return jsonResponse({ default_provider: provider, source: "user" });
         }
         if (url.startsWith("/api/favorites?")) {
