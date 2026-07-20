@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -9,6 +10,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PROVIDER_STORAGE_KEY } from "@/lib/preferences/default-provider-storage";
+import { SEARCH_HISTORY_STORAGE_KEY } from "@/lib/search-history/storage";
 import { MobileSearchPage } from "./MobileSearchPage";
 
 const providers = [
@@ -145,6 +147,7 @@ describe("MobileSearchPage", () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -495,6 +498,9 @@ describe("MobileSearchPage", () => {
     render(<MobileSearchPage />);
 
     const select = await screen.findByLabelText("제공사");
+    await waitFor(() => {
+      expect((select as HTMLSelectElement).value).toBe("provider_default");
+    });
     fireEvent.change(select, { target: { value: "provider_secondary" } });
     fireEvent.change(screen.getByLabelText("검색어"), {
       target: { value: "sample title" }
@@ -1193,7 +1199,876 @@ describe("MobileSearchPage", () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
   });
+
+  it("records a successful guest search in localStorage", async () => {
+    mockFetch([
+      { ok: true, body: { items: providers } },
+      { ok: true, body: searchResponse }
+    ]);
+
+    render(<MobileSearchPage />);
+
+    await screen.findByText("최근 검색어가 없습니다.");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "  sample title  " }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    await screen.findByText("Sample Display Title");
+    await waitFor(() => {
+      const stored = readStoredHistoryPayload();
+      expect(stored.items).toHaveLength(1);
+      expect(stored.items[0]).toMatchObject({
+        query: "sample title",
+        normalized_query: "sampletitle"
+      });
+      expect(screen.getByRole("button", { name: "sample title" })).toBeTruthy();
+    });
+  });
+
+  it("does not record a failed guest search", async () => {
+    mockFetch([
+      { ok: true, body: { items: providers } },
+      { ok: false, status: 500, body: {} }
+    ]);
+
+    render(<MobileSearchPage />);
+    await screen.findByText("최근 검색어가 없습니다.");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "failed query" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    await screen.findByRole("alert");
+    expect(window.localStorage.getItem(SEARCH_HISTORY_STORAGE_KEY)).toBeNull();
+  });
+
+  it("does not record a timed-out guest search", async () => {
+    const fetchMock = vi.fn(
+      (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        const url = input.toString();
+        if (url === "/api/auth/get-session") {
+          return Promise.resolve(jsonResponse(null));
+        }
+        if (url === "/api/providers") {
+          return Promise.resolve(jsonResponse({ items: providers }));
+        }
+        if (url === "/api/user-preference") {
+          return Promise.resolve(unauthenticatedResponse());
+        }
+        if (url.startsWith("/api/search?")) {
+          return new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () =>
+              reject(new DOMException("aborted", "AbortError"))
+            );
+          });
+        }
+        throw new Error(`Unexpected fetch call: ${url}`);
+      }
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<MobileSearchPage />);
+    await screen.findByText("최근 검색어가 없습니다.");
+    vi.useFakeTimers();
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "timeout query" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(8_000);
+    });
+
+    expect(screen.getByText("검색 요청 시간이 초과되었습니다.")).toBeTruthy();
+    expect(window.localStorage.getItem(SEARCH_HISTORY_STORAGE_KEY)).toBeNull();
+  });
+
+  it("does not record an aborted stale search during rapid submissions", async () => {
+    const slowSearch = deferred<Response>();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === "/api/auth/get-session") {
+        return Promise.resolve(jsonResponse(null));
+      }
+      if (url === "/api/providers") {
+        return Promise.resolve(jsonResponse({ items: providers }));
+      }
+      if (url === "/api/user-preference") {
+        return Promise.resolve(unauthenticatedResponse());
+      }
+      if (url.startsWith("/api/search?q=slow")) {
+        return slowSearch.promise;
+      }
+      if (url.startsWith("/api/search?q=fast")) {
+        return Promise.resolve(
+          jsonResponse({
+            ...searchResponse,
+            query: "fast",
+            normalized_query: "fast"
+          })
+        );
+      }
+      throw new Error(`Unexpected fetch call: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<MobileSearchPage />);
+    await screen.findByText("최근 검색어가 없습니다.");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "slow" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "fast" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    await screen.findByText("Sample Display Title");
+    slowSearch.resolve(
+      jsonResponse({
+        ...searchResponse,
+        query: "slow",
+        normalized_query: "slow"
+      })
+    );
+    await waitFor(() => {
+      expect(
+        readStoredHistoryPayload().items.map(({ query }) => query)
+      ).toEqual(["fast"]);
+    });
+  });
+
+  it("loads and records authenticated server history without blocking results", async () => {
+    const existing = serverHistoryItem(
+      "Existing",
+      "existing",
+      "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb",
+      "2026-07-20T01:00:00.000Z"
+    );
+    const recorded = serverHistoryItem(
+      "sample title",
+      "sampletitle",
+      "cccccccc-cccc-4ccc-bccc-cccccccccccc",
+      "2026-07-20T02:00:00.000Z"
+    );
+    const fetchMock = authenticatedFetch(({ url, init }) => {
+      if (url === "/api/search-history" && init?.method === "POST") {
+        return jsonResponse({ item: recorded });
+      }
+      if (url === "/api/search-history") {
+        return jsonResponse({ items: [existing] });
+      }
+      if (url.startsWith("/api/search?")) {
+        return jsonResponse(searchResponse);
+      }
+      return undefined;
+    });
+
+    render(<MobileSearchPage />);
+
+    expect(
+      await screen.findByRole("button", { name: "Existing" })
+    ).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "sample title" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    await screen.findByText("Sample Display Title");
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "sample title" })).toBeTruthy();
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/search-history",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ query: "sample title" })
+      })
+    );
+    expect(window.localStorage.getItem(SEARCH_HISTORY_STORAGE_KEY)).toBeNull();
+  });
+
+  it("keeps authenticated search results when history POST fails", async () => {
+    authenticatedFetch(({ url, init }) => {
+      if (url === "/api/search-history" && init?.method === "POST") {
+        return errorJsonResponse(500, "PERSONALIZATION_UNAVAILABLE");
+      }
+      if (url === "/api/search-history") {
+        return jsonResponse({ items: [] });
+      }
+      if (url.startsWith("/api/search?")) {
+        return jsonResponse(searchResponse);
+      }
+      return undefined;
+    });
+
+    render(<MobileSearchPage />);
+    await screen.findByText("최근 검색어가 없습니다.");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "sample title" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    expect(await screen.findByText("Sample Display Title")).toBeTruthy();
+    expect(
+      await screen.findByText(/서버에 최근 검색어를 기록하지 못했습니다/u)
+    ).toBeTruthy();
+  });
+
+  it("handles a history POST 401 as session expiry and stores the search locally", async () => {
+    authenticatedFetch(({ url, init }) => {
+      if (url === "/api/search-history" && init?.method === "POST") {
+        return errorJsonResponse(401, "UNAUTHENTICATED");
+      }
+      if (url === "/api/search-history") {
+        return jsonResponse({ items: [] });
+      }
+      if (url.startsWith("/api/search?")) {
+        return jsonResponse(searchResponse);
+      }
+      return undefined;
+    });
+
+    render(<MobileSearchPage />);
+    await screen.findByText("최근 검색어가 없습니다.");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "sample title" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    expect(await screen.findByText("Sample Display Title")).toBeTruthy();
+    expect(
+      await screen.findByText(/세션이 만료되어 이 검색어는 브라우저에 보관/u)
+    ).toBeTruthy();
+    expect(readStoredHistoryPayload().items[0]).toMatchObject({
+      query: "sample title",
+      normalized_query: "sampletitle"
+    });
+  });
+
+  it("does not treat an auth 503 as guest or overwrite local history", async () => {
+    seedLocalHistory([
+      {
+        query: "Local Existing",
+        normalized_query: "localexisting",
+        searched_at: "2026-07-20T01:00:00.000Z"
+      }
+    ]);
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === "/api/auth/get-session") {
+        return Promise.resolve(
+          errorJsonResponse(503, "PERSONALIZATION_UNAVAILABLE")
+        );
+      }
+      if (url === "/api/providers") {
+        return Promise.resolve(jsonResponse({ items: providers }));
+      }
+      if (url === "/api/user-preference") {
+        return Promise.resolve(
+          errorJsonResponse(503, "PERSONALIZATION_UNAVAILABLE")
+        );
+      }
+      if (url.startsWith("/api/search?")) {
+        return Promise.resolve(jsonResponse(searchResponse));
+      }
+      throw new Error(`Unexpected fetch call: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<MobileSearchPage />);
+    expect(
+      await screen.findByText(/로그인 상태를 확인하지 못해 최근 검색어/u)
+    ).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "sample title" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    await screen.findByText("Sample Display Title");
+    expect(readStoredHistoryPayload().items.map(({ query }) => query)).toEqual([
+      "Local Existing"
+    ]);
+  });
+
+  it("merges local history once after login and clears it only after success", async () => {
+    seedLocalHistory([
+      {
+        query: "Local Query",
+        normalized_query: "localquery",
+        searched_at: "2026-07-20T01:00:00.000Z"
+      }
+    ]);
+    const merged = serverHistoryItem(
+      "Local Query",
+      "localquery",
+      "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb",
+      "2026-07-20T01:00:00.000Z"
+    );
+    const fetchMock = authenticatedFetch(({ url }) => {
+      if (url === "/api/user-data/merge") {
+        return jsonResponse(mergePayload([merged]));
+      }
+      return undefined;
+    });
+
+    render(<MobileSearchPage />);
+
+    expect(
+      await screen.findByRole("button", { name: "Local Query" })
+    ).toBeTruthy();
+    await waitFor(() => {
+      expect(
+        window.localStorage.getItem(SEARCH_HISTORY_STORAGE_KEY)
+      ).toBeNull();
+    });
+    const mergeCall = fetchMock.mock.calls.find(
+      ([input]) => input.toString() === "/api/user-data/merge"
+    );
+    const body = JSON.parse(String(mergeCall?.[1]?.body));
+    expect(body).toMatchObject({
+      recent_searches: [
+        { query: "Local Query", searched_at: "2026-07-20T01:00:00.000Z" }
+      ]
+    });
+    expect(body.merge_id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu
+    );
+    expect(
+      fetchMock.mock.calls.filter(
+        ([input]) => input.toString() === "/api/user-data/merge"
+      )
+    ).toHaveLength(1);
+  });
+
+  it("keeps local history after merge failure and retries with the same merge id", async () => {
+    seedLocalHistory([
+      {
+        query: "Retry Query",
+        normalized_query: "retryquery",
+        searched_at: "2026-07-20T01:00:00.000Z"
+      }
+    ]);
+    const merged = serverHistoryItem(
+      "Retry Query",
+      "retryquery",
+      "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb",
+      "2026-07-20T01:00:00.000Z"
+    );
+    let mergeCount = 0;
+    const fetchMock = authenticatedFetch(({ url }) => {
+      if (url === "/api/user-data/merge") {
+        mergeCount += 1;
+        return mergeCount === 1
+          ? errorJsonResponse(500, "PERSONALIZATION_UNAVAILABLE")
+          : jsonResponse(mergePayload([merged]));
+      }
+      return undefined;
+    });
+
+    render(<MobileSearchPage />);
+    expect(await screen.findByText(/병합에 실패했습니다/u)).toBeTruthy();
+    expect(
+      window.localStorage.getItem(SEARCH_HISTORY_STORAGE_KEY)
+    ).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    await waitFor(() => {
+      expect(
+        window.localStorage.getItem(SEARCH_HISTORY_STORAGE_KEY)
+      ).toBeNull();
+    });
+    const mergeBodies = fetchMock.mock.calls
+      .filter(([input]) => input.toString() === "/api/user-data/merge")
+      .map(([, init]) => JSON.parse(String(init?.body)));
+    expect(mergeBodies).toHaveLength(2);
+    expect(mergeBodies[1].merge_id).toBe(mergeBodies[0].merge_id);
+  });
+
+  it("starts a new merge attempt when local history changes after a merge 401", async () => {
+    seedLocalHistory([
+      {
+        query: "Original Local",
+        normalized_query: "originallocal",
+        searched_at: "2026-07-20T01:00:00.000Z"
+      }
+    ]);
+    const original = serverHistoryItem(
+      "Original Local",
+      "originallocal",
+      "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb",
+      "2026-07-20T01:00:00.000Z"
+    );
+    const added = serverHistoryItem(
+      "New Local",
+      "newlocal",
+      "cccccccc-cccc-4ccc-bccc-cccccccccccc",
+      "2026-07-20T02:00:00.000Z"
+    );
+    const mergeBodies: Array<{
+      merge_id: string;
+      recent_searches: Array<{ query: string; searched_at: string }>;
+    }> = [];
+    const fetchMock = authenticatedFetch(({ url, init }) => {
+      if (url === "/api/user-data/merge") {
+        mergeBodies.push(JSON.parse(String(init?.body)));
+        return mergeBodies.length === 1
+          ? errorJsonResponse(401, "UNAUTHENTICATED")
+          : jsonResponse(mergePayload([added, original]));
+      }
+      if (url.startsWith("/api/search?")) {
+        return jsonResponse({
+          ...searchResponse,
+          query: "New Local",
+          normalized_query: "newlocal"
+        });
+      }
+      return undefined;
+    });
+
+    render(<MobileSearchPage />);
+    expect(
+      await screen.findByText(/로그인 세션이 만료되어 최근 검색어를 동기화/u)
+    ).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "New Local" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    await screen.findByText("Sample Display Title");
+    await waitFor(() => {
+      expect(
+        readStoredHistoryPayload().items.map(({ query }) => query)
+      ).toEqual(["New Local", "Original Local"]);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    await screen.findByRole("button", { name: "New Local" });
+    await waitFor(() => {
+      expect(
+        window.localStorage.getItem(SEARCH_HISTORY_STORAGE_KEY)
+      ).toBeNull();
+    });
+    expect(fetchMock).toHaveBeenCalled();
+    expect(mergeBodies).toHaveLength(2);
+    expect(mergeBodies[1].recent_searches.map(({ query }) => query)).toEqual([
+      "New Local",
+      "Original Local"
+    ]);
+    expect(mergeBodies[1].merge_id).not.toBe(mergeBodies[0].merge_id);
+  });
+
+  it("deletes individual and all guest history locally without triggering search", async () => {
+    seedLocalHistory([
+      {
+        query: "Newest",
+        normalized_query: "newest",
+        searched_at: "2026-07-20T02:00:00.000Z"
+      },
+      {
+        query: "Older",
+        normalized_query: "older",
+        searched_at: "2026-07-20T01:00:00.000Z"
+      }
+    ]);
+    const fetchMock = mockFetch([{ ok: true, body: { items: providers } }]);
+
+    render(<MobileSearchPage />);
+    await screen.findByRole("button", { name: "Newest" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "최근 검색어 Newest 삭제" })
+    );
+    expect(screen.queryByRole("button", { name: "Newest" })).toBeNull();
+    expect(
+      fetchMock.mock.calls.filter(([input]) =>
+        input.toString().startsWith("/api/search?")
+      )
+    ).toHaveLength(0);
+    fireEvent.click(
+      screen.getByRole("button", { name: "최근 검색어 전체 삭제" })
+    );
+    expect(await screen.findByText("최근 검색어가 없습니다.")).toBeTruthy();
+    expect(window.localStorage.getItem(SEARCH_HISTORY_STORAGE_KEY)).toBeNull();
+  });
+
+  it("restores exact authenticated history order when an individual delete fails", async () => {
+    const newest = serverHistoryItem(
+      "Newest",
+      "newest",
+      "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb",
+      "2026-07-20T02:00:00.000Z"
+    );
+    const older = serverHistoryItem(
+      "Older",
+      "older",
+      "cccccccc-cccc-4ccc-bccc-cccccccccccc",
+      "2026-07-20T01:00:00.000Z"
+    );
+    authenticatedFetch(({ url, init }) => {
+      if (url === "/api/search-history") {
+        return jsonResponse({ items: [newest, older] });
+      }
+      if (
+        url === `/api/search-history/${newest.id}` &&
+        init?.method === "DELETE"
+      ) {
+        return errorJsonResponse(500, "PERSONALIZATION_UNAVAILABLE");
+      }
+      return undefined;
+    });
+
+    const { container } = render(<MobileSearchPage />);
+    await screen.findByRole("button", { name: "Newest" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "최근 검색어 Newest 삭제" })
+    );
+
+    expect(
+      await screen.findByText(/이전 목록과 순서로 복구했습니다/u)
+    ).toBeTruthy();
+    const queries = [...container.querySelectorAll(".recent-search-query")].map(
+      (element) => element.textContent
+    );
+    expect(queries).toEqual(["Newest", "Older"]);
+  });
+
+  it("uses server authority for authenticated individual and full deletion", async () => {
+    const first = serverHistoryItem(
+      "First",
+      "first",
+      "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb",
+      "2026-07-20T02:00:00.000Z"
+    );
+    const second = serverHistoryItem(
+      "Second",
+      "second",
+      "cccccccc-cccc-4ccc-bccc-cccccccccccc",
+      "2026-07-20T01:00:00.000Z"
+    );
+    const fetchMock = authenticatedFetch(({ url, init }) => {
+      if (url === "/api/search-history" && init?.method === "DELETE") {
+        return jsonResponse({ deleted_count: 1 });
+      }
+      if (url === "/api/search-history") {
+        return jsonResponse({ items: [first, second] });
+      }
+      if (url === `/api/search-history/${first.id}`) {
+        return jsonResponse({ deleted_count: 1 });
+      }
+      return undefined;
+    });
+
+    render(<MobileSearchPage />);
+    await screen.findByRole("button", { name: "First" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "최근 검색어 First 삭제" })
+    );
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "First" })).toBeNull();
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "최근 검색어 전체 삭제" })
+    );
+    expect(await screen.findByText("최근 검색어가 없습니다.")).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/search-history",
+      expect.objectContaining({ method: "DELETE" })
+    );
+  });
+
+  it("records a search after an in-flight clear finishes", async () => {
+    const existing = serverHistoryItem(
+      "Existing",
+      "existing",
+      "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb",
+      "2026-07-20T01:00:00.000Z"
+    );
+    const recorded = serverHistoryItem(
+      "After Clear",
+      "afterclear",
+      "cccccccc-cccc-4ccc-bccc-cccccccccccc",
+      "2026-07-20T02:00:00.000Z"
+    );
+    const clearRequest = deferred<Response>();
+    let postCount = 0;
+    authenticatedFetch(({ url, init }) => {
+      if (url === "/api/search-history" && init?.method === "DELETE") {
+        return clearRequest.promise;
+      }
+      if (url === "/api/search-history" && init?.method === "POST") {
+        postCount += 1;
+        return jsonResponse({ item: recorded });
+      }
+      if (url === "/api/search-history") {
+        return jsonResponse({ items: [existing] });
+      }
+      if (url.startsWith("/api/search?")) {
+        return jsonResponse({
+          ...searchResponse,
+          query: "After Clear",
+          normalized_query: "afterclear"
+        });
+      }
+      return undefined;
+    });
+
+    render(<MobileSearchPage />);
+    await screen.findByRole("button", { name: "Existing" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "최근 검색어 전체 삭제" })
+    );
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "After Clear" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    await screen.findByText("Sample Display Title");
+    await act(async () => Promise.resolve());
+    expect(postCount).toBe(0);
+    clearRequest.resolve(jsonResponse({ deleted_count: 1 }));
+
+    expect(
+      await screen.findByRole("button", { name: "After Clear" })
+    ).toBeTruthy();
+    expect(postCount).toBe(1);
+  });
+
+  it("runs an explicit search when a recent query is selected", async () => {
+    seedLocalHistory([
+      {
+        query: "Recent Choice",
+        normalized_query: "recentchoice",
+        searched_at: "2026-07-20T01:00:00.000Z"
+      }
+    ]);
+    const fetchMock = mockFetch([
+      { ok: true, body: { items: providers } },
+      {
+        ok: true,
+        body: {
+          ...searchResponse,
+          query: "Recent Choice",
+          normalized_query: "recentchoice"
+        }
+      }
+    ]);
+
+    render(<MobileSearchPage />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Recent Choice" })
+    );
+
+    await screen.findByText("Sample Display Title");
+    expect((screen.getByLabelText("검색어") as HTMLInputElement).value).toBe(
+      "Recent Choice"
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/search?q=Recent+Choice&provider_id=provider_default",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+  });
+
+  it("finishes initial history loading before recording a newer search", async () => {
+    const initialHistoryRequest = deferred<Response>();
+    const recorded = serverHistoryItem(
+      "Queued Search",
+      "queuedsearch",
+      "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb",
+      "2026-07-20T02:00:00.000Z"
+    );
+    let postCount = 0;
+    const fetchMock = authenticatedFetch(({ url, init }) => {
+      if (url === "/api/search-history" && init?.method === "POST") {
+        postCount += 1;
+        return jsonResponse({ item: recorded });
+      }
+      if (url === "/api/search-history") {
+        return initialHistoryRequest.promise;
+      }
+      if (url.startsWith("/api/search?")) {
+        return jsonResponse({
+          ...searchResponse,
+          query: "Queued Search",
+          normalized_query: "queuedsearch"
+        });
+      }
+      return undefined;
+    });
+
+    render(<MobileSearchPage />);
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.filter(
+          ([input, init]) =>
+            input.toString() === "/api/search-history" &&
+            init?.method === undefined
+        )
+      ).toHaveLength(1);
+    });
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "Queued Search" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+
+    await screen.findByText("Sample Display Title");
+    await act(async () => Promise.resolve());
+    expect(postCount).toBe(0);
+    initialHistoryRequest.resolve(jsonResponse({ items: [] }));
+
+    expect(
+      await screen.findByRole("button", { name: "Queued Search" })
+    ).toBeTruthy();
+    expect(postCount).toBe(1);
+  });
+
+  it("serializes rapid authenticated history writes so older responses cannot win", async () => {
+    const firstPost = deferred<Response>();
+    let postCount = 0;
+    const fetchMock = authenticatedFetch(({ url, init }) => {
+      if (url === "/api/search-history" && init?.method === "POST") {
+        postCount += 1;
+        return postCount === 1
+          ? firstPost.promise
+          : jsonResponse({
+              item: serverHistoryItem(
+                "second",
+                "second",
+                "cccccccc-cccc-4ccc-bccc-cccccccccccc",
+                "2026-07-20T02:00:00.000Z"
+              )
+            });
+      }
+      if (url === "/api/search-history") {
+        return jsonResponse({ items: [] });
+      }
+      if (url.startsWith("/api/search?q=first")) {
+        return jsonResponse({
+          ...searchResponse,
+          query: "first",
+          normalized_query: "first"
+        });
+      }
+      if (url.startsWith("/api/search?q=second")) {
+        return jsonResponse({
+          ...searchResponse,
+          query: "second",
+          normalized_query: "second"
+        });
+      }
+      return undefined;
+    });
+
+    const { container } = render(<MobileSearchPage />);
+    await screen.findByText("최근 검색어가 없습니다.");
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "first" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+    await waitFor(() => expect(postCount).toBe(1));
+    fireEvent.change(screen.getByLabelText("검색어"), {
+      target: { value: "second" }
+    });
+    fireEvent.submit(screen.getByRole("search"));
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.filter(
+          ([input, init]) =>
+            input.toString() === "/api/search-history" &&
+            init?.method === "POST"
+        )
+      ).toHaveLength(1);
+    });
+
+    firstPost.resolve(
+      jsonResponse({
+        item: serverHistoryItem(
+          "first",
+          "first",
+          "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb",
+          "2026-07-20T01:00:00.000Z"
+        )
+      })
+    );
+    await waitFor(() => {
+      const queries = [
+        ...container.querySelectorAll(".recent-search-query")
+      ].map((element) => element.textContent);
+      expect(queries).toEqual(["second", "first"]);
+    });
+  });
 });
+
+type StoredHistoryTestItem = {
+  query: string;
+  normalized_query: string;
+  searched_at: string;
+};
+
+function authenticatedFetch(
+  resolve: (context: {
+    url: string;
+    init: RequestInit | undefined;
+  }) => Response | Promise<Response> | undefined
+) {
+  const fetchMock = vi.fn(
+    async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = input.toString();
+      if (url === "/api/auth/get-session") {
+        return jsonResponse({ user: { id: "authenticated-user" } });
+      }
+      if (url === "/api/providers") {
+        return jsonResponse({ items: providers });
+      }
+      if (url === "/api/user-preference") {
+        return unauthenticatedResponse();
+      }
+      if (url.startsWith("/api/favorites?")) {
+        return jsonResponse({ items: [], next_cursor: null });
+      }
+
+      const response = resolve({ url, init });
+      if (response !== undefined) {
+        return response;
+      }
+      throw new Error(`Unexpected fetch call: ${url} (${init?.method})`);
+    }
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function serverHistoryItem(
+  query: string,
+  normalized_query: string,
+  id: string,
+  searched_at: string
+) {
+  return { id, query, normalized_query, searched_at };
+}
+
+function mergePayload(recentSearches: ReturnType<typeof serverHistoryItem>[]) {
+  return {
+    merged: true,
+    recent_searches: recentSearches,
+    default_provider: { default_provider: null, source: "none" }
+  };
+}
+
+function seedLocalHistory(items: StoredHistoryTestItem[]): void {
+  window.localStorage.setItem(
+    SEARCH_HISTORY_STORAGE_KEY,
+    JSON.stringify({ version: 1, items })
+  );
+}
+
+function readStoredHistoryPayload(): {
+  version: number;
+  items: StoredHistoryTestItem[];
+} {
+  return JSON.parse(
+    window.localStorage.getItem(SEARCH_HISTORY_STORAGE_KEY) ?? "null"
+  );
+}
 
 function mockFetch(
   responses: Array<{ ok: boolean; status?: number; body: unknown }>
@@ -1291,6 +2166,14 @@ function jsonResponse(body: unknown, ok = true): Response {
     ok,
     status: ok ? 200 : 500,
     json: async () => body
+  } as Response;
+}
+
+function errorJsonResponse(status: number, code: string): Response {
+  return {
+    ok: false,
+    status,
+    json: async () => ({ error: { code, message: "safe" } })
   } as Response;
 }
 

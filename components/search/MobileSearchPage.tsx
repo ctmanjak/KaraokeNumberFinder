@@ -36,6 +36,23 @@ import {
 } from "@/lib/preferences/default-provider-client";
 import type { ProviderListItem } from "@/lib/providers/providers";
 import type { SearchResponse, SearchResultItem } from "@/lib/search/search";
+import {
+  clearServerSearchHistory,
+  createSearchHistoryMergeId,
+  deleteServerSearchHistoryItem,
+  fetchServerSearchHistory,
+  isUnauthenticatedSearchHistoryError,
+  mergeServerSearchHistory,
+  postServerSearchHistory
+} from "@/lib/search-history/client";
+import type { SearchHistoryItem } from "@/lib/search-history/service";
+import {
+  addStoredSearchHistory,
+  clearStoredSearchHistory,
+  readStoredSearchHistory,
+  removeStoredSearchHistoryItem,
+  type StoredSearchHistoryItem
+} from "@/lib/search-history/storage";
 import { SearchResultCard } from "./SearchResultCard";
 
 type RequestState = "idle" | "loading" | "success" | "error";
@@ -44,6 +61,13 @@ type FavoriteSessionState =
 type FavoriteNotice = Readonly<{
   message: string;
   retry: "session" | "favorites" | null;
+}>;
+type SearchHistoryMode =
+  "loading" | "authenticated" | "guest" | "unavailable" | "expired";
+type RecentSearchItem = SearchHistoryItem | StoredSearchHistoryItem;
+type SearchHistoryNotice = Readonly<{
+  message: string;
+  retry: "load" | "merge" | null;
 }>;
 const SEARCH_REQUEST_TIMEOUT_MS = 8_000;
 
@@ -95,6 +119,17 @@ export function MobileSearchPage({
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginSubmitting, setLoginSubmitting] = useState(false);
   const [loginIntentStored, setLoginIntentStored] = useState(false);
+  const [searchHistoryMode, setSearchHistoryMode] =
+    useState<SearchHistoryMode>("loading");
+  const [searchHistoryStatus, setSearchHistoryStatus] =
+    useState<RequestState>("loading");
+  const [recentSearches, setRecentSearches] = useState<RecentSearchItem[]>([]);
+  const [searchHistoryNotice, setSearchHistoryNotice] =
+    useState<SearchHistoryNotice | null>(null);
+  const [searchHistoryMutationPending, setSearchHistoryMutationPending] =
+    useState(false);
+  const [searchHistoryRecordingPending, setSearchHistoryRecordingPending] =
+    useState(false);
   const latestSearchRequestId = useRef(0);
   const activeSearchRequest = useRef<{
     controller: AbortController;
@@ -109,6 +144,147 @@ export function MobileSearchPage({
   const preferenceWriteQueue = useRef<Promise<void>>(Promise.resolve());
   const favoriteBootstrapVersion = useRef(0);
   const pendingFavoriteSongIdsRef = useRef<Set<string>>(new Set());
+  const searchHistoryModeRef = useRef<SearchHistoryMode>("loading");
+  const searchHistoryBootstrapVersion = useRef(0);
+  const searchHistoryMergeAttempt = useRef<{
+    mergeId: string;
+    recentSearches: StoredSearchHistoryItem[];
+  } | null>(null);
+  const searchHistoryOperationQueue = useRef<Promise<void>>(Promise.resolve());
+  const pendingSearchHistoryWrites = useRef(0);
+
+  const updateSearchHistoryMode = useCallback(
+    (mode: SearchHistoryMode): void => {
+      searchHistoryModeRef.current = mode;
+      setSearchHistoryMode(mode);
+    },
+    []
+  );
+
+  const loadSearchHistoryPersonalization =
+    useCallback(async (): Promise<void> => {
+      const requestVersion = searchHistoryBootstrapVersion.current + 1;
+      searchHistoryBootstrapVersion.current = requestVersion;
+      updateSearchHistoryMode("loading");
+      setSearchHistoryStatus("loading");
+      setSearchHistoryNotice(null);
+
+      const auth = await fetchBrowserAuthState();
+      if (searchHistoryBootstrapVersion.current !== requestVersion) {
+        return;
+      }
+
+      const localSearches = readStoredSearchHistory();
+      if (auth.status === "guest") {
+        searchHistoryMergeAttempt.current = null;
+        updateSearchHistoryMode("guest");
+        setRecentSearches(localSearches);
+        setSearchHistoryStatus("success");
+        return;
+      }
+
+      if (auth.status === "unavailable") {
+        updateSearchHistoryMode("unavailable");
+        setRecentSearches([]);
+        setSearchHistoryStatus("error");
+        setSearchHistoryNotice({
+          message:
+            "로그인 상태를 확인하지 못해 최근 검색어를 불러오지 못했습니다. 검색은 계속 사용할 수 있습니다.",
+          retry: "load"
+        });
+        return;
+      }
+
+      updateSearchHistoryMode("authenticated");
+
+      try {
+        if (localSearches.length > 0) {
+          if (
+            searchHistoryMergeAttempt.current === null ||
+            !areStoredSearchHistoriesEqual(
+              searchHistoryMergeAttempt.current.recentSearches,
+              localSearches
+            )
+          ) {
+            searchHistoryMergeAttempt.current = {
+              mergeId: createSearchHistoryMergeId(),
+              recentSearches: localSearches
+            };
+          }
+          const attempt = searchHistoryMergeAttempt.current;
+          const items = await enqueueSearchHistoryOperation(
+            searchHistoryOperationQueue,
+            () =>
+              mergeServerSearchHistory({
+                mergeId: attempt.mergeId,
+                recentSearches: attempt.recentSearches
+              })
+          );
+
+          if (searchHistoryBootstrapVersion.current !== requestVersion) {
+            return;
+          }
+
+          setRecentSearches(items);
+          if (
+            !areStoredSearchHistoriesEqual(
+              readStoredSearchHistory(),
+              attempt.recentSearches
+            ) ||
+            !clearStoredSearchHistory()
+          ) {
+            setSearchHistoryStatus("error");
+            setSearchHistoryNotice({
+              message:
+                "병합은 완료됐지만 브라우저의 이전 기록을 정리하지 못했습니다. 다시 시도해 주세요.",
+              retry: "merge"
+            });
+            return;
+          }
+
+          searchHistoryMergeAttempt.current = null;
+          setSearchHistoryStatus("success");
+          setSearchHistoryNotice(null);
+          return;
+        }
+
+        searchHistoryMergeAttempt.current = null;
+        const items = await enqueueSearchHistoryOperation(
+          searchHistoryOperationQueue,
+          () => fetchServerSearchHistory()
+        );
+        if (searchHistoryBootstrapVersion.current !== requestVersion) {
+          return;
+        }
+        setRecentSearches(items);
+        setSearchHistoryStatus("success");
+        setSearchHistoryNotice(null);
+      } catch (error) {
+        if (searchHistoryBootstrapVersion.current !== requestVersion) {
+          return;
+        }
+
+        if (isUnauthenticatedSearchHistoryError(error)) {
+          updateSearchHistoryMode("expired");
+          setRecentSearches(localSearches);
+          setSearchHistoryNotice({
+            message:
+              "로그인 세션이 만료되어 최근 검색어를 동기화하지 못했습니다. 검색은 계속 사용할 수 있습니다.",
+            retry: "load"
+          });
+        } else {
+          setRecentSearches(localSearches);
+          setSearchHistoryNotice({
+            message:
+              localSearches.length > 0
+                ? "최근 검색어 병합에 실패했습니다. 로컬 기록은 유지되며 다시 시도할 수 있습니다."
+                : "서버 최근 검색어를 불러오지 못했습니다. 검색은 계속 사용할 수 있습니다.",
+            retry: localSearches.length > 0 ? "merge" : "load"
+          });
+        }
+        setSearchHistoryStatus("error");
+      }
+    }, [updateSearchHistoryMode]);
 
   const loadFavoritePersonalization = useCallback(async (): Promise<void> => {
     const requestVersion = favoriteBootstrapVersion.current + 1;
@@ -184,6 +360,12 @@ export function MobileSearchPage({
   useEffect(() => {
     let isMounted = true;
 
+    void Promise.resolve().then(() => {
+      if (isMounted) {
+        return loadSearchHistoryPersonalization();
+      }
+    });
+
     fetchProviders()
       .then((items) => {
         if (!isMounted) {
@@ -242,6 +424,7 @@ export function MobileSearchPage({
     return () => {
       isMounted = false;
       favoriteBootstrapVersion.current += 1;
+      searchHistoryBootstrapVersion.current += 1;
       if (activeSearchRequest.current !== null) {
         clearTimeout(activeSearchRequest.current.timeoutId);
         activeSearchRequest.current.controller.abort();
@@ -250,6 +433,7 @@ export function MobileSearchPage({
     };
   }, [
     loadFavoritePersonalization,
+    loadSearchHistoryPersonalization,
     persistProviderSelection,
     updateSelectedProvider
   ]);
@@ -399,6 +583,175 @@ export function MobileSearchPage({
     }
   }
 
+  function recordSuccessfulSearch(queryToRecord: string): void {
+    const mode = searchHistoryModeRef.current;
+
+    if (mode === "guest" || mode === "expired") {
+      const items = addStoredSearchHistory(queryToRecord);
+      if (items === undefined) {
+        setSearchHistoryNotice({
+          message:
+            "검색 결과는 표시했지만 브라우저에 최근 검색어를 저장하지 못했습니다.",
+          retry: null
+        });
+        return;
+      }
+
+      searchHistoryMergeAttempt.current = null;
+      setRecentSearches(items);
+      setSearchHistoryStatus("success");
+      return;
+    }
+
+    if (mode !== "authenticated") {
+      setSearchHistoryNotice({
+        message:
+          "검색 결과는 표시했지만 로그인 상태 문제로 최근 검색어를 기록하지 못했습니다.",
+        retry: "load"
+      });
+      return;
+    }
+
+    pendingSearchHistoryWrites.current += 1;
+    setSearchHistoryRecordingPending(true);
+    void enqueueSearchHistoryOperation(
+      searchHistoryOperationQueue,
+      async () => {
+        try {
+          const item = await postServerSearchHistory(queryToRecord);
+          if (searchHistoryModeRef.current !== "authenticated") {
+            return;
+          }
+          setRecentSearches((current) => upsertRecentSearch(current, item));
+        } catch (error) {
+          if (isUnauthenticatedSearchHistoryError(error)) {
+            updateSearchHistoryMode("expired");
+            const items = addStoredSearchHistory(queryToRecord);
+            if (items !== undefined) {
+              searchHistoryMergeAttempt.current = null;
+              setRecentSearches(items);
+              setSearchHistoryStatus("success");
+            }
+            setSearchHistoryNotice({
+              message:
+                "로그인 세션이 만료되어 이 검색어는 브라우저에 보관했습니다.",
+              retry: "load"
+            });
+          } else {
+            setSearchHistoryNotice({
+              message:
+                "검색 결과는 표시했지만 서버에 최근 검색어를 기록하지 못했습니다.",
+              retry: null
+            });
+          }
+        } finally {
+          pendingSearchHistoryWrites.current -= 1;
+          setSearchHistoryRecordingPending(
+            pendingSearchHistoryWrites.current > 0
+          );
+        }
+      }
+    );
+  }
+
+  async function handleDeleteRecentSearch(
+    item: RecentSearchItem
+  ): Promise<void> {
+    if (searchHistoryMutationPending) {
+      return;
+    }
+
+    const mode = searchHistoryModeRef.current;
+    if (mode === "guest" || mode === "expired") {
+      const items = removeStoredSearchHistoryItem(item.normalized_query);
+      if (items === undefined) {
+        setSearchHistoryNotice({
+          message: "브라우저의 최근 검색어를 삭제하지 못했습니다.",
+          retry: null
+        });
+      } else {
+        searchHistoryMergeAttempt.current = null;
+        setRecentSearches(items);
+        setSearchHistoryNotice(null);
+      }
+      return;
+    }
+
+    if (mode !== "authenticated" || !("id" in item)) {
+      return;
+    }
+
+    const previous = recentSearches;
+    setSearchHistoryMutationPending(true);
+    setRecentSearches((current) => current.filter((entry) => entry !== item));
+    setSearchHistoryNotice(null);
+    try {
+      await enqueueSearchHistoryOperation(searchHistoryOperationQueue, () =>
+        deleteServerSearchHistoryItem(item.id)
+      );
+    } catch (error) {
+      setRecentSearches(previous);
+      setSearchHistoryNotice({
+        message: "최근 검색어 삭제에 실패해 이전 목록과 순서로 복구했습니다.",
+        retry: null
+      });
+      if (isUnauthenticatedSearchHistoryError(error)) {
+        updateSearchHistoryMode("expired");
+        setSearchHistoryStatus("error");
+      }
+    } finally {
+      setSearchHistoryMutationPending(false);
+    }
+  }
+
+  async function handleClearRecentSearches(): Promise<void> {
+    if (searchHistoryMutationPending || recentSearches.length === 0) {
+      return;
+    }
+
+    const mode = searchHistoryModeRef.current;
+    if (mode === "guest" || mode === "expired") {
+      if (clearStoredSearchHistory()) {
+        searchHistoryMergeAttempt.current = null;
+        setRecentSearches([]);
+        setSearchHistoryNotice(null);
+      } else {
+        setSearchHistoryNotice({
+          message: "브라우저의 최근 검색어를 전체 삭제하지 못했습니다.",
+          retry: null
+        });
+      }
+      return;
+    }
+
+    if (mode !== "authenticated") {
+      return;
+    }
+
+    const previous = recentSearches;
+    setSearchHistoryMutationPending(true);
+    setRecentSearches([]);
+    setSearchHistoryNotice(null);
+    try {
+      await enqueueSearchHistoryOperation(searchHistoryOperationQueue, () =>
+        clearServerSearchHistory()
+      );
+    } catch (error) {
+      setRecentSearches(previous);
+      setSearchHistoryNotice({
+        message:
+          "최근 검색어 전체 삭제에 실패해 이전 목록과 순서로 복구했습니다.",
+        retry: null
+      });
+      if (isUnauthenticatedSearchHistoryError(error)) {
+        updateSearchHistoryMode("expired");
+        setSearchHistoryStatus("error");
+      }
+    } finally {
+      setSearchHistoryMutationPending(false);
+    }
+  }
+
   async function runSearch(
     nextQuery: string,
     providerId: string | undefined = selectedProviderId
@@ -451,6 +804,7 @@ export function MobileSearchPage({
       setSuccessfulQuery(response.query);
       setSuccessfulProviderName(providerName);
       setSearchStatus("success");
+      recordSuccessfulSearch(response.query);
     } catch (error) {
       if (latestSearchRequestId.current !== requestId) {
         return;
@@ -480,6 +834,11 @@ export function MobileSearchPage({
   function handleSuggestionSearch(suggestion: string) {
     setQuery(suggestion);
     void runSearch(suggestion);
+  }
+
+  function handleRecentSearch(queryToSearch: string) {
+    setQuery(queryToSearch);
+    void runSearch(queryToSearch);
   }
 
   const canSubmit = query.trim().length > 0 && searchStatus !== "loading";
@@ -557,6 +916,19 @@ export function MobileSearchPage({
           </form>
         </section>
 
+        <RecentSearchesPanel
+          mode={searchHistoryMode}
+          status={searchHistoryStatus}
+          items={recentSearches}
+          notice={searchHistoryNotice}
+          mutationPending={searchHistoryMutationPending}
+          recordingPending={searchHistoryRecordingPending}
+          onRetry={() => void loadSearchHistoryPersonalization()}
+          onSearch={handleRecentSearch}
+          onDelete={(item) => void handleDeleteRecentSearch(item)}
+          onClear={() => void handleClearRecentSearches()}
+        />
+
         <section className="results-section" aria-live="polite">
           {favoriteNotice === null ? null : (
             <div className="inline-status inline-status-error" role="alert">
@@ -625,6 +997,153 @@ export function MobileSearchPage({
       )}
     </main>
   );
+}
+
+function enqueueSearchHistoryOperation<T>(
+  queue: { current: Promise<void> },
+  operation: () => Promise<T>
+): Promise<T> {
+  const queued = queue.current.then(operation, operation);
+  queue.current = queued.then(
+    () => undefined,
+    () => undefined
+  );
+  return queued;
+}
+
+function areStoredSearchHistoriesEqual(
+  left: readonly StoredSearchHistoryItem[],
+  right: readonly StoredSearchHistoryItem[]
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every(
+      (item, index) =>
+        item.query === right[index]?.query &&
+        item.normalized_query === right[index]?.normalized_query &&
+        item.searched_at === right[index]?.searched_at
+    )
+  );
+}
+
+function RecentSearchesPanel({
+  mode,
+  status,
+  items,
+  notice,
+  mutationPending,
+  recordingPending,
+  onRetry,
+  onSearch,
+  onDelete,
+  onClear
+}: {
+  mode: SearchHistoryMode;
+  status: RequestState;
+  items: RecentSearchItem[];
+  notice: SearchHistoryNotice | null;
+  mutationPending: boolean;
+  recordingPending: boolean;
+  onRetry: () => void;
+  onSearch: (query: string) => void;
+  onDelete: (item: RecentSearchItem) => void;
+  onClear: () => void;
+}) {
+  const mutationsDisabled =
+    mutationPending ||
+    recordingPending ||
+    status === "loading" ||
+    status === "error";
+
+  return (
+    <section
+      className="recent-searches"
+      aria-labelledby="recent-search-title"
+      aria-live="polite"
+    >
+      <div className="recent-searches-heading">
+        <h2 id="recent-search-title">최근 검색어</h2>
+        {items.length === 0 ? null : (
+          <button
+            className="link-button"
+            type="button"
+            disabled={mutationsDisabled}
+            aria-label="최근 검색어 전체 삭제"
+            onClick={onClear}
+          >
+            전체 삭제
+          </button>
+        )}
+      </div>
+
+      {status === "loading" ? (
+        <p className="recent-searches-note">최근 검색어를 불러오는 중입니다.</p>
+      ) : null}
+      {recordingPending ? (
+        <p className="recent-searches-note">최근 검색어를 저장하는 중입니다.</p>
+      ) : null}
+      {notice === null ? null : (
+        <div className="recent-searches-error">
+          <span>{notice.message}</span>
+          {notice.retry === null ? null : (
+            <button className="link-button" type="button" onClick={onRetry}>
+              다시 시도
+            </button>
+          )}
+        </div>
+      )}
+      {status !== "loading" && items.length === 0 && notice === null ? (
+        <p className="recent-searches-note">최근 검색어가 없습니다.</p>
+      ) : null}
+      {items.length > 0 ? (
+        <ul className="recent-search-list">
+          {items.map((item) => (
+            <li key={item.normalized_query}>
+              <button
+                className="recent-search-query"
+                type="button"
+                onClick={() => onSearch(item.query)}
+              >
+                {item.query}
+              </button>
+              <button
+                className="recent-search-delete"
+                type="button"
+                disabled={mutationsDisabled}
+                aria-label={`최근 검색어 ${item.query} 삭제`}
+                onClick={() => onDelete(item)}
+              >
+                삭제
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {mode === "expired" && notice === null ? (
+        <p className="recent-searches-note">
+          로그인 세션이 만료되어 새 검색어는 이 브라우저에 보관됩니다.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function upsertRecentSearch(
+  items: RecentSearchItem[],
+  item: SearchHistoryItem
+): RecentSearchItem[] {
+  return [
+    item,
+    ...items.filter(
+      (existing) => existing.normalized_query !== item.normalized_query
+    )
+  ]
+    .sort(
+      (left, right) =>
+        new Date(right.searched_at).getTime() -
+        new Date(left.searched_at).getTime()
+    )
+    .slice(0, 10);
 }
 
 function SearchState({
