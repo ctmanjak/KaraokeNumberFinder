@@ -18,6 +18,13 @@ runLocalBinary("vitest", ["run", "prisma/auth-user-data-schema.test.ts"], {
 });
 runLocalBinary(
   "vitest",
+  ["run", "lib/favorites/repository.integration.test.ts"],
+  {
+    M3_TEST_DATABASE_URL: testDatabaseUrl
+  }
+);
+runLocalBinary(
+  "vitest",
   ["run", "lib/search-history/repository.integration.test.ts"],
   {
     M3_TEST_DATABASE_URL: testDatabaseUrl
