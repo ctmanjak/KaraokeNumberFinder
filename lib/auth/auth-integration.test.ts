@@ -7,6 +7,10 @@ import type { AuthEnvironment } from "./env";
 import type { OAuthFlowStore } from "./oauth-flow-store";
 import { authCookiePolicy } from "./policy";
 import { createAuthRuntime, type AuthRuntime } from "./runtime";
+import {
+  createPersonalizationHandler,
+  createRequireSession
+} from "../personalization";
 
 const ACCESS_TOKEN = "oauth-access-token-must-not-leak";
 const ID_TOKEN = "oauth-id-token-must-not-leak";
@@ -286,9 +290,15 @@ describe("Better Auth Google OAuth integration", () => {
     expect(await response.json()).toBeNull();
     expect(harness.db.session).toHaveLength(0);
     expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
+
+    const protectedResponse = await createProtectedHandler(harness)(
+      protectedRequest(cookie)
+    );
+    expect(protectedResponse.status).toBe(401);
+    expect(protectedResponse.headers.get("www-authenticate")).toBe("Session");
   });
 
-  it("deletes the Session on POST logout and rejects the old cookie", async () => {
+  it("keeps the Session for a fresh protected request, then rejects it with 401 after POST logout", async () => {
     const harness = createHarness();
     const login = await harness.startLogin("/");
     const callback = await harness.callback(login, "valid-code");
@@ -296,6 +306,13 @@ describe("Better Auth Google OAuth integration", () => {
       callback,
       authCookiePolicy(false).sessionCookieName
     );
+    const protectedHandler = createProtectedHandler(harness);
+
+    const authenticated = await protectedHandler(protectedRequest(cookie));
+    expect(authenticated.status).toBe(200);
+    expect(await authenticated.json()).toEqual({
+      user_id: harness.db.user[0].id
+    });
 
     const logout = await harness.runtime.handlers.POST(
       new Request(`${LOCAL_ORIGIN}/api/auth/sign-out`, {
@@ -311,6 +328,21 @@ describe("Better Auth Google OAuth integration", () => {
     expect(logout.status).toBe(200);
     expect(harness.db.session).toHaveLength(0);
     expect(logout.headers.get("set-cookie")).toContain("Max-Age=0");
+
+    const protectedAfterLogout = await protectedHandler(
+      protectedRequest(cookie)
+    );
+    expect(protectedAfterLogout.status).toBe(401);
+    expect(protectedAfterLogout.headers.get("www-authenticate")).toBe(
+      "Session"
+    );
+    expect(protectedAfterLogout.headers.get("cache-control")).toBe(
+      "private, no-store"
+    );
+    expect(await protectedAfterLogout.json()).toMatchObject({
+      error: { code: "UNAUTHENTICATED" }
+    });
+
     const reused = await harness.getSession(cookie);
     expect(await reused.json()).toBeNull();
   });
@@ -549,4 +581,24 @@ function fullCookieFromResponse(response: Response, name: string): string {
     throw new Error(`Expected ${name} cookie.`);
   }
   return cookie;
+}
+
+function createProtectedHandler(harness: Harness) {
+  return createPersonalizationHandler(
+    ({ auth }) => Response.json({ user_id: auth.user.id }),
+    {
+      requireSession: createRequireSession((input) =>
+        harness.runtime.auth.api.getSession(input)
+      ),
+      trustedOrigin: LOCAL_ORIGIN,
+      generateRequestId: () => "auth-integration-request-id",
+      writeSafeLog: () => undefined
+    }
+  );
+}
+
+function protectedRequest(cookie: string): Request {
+  return new Request(`${LOCAL_ORIGIN}/api/favorites`, {
+    headers: { cookie }
+  });
 }
