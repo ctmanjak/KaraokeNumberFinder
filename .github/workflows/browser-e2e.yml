@@ -1,0 +1,59 @@
+name: Browser E2E
+
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: karaoke_number_finder_m3_test
+          POSTGRES_PASSWORD: prisma
+          POSTGRES_USER: prisma
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U prisma -d karaoke_number_finder_m3_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      M3_TEST_DATABASE_URL: postgresql://prisma:prisma@127.0.0.1:5432/karaoke_number_finder_m3_test
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+      - run: npm ci
+      - name: Install pinned Chromium runtime
+        run: npx playwright install --with-deps chromium
+      - name: Record browser runner version
+        run: npx playwright --version
+      - name: Run the isolated suite twice
+        run: npm run test:e2e:repeat
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-e2e-failure-screenshots-${{ github.run_id }}
+          path: test-results/**/*.png
+          if-no-files-found: ignore
+          retention-days: 7

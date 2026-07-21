@@ -149,7 +149,11 @@ export async function signOutBrowserSession(
     try {
       response = await (options.fetcher ?? fetch)("/api/auth/sign-out", {
         method: "POST",
-        headers: { accept: "application/json" },
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json"
+        },
+        body: "{}",
         signal: request.signal
       });
     } catch {

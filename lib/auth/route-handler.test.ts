@@ -260,6 +260,7 @@ describe("createAuthRouteHandlers", () => {
     const text = await response.text();
 
     expect(text).not.toContain("session-token-secret");
+    expect(JSON.parse(text)).toEqual({ user: { id: "user-id" } });
     expect(response.headers.get("set-cookie")).toContain("Max-Age=86400");
     expect(response.headers.get("set-cookie")).toContain(
       `Expires=${expiresAt.toUTCString()}`

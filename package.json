@@ -15,6 +15,9 @@
     "format:write": "prettier --write .",
     "pretest": "npm run db:generate",
     "test": "vitest run",
+    "test:e2e": "vite-node scripts/e2e/run.ts",
+    "test:e2e:repeat": "vite-node scripts/e2e/run.ts --repeat-each=2",
+    "e2e:serve": "vite-node scripts/e2e/serve.ts",
     "test:m3-db": "vite-node scripts/m3/test-db.ts",
     "seed:validate": "vite-node scripts/seed/validate.ts",
     "seed:import": "vite-node scripts/seed/import.ts",
@@ -50,6 +53,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "@playwright/test": "^1.61.1",
     "@testing-library/dom": "10.4.1",
     "@testing-library/react": "^16.3.0",
     "@types/node": "^24.0.0",

@@ -363,10 +363,6 @@ async function handleGetSession(
     return jsonError(503, "AUTH_UNAVAILABLE", "Authentication is unavailable.");
   }
 
-  if (isRecord(body) && isRecord(body.session)) {
-    delete body.session.token;
-  }
-
   const headers = cloneHeaders(response.headers);
   headers.set("content-type", "application/json; charset=utf-8");
   headers.set("cache-control", "no-store");
@@ -386,10 +382,40 @@ async function handleGetSession(
     );
   }
 
-  return new Response(JSON.stringify(body), {
+  const publicBody = browserSessionBody(body);
+  if (body !== null && publicBody === null) {
+    return jsonError(503, "AUTH_UNAVAILABLE", "Authentication is unavailable.");
+  }
+
+  return new Response(JSON.stringify(publicBody), {
     status: response.status,
     headers
   });
+}
+
+function browserSessionBody(
+  body: unknown
+): { user: Record<string, unknown> } | null {
+  if (body === null) {
+    return null;
+  }
+  if (!isRecord(body) || !isRecord(body.user)) {
+    return null;
+  }
+
+  const user = body.user;
+  if (typeof user.id !== "string" || user.id.length === 0) {
+    return null;
+  }
+
+  return {
+    user: {
+      id: user.id,
+      ...(typeof user.name === "string" ? { name: user.name } : {}),
+      ...(typeof user.email === "string" ? { email: user.email } : {}),
+      ...(typeof user.image === "string" ? { image: user.image } : {})
+    }
+  };
 }
 
 async function handleSignOut(
