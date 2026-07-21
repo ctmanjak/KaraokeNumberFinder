@@ -14,15 +14,7 @@ test("auth 401 keeps the browser in guest mode and public search remains usable"
 }) => {
   await page.route(
     "**/api/auth/get-session",
-    (route) =>
-      route.fulfill({
-        status: 401,
-        contentType: "application/json",
-        headers: { "www-authenticate": "Session" },
-        body: JSON.stringify({
-          error: { code: "UNAUTHENTICATED", message: "Login required." }
-        })
-      }),
+    jsonError(401, "UNAUTHENTICATED", "Login required."),
     { times: 1 }
   );
 
@@ -89,6 +81,11 @@ test("favorite add rolls back on 5xx and moves to reauthentication on 401 withou
     })
   ).toHaveAttribute("aria-pressed", "false");
   await expect(
+    page.getByRole("button", {
+      name: `${catalog.songs[0].display_title} 즐겨찾기에 추가`
+    })
+  ).toBeEnabled();
+  await expect(
     page.getByText(
       "즐겨찾기 변경에 실패해 이전 상태로 되돌렸습니다. 검색 결과는 유지됩니다."
     )
@@ -100,15 +97,7 @@ test("favorite add rolls back on 5xx and moves to reauthentication on 401 withou
   await page.unroute(favoriteURL);
   await page.route(
     favoriteURL,
-    (route) =>
-      route.fulfill({
-        status: 401,
-        contentType: "application/json",
-        headers: { "www-authenticate": "Session" },
-        body: JSON.stringify({
-          error: { code: "UNAUTHENTICATED", message: "Login required." }
-        })
-      }),
+    jsonError(401, "UNAUTHENTICATED", "Login required."),
     { times: 1 }
   );
   await page
@@ -224,14 +213,7 @@ test("auth and merge failures remain isolated from search, then merge retry succ
 }) => {
   await page.route(
     "**/api/auth/get-session",
-    (route) =>
-      route.fulfill({
-        status: 503,
-        contentType: "application/json",
-        body: JSON.stringify({
-          error: { code: "AUTH_UNAVAILABLE", message: "Unavailable." }
-        })
-      }),
+    jsonError(503, "AUTH_UNAVAILABLE", "Unavailable."),
     { times: 1 }
   );
   await page.goto("/");
@@ -255,17 +237,7 @@ test("auth and merge failures remain isolated from search, then merge retry succ
   );
   await page.route(
     "**/api/user-data/merge",
-    (route) =>
-      route.fulfill({
-        status: 503,
-        contentType: "application/json",
-        body: JSON.stringify({
-          error: {
-            code: "PERSONALIZATION_UNAVAILABLE",
-            message: "Unavailable."
-          }
-        })
-      }),
+    jsonError(503, "PERSONALIZATION_UNAVAILABLE", "Unavailable."),
     { times: 1 }
   );
   await loginDirectly(page, users, user);
@@ -549,6 +521,20 @@ function controlledRoute(): {
       markSettled();
     }
   };
+}
+
+function jsonError(
+  status: number,
+  code: string,
+  message: string
+): (route: Route) => Promise<void> {
+  return (route) =>
+    route.fulfill({
+      status,
+      contentType: "application/json",
+      ...(status === 401 ? { headers: { "www-authenticate": "Session" } } : {}),
+      body: JSON.stringify({ error: { code, message } })
+    });
 }
 
 async function searchPayload(

@@ -40,7 +40,11 @@ try {
     false
   );
 } finally {
-  runLocalBinary("vite-node", ["scripts/e2e/cleanup.ts"], environment);
+  try {
+    runLocalBinary("vite-node", ["scripts/e2e/cleanup.ts"], environment);
+  } catch (cleanupError) {
+    console.error("E2E cleanup after tests failed:", cleanupError);
+  }
 }
 
 process.exitCode = exitCode;

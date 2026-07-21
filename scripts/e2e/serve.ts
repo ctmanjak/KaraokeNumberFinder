@@ -35,6 +35,11 @@ const nextServer = spawn(
   ["start", "--hostname", "127.0.0.1", "--port", String(internalPort)],
   { env: process.env, stdio: "inherit" }
 );
+nextServer.on("error", (error) => {
+  console.error("Failed to start the Next.js server for browser E2E:", error);
+  process.exitCode = 1;
+  setImmediate(shutdown);
+});
 
 const proxy = createServer(
   {
