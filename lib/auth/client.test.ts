@@ -136,11 +136,23 @@ describe("browser auth client", () => {
   );
 
   it("validates logout success and rejects malformed success payloads", async () => {
+    const successfulFetcher = fetchOnce(jsonResponse({ success: true }));
     await expect(
       signOutBrowserSession({
-        fetcher: fetchOnce(jsonResponse({ success: true }))
+        fetcher: successfulFetcher
       })
     ).resolves.toBeUndefined();
+    expect(successfulFetcher).toHaveBeenCalledWith(
+      "/api/auth/sign-out",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json"
+        },
+        body: "{}"
+      })
+    );
     await expect(
       signOutBrowserSession({
         fetcher: fetchOnce(jsonResponse({ success: true, token: "unsafe" }))

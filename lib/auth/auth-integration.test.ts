@@ -76,6 +76,10 @@ describe("Better Auth Google OAuth integration", () => {
     );
     const sessionResponse = await harness.getSession(sessionCookie);
     const sessionText = await sessionResponse.text();
+    expect(JSON.parse(sessionText)).toEqual({
+      user: expect.objectContaining({ id: harness.db.user[0].id })
+    });
+    expect(sessionText).not.toContain('"session"');
     expect(sessionText).not.toContain(session.token);
     expect(sessionText).not.toContain(ACCESS_TOKEN);
     expect(sessionText).not.toContain(ID_TOKEN);
