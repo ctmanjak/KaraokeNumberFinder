@@ -492,14 +492,16 @@ function controlledRoute(): {
   let markSeen!: () => void;
   let releaseResponse!: (value: { status: number; body: unknown }) => void;
   let markSettled!: () => void;
+  let rejectSettled!: (reason: unknown) => void;
   const requestSeen = new Promise<void>((resolve) => {
     markSeen = resolve;
   });
   const response = new Promise<{ status: number; body: unknown }>((resolve) => {
     releaseResponse = resolve;
   });
-  const settled = new Promise<void>((resolve) => {
+  const settled = new Promise<void>((resolve, reject) => {
     markSettled = resolve;
+    rejectSettled = reject;
   });
 
   return {
@@ -511,14 +513,16 @@ function controlledRoute(): {
     async handler(route) {
       markSeen();
       const released = await response;
-      await route
-        .fulfill({
+      try {
+        await route.fulfill({
           status: released.status,
           contentType: "application/json",
           body: JSON.stringify(released.body)
-        })
-        .catch(() => undefined);
-      markSettled();
+        });
+        markSettled();
+      } catch (error) {
+        rejectSettled(error);
+      }
     }
   };
 }

@@ -141,7 +141,7 @@ export async function completeMockGoogleLogin(options: {
     { times: 1 }
   );
 
-  await triggerOAuthBoundary(options.page, options.trigger, () => oauthState);
+  await triggerOAuthBoundary(options.trigger, () => oauthState);
   expect(oauthState).toBeDefined();
   const returnURL = new URL(options.returnTo ?? "/", baseURL).href;
   const loginResponse = await options.users.login(
@@ -189,7 +189,7 @@ export async function completeMockGoogleFailure(options: {
     { times: 1 }
   );
 
-  await triggerOAuthBoundary(options.page, options.trigger, () => oauthState);
+  await triggerOAuthBoundary(options.trigger, () => oauthState);
   if (callbackURL === undefined) {
     throw new Error("Mock Google callback was not captured.");
   }
@@ -204,26 +204,11 @@ export async function completeMockGoogleFailure(options: {
 }
 
 async function triggerOAuthBoundary(
-  page: Page,
   trigger: Locator,
   readState: () => string | undefined
 ): Promise<void> {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    await trigger.click();
-    try {
-      await expect.poll(readState, { timeout: 6_000 }).not.toBeUndefined();
-      return;
-    } catch (error) {
-      if (attempt === 1) {
-        throw error;
-      }
-      await expect(
-        page.getByText(
-          "로그인 요청을 시작하지 못했습니다. 현재 화면은 계속 사용할 수 있습니다."
-        )
-      ).toBeVisible();
-    }
-  }
+  await trigger.click();
+  await expect.poll(readState, { timeout: 6_000 }).not.toBeUndefined();
 }
 
 function uniqueTestClientIP(): string {
