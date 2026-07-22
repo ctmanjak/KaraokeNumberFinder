@@ -39,6 +39,35 @@ describe("FavoritesPage", () => {
     expect(screen.queryByText("로그인이 필요합니다")).toBeNull();
   });
 
+  it("restores the login button after returning from Google", async () => {
+    installFetch({ auth: "guest" });
+    const navigateToAuth = vi.fn();
+    render(<FavoritesPage navigateToAuth={navigateToAuth} />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Google로 로그인" })
+    );
+
+    await waitFor(() => expect(navigateToAuth).toHaveBeenCalledOnce());
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "로그인 준비 중"
+        }) as HTMLButtonElement
+      ).disabled
+    ).toBe(true);
+
+    fireEvent(window, new Event("pageshow"));
+
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Google로 로그인"
+        }) as HTMLButtonElement
+      ).disabled
+    ).toBe(false);
+  });
+
   it("renders an empty authenticated favorite list", async () => {
     installFetch({ auth: "authenticated", pages: [favoritePage([])] });
 

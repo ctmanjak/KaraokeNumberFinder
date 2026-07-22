@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useOptionalAuth } from "@/components/auth/AuthProvider";
 import { isCurrentSharedAuthUser } from "@/components/auth/shared-auth-user";
+import { useResetAuthNavigationPending } from "@/components/auth/use-reset-auth-navigation-pending";
 import {
   createGoogleSignInUrl,
   fetchBrowserAuthState
@@ -69,6 +70,8 @@ export function FavoritesPage({
   const itemsOwnerUserIdRef = useRef<string | null>(null);
   const sharedAuth = useOptionalAuth();
   const sharedAuthRef = useRef(sharedAuth);
+
+  useResetAuthNavigationPending(setLoginSubmitting);
 
   useLayoutEffect(() => {
     sharedAuthRef.current = sharedAuth;
