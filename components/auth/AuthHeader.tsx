@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { createGoogleSignInUrl } from "@/lib/auth/client";
 import type { AllowedAuthCallbackPath } from "@/lib/auth/policy";
 import { useAuth } from "./AuthProvider";
+import { useResetAuthNavigationPending } from "./use-reset-auth-navigation-pending";
 
 export function AuthHeader({
   navigateToAuth = (url) => window.location.assign(url)
@@ -18,6 +19,8 @@ export function AuthHeader({
   const [callbackMessage, setCallbackMessage] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  useResetAuthNavigationPending(setLoginPending);
 
   useEffect(() => {
     const errorCode = new URLSearchParams(window.location.search).get(

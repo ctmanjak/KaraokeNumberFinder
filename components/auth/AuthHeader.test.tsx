@@ -85,6 +85,41 @@ describe("global auth header", () => {
     expect(screen.queryByText("raw-secret")).toBeNull();
   });
 
+  it("restores the login button after returning from Google", async () => {
+    const navigateToAuth = vi.fn();
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(null))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          url: "https://accounts.google.com/o/oauth2/v2/auth?state=safe",
+          redirect: true
+        })
+      );
+    vi.stubGlobal("fetch", fetcher);
+
+    renderHeader(navigateToAuth);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Google 로그인" })
+    );
+
+    await waitFor(() => expect(navigateToAuth).toHaveBeenCalledOnce());
+    expect(
+      (screen.getByRole("button", { name: "준비 중" }) as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
+
+    fireEvent(window, new Event("pageshow"));
+
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Google 로그인"
+        }) as HTMLButtonElement
+      ).disabled
+    ).toBe(false);
+  });
+
   it("exposes an accessible keyboard menu and signs out", async () => {
     const fetcher = vi
       .fn()
