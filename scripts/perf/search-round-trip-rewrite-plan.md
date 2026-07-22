@@ -31,13 +31,13 @@ The remaining latency signal is not primarily index selection. A representative
 local dev request against Neon production data showed about 1.27s total route
 time, mostly in DB calls:
 
-| Timing event                              | Duration |
-| ----------------------------------------- | -------: |
-| `search.providers`                       | 526.66ms |
-| `search.candidate.normalized_equals`     |  72.57ms |
-| `search.candidate.normalized_starts_with` | 522.41ms |
-| `search.alias_detail`                    | 217.13ms |
-| `route.total`                            | 1267.87ms |
+| Timing event                              |  Duration |
+| ----------------------------------------- | --------: |
+| `search.providers`                        |  526.66ms |
+| `search.candidate.normalized_equals`      |   72.57ms |
+| `search.candidate.normalized_starts_with` |  522.41ms |
+| `search.alias_detail`                     |  217.13ms |
+| `route.total`                             | 1267.87ms |
 
 The current application path uses several Prisma calls:
 
@@ -178,13 +178,13 @@ Neon/current-seed validation should be low volume only:
 
 ## Ticket Definition
 
-| Field | Value |
-| ----- | ----- |
-| Title | `[M2-Perf-16] reduce search DB round-trips with raw SQL query shape` |
-| Goal | Collapse the successful search path into fewer DB round trips while preserving ranking, provider behavior, and payload shape. |
-| Scope | Design and implement a raw SQL/CTE-backed search path or equivalent lower-round-trip query shape; update tests, query-shape evidence, and small timing smoke. |
-| Priority | High |
-| Notion | https://app.notion.com/p/3974c60a73038187a57eca2d04bbc2a3 |
-| Non-goals | No schema/index changes, no production data writes, no synthetic import to Neon, no deployment-region work. |
-| Inputs | `lib/search/search.ts`, `lib/search/timing.ts`, `lib/perf/query-shape.ts`, `scripts/perf/search-index-strategy-spike.md`, this document. |
-| Expected output | Implementation PR with behavior tests, query-shape comparison, timing notes, and rollback path to the existing Prisma search path if needed. |
+| Field           | Value                                                                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Title           | `[M2-Perf-16] reduce search DB round-trips with raw SQL query shape`                                                                                          |
+| Goal            | Collapse the successful search path into fewer DB round trips while preserving ranking, provider behavior, and payload shape.                                 |
+| Scope           | Design and implement a raw SQL/CTE-backed search path or equivalent lower-round-trip query shape; update tests, query-shape evidence, and small timing smoke. |
+| Priority        | High                                                                                                                                                          |
+| Notion          | https://app.notion.com/p/3974c60a73038187a57eca2d04bbc2a3                                                                                                     |
+| Non-goals       | No schema/index changes, no production data writes, no synthetic import to Neon, no deployment-region work.                                                   |
+| Inputs          | `lib/search/search.ts`, `lib/search/timing.ts`, `lib/perf/query-shape.ts`, `scripts/perf/search-index-strategy-spike.md`, this document.                      |
+| Expected output | Implementation PR with behavior tests, query-shape comparison, timing notes, and rollback path to the existing Prisma search path if needed.                  |
