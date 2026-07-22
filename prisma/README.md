@@ -1,18 +1,20 @@
 # Prisma
 
-This directory contains the Prisma setup and first milestone schema.
+This directory contains the Prisma setup for the public search schema and the M3 authentication and user-data schema.
 
 `schema.prisma` contains:
 
 - Prisma Client generator using the Prisma 7 `prisma-client` provider
 - Explicit generated client output at `lib/generated/prisma`
 - PostgreSQL datasource provider
-- First milestone search-loop models: `Song`, `SongAlias`, `KaraokeProvider`, `KaraokeEntry`
+- Public search-loop models: `Song`, `SongAlias`, `KaraokeProvider`, `KaraokeEntry`
+- M3 authentication models: `User`, `Account`, `Session`, `Verification`
+- M3 personalization models: `UserPreference`, `Favorite`, `SearchHistory`
 - Search and karaoke status enums: `AliasType`, `AvailabilityStatus`
 
 Prisma 7 reads the database connection URL from the root `prisma.config.ts`, not from a `url` field inside `schema.prisma`.
 
-Authentication and user-data models are intentionally not part of this milestone schema. `User`, `Favorite`, `SearchHistory`, and `UserPreference` should be added in a later authentication milestone.
+The M3 schema is applied by `20260718121000_add_auth_user_data_schema`. Its deployment, constraint checks, recovery limits, and reviewed down-SQL draft are documented in [`docs/m3-t02-migration-runbook.md`](../docs/m3-t02-migration-runbook.md).
 
 ## Local database
 
@@ -28,7 +30,7 @@ Update `.env` with your local database credentials:
 DATABASE_URL="postgresql://user:password@localhost:5432/karaoke_number_finder?schema=public"
 ```
 
-Use any local PostgreSQL installation for development. For example, with Homebrew:
+Use any local PostgreSQL installation for development. Never point migration, seed, M3 DB, or browser E2E rehearsal commands at staging or production. For example, with Homebrew:
 
 ```bash
 brew install postgresql@16
@@ -36,7 +38,9 @@ brew services start postgresql@16
 createdb karaoke_number_finder
 ```
 
-Docker Compose is not required for the first milestone. If you prefer Docker, run a local PostgreSQL container and point `DATABASE_URL` at that container.
+Docker Compose is not required. If you prefer Docker, run a local PostgreSQL container and point `DATABASE_URL` at that container.
+
+M3 DB and browser E2E tests accept only `M3_TEST_DATABASE_URL` values for loopback PostgreSQL with the exact database name `karaoke_number_finder_m3_test`. The scripts fail before connecting for remote hosts or any other database name.
 
 ## Prisma 7 config
 
@@ -91,15 +95,26 @@ Timestamps are database-managed:
 
 Provider names and counts are data only. The schema must not encode specific providers.
 
+M3 auth and personalization IDs are native UUIDs. Ownership and deduplication are enforced by foreign keys and unique constraints, including `(providerId, accountId)`, session token, `(userId, songId)`, and `(userId, normalizedQuery)`. Provider deletion sets `UserPreference.defaultProviderId` to null; user deletion cascades only that user's auth and personalization rows.
+
 ## Commands
 
 ```bash
 npm run db:validate
-npx prisma migrate dev --name add_core_search_schema
+npx prisma migrate dev --name <migration_name>
 npm run db:generate
 npm run db:studio
 ```
 
 `db:validate` checks that `schema.prisma` and `prisma.config.ts` are valid. `db:generate` generates Prisma Client into `lib/generated/prisma`. `db:studio` opens Prisma Studio after the database is reachable.
 
-Use `npx prisma migrate dev --name add_core_search_schema` after changing the schema locally. The generated migration is committed under `prisma/migrations`; the generated Prisma Client under `lib/generated/prisma` is ignored and should not be committed.
+Use `npx prisma migrate dev --name <migration_name>` after changing the schema locally. The generated migration is committed under `prisma/migrations`; the generated Prisma Client under `lib/generated/prisma` is ignored and should not be committed.
+
+Apply committed migrations to a new disposable DB and run the M3 constraint/repository suite with:
+
+```bash
+M3_TEST_DATABASE_URL=postgresql://USER:PASSWORD@127.0.0.1:PORT/karaoke_number_finder_m3_test \
+  npm run test:m3-db
+```
+
+The runner executes `prisma migrate deploy` before the PostgreSQL-backed checks. Shared or production deployment must use the reviewed procedure in `docs/m3-t02-migration-runbook.md`; do not use `migrate dev`, `db push`, or `migrate reset` there.
