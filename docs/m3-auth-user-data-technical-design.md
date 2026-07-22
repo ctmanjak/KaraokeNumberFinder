@@ -1,9 +1,11 @@
 # M3 인증 및 사용자 데이터 기술 설계 v0.1
 
-- 상태: T01 설계 확정안 (구현 전 리뷰 대상)
+- 상태: T01 설계 확정 기준선 (2026-07-13 승인, 후속 구현이 저장소에 반영됨)
 - 작성일: 2026-07-12
 - 범위: M3-T01만 포함. dependency, Prisma schema, migration, route, UI 변경은 포함하지 않는다.
 - 기준: M3 milestone, M3-T01, Lean PRD, MVP 기술 구현 계획, MVP 첫 milestone 개발 태스크, 조회 성능 진단 계획, 데이터 시드 명세
+
+현재 구현·운영 절차는 `docs/m3-t02-migration-runbook.md`, `docs/m3-t03-google-oauth-session.md`, `docs/m3-t13-browser-e2e.md`와 `prisma/README.md`를 함께 확인한다. 아래 "T01 작성 시점 구조"는 T01 결정 당시의 기준선을 기록한 역사적 문맥이다.
 
 ## 목표와 범위
 
@@ -11,13 +13,13 @@
 
 포함 범위는 인증 라이브러리, OAuth 검증, 세션 정책, 사용자 데이터 모델 초안, 보호 API/CSRF 규칙, 로컬 데이터 병합, 검색 장애 격리와 T05·T06·T08 입력 계약이다. Google 외 제공사, 자체 계정, 계정 연결·자동 병합, 비로그인 즐겨찾기, Admin/크롤링/제공사 동기화는 제외한다.
 
-## 현재 구조
+## T01 작성 시점 구조 (2026-07-12)
 
 - Next.js `16.2.9` App Router, React `19.1`, TypeScript strict, Node Route Handler 구조다.
 - Prisma `7.8.0` + `@prisma/adapter-pg` + PostgreSQL이며 단일 `getPrismaClient()`가 최대 5 connection pool을 공유한다.
 - 공개 `GET /api/search`, `GET /api/providers`는 route 파일과 주입 가능한 순수 handler/service를 분리하고 Vitest에서 DB 없이 handler를 검증한다.
 - 검색 응답은 `query`, `normalized_query`, `items`, `next_cursor`, `suggestions`이며 관련도 우선·제공사 수록/수록 수/최신성 보조 정렬을 구현한다.
-- 현재 Prisma에는 `Song`, `SongAlias`, `KaraokeProvider`, `KaraokeEntry`만 있다. 인증 dependency, 사용자/계정/세션/개인화 모델, 인증 route, CSRF 공통 모듈은 없다.
+- 작성 시점 Prisma에는 `Song`, `SongAlias`, `KaraokeProvider`, `KaraokeEntry`만 있었다. 인증 dependency, 사용자/계정/세션/개인화 모델, 인증 route, CSRF 공통 모듈은 후속 티켓에서 추가했다.
 - 테스트는 `**/*.test.ts(x)`를 Node 환경에서 실행한다. UI 테스트만 파일별로 jsdom을 지정한다.
 
 ### 기존 결정과 코드의 차이
@@ -87,7 +89,7 @@ sequenceDiagram
 - 갱신: 마지막 갱신 후 24시간이 지난 유효 세션만 DB expiry와 cookie Max-Age를 연장한다. 요청마다 write하지 않는다.
 - 회전: 로그인 성공 때 항상 새 세션. 권한 상승/보안 중요 계정 변경은 MVP 범위 밖이지만 후속 도입 시 즉시 회전한다. 일반 24시간 갱신은 동일 token을 유지한다. absolute 30일 도달 시 재인증한다.
 - 로그아웃: POST만 허용하고 현재 Session row를 먼저 삭제한 뒤 만료된 동일 속성 cookie를 내려보낸다. 실패해도 cookie는 제거하되 서버 삭제 재시도/감사 로그를 남긴다. 삭제된 token은 재사용할 수 없다.
-- 동시 세션: 기기별 허용. MVP UI는 현재 세션 logout만 제공하되 service는 `revokeAllForUser`를 분리해 향후 전체 로그아웃을 지원한다.
+- 동시 세션: 기기별 허용. MVP UI와 서비스는 현재 세션 logout과 로그인 시 이전 세션 회전을 제공한다. 사용자 전체 세션 강제 폐기 API/service는 아직 없으며 운영자 DB 절차와 후속 구현 범위는 `docs/m3-t03-google-oauth-session.md`에 기록한다.
 - cookie: production 이름 `__Host-knf.session_token`, `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`, `Domain` 미설정, expiry는 session expiry와 일치. `__Host-` 조건 때문에 HTTPS가 아닌 local dev에서는 별도 non-Secure 개발 이름을 사용한다. cross-subdomain cookie는 금지한다.
 - 민감 정보: session cookie, OAuth token과 PKCE verifier는 JavaScript-readable storage/localStorage, URL과 API JSON에 절대 포함하지 않는다. Authorization code는 exact callback query에서만 받아 즉시 소비하고 완료 redirect·로그·analytics에는 전달하지 않는다. state, nonce와 PKCE challenge는 검증된 Google authorization URL을 담은 로그인 시작 응답에만 허용하고 영구 저장소·로그·analytics에는 기록하지 않는다. 서버 로그는 user ID/session ID의 단방향 축약 식별자만 쓴다.
 
@@ -271,21 +273,21 @@ flowchart LR
 
 ## 후속 티켓별 입력 계약
 
-### T05: Favorite
+### T06: Favorite
 
 - `GET /api/favorites?cursor=&limit=20` → `{items:[{song_id,created_at,song}],next_cursor}`. cursor는 `(createdAt,id)` opaque encoding.
 - `PUT /api/favorites/{songId}` → `200 {favorite:true,created_at}`; 이미 존재해도 동일 성공.
 - `DELETE /api/favorites/{songId}` → `200 {favorite:false}`; 없어도 동일 성공.
 - song 미존재 `404 SONG_NOT_FOUND`; 인증/CSRF/공통 오류는 위 계약을 따른다. body의 user ID를 금지한다.
 
-### T06: SearchHistory
+### T08: SearchHistory
 
 - `GET /api/search-history` → `{items:[{id,query,normalized_query,searched_at}]}` 최신순 최대 10.
 - `POST /api/search-history` body `{query}` → `200 {item}`. 서버가 normalize/upsert/prune하며 검색 API와 독립이다.
 - `DELETE /api/search-history/{id}`와 `DELETE /api/search-history` → `200 {deleted_count}`. 소유권 composite query.
 - `POST /api/user-data/merge` body `{merge_id,recent_searches:[{query,searched_at}],default_provider_id?}` → `{merged:true,recent_searches,default_provider}`.
 
-### T08: UserPreference
+### T05: UserPreference
 
 - `GET /api/user-preference` → `{default_provider:null|{id,name,...},source:"user"|"operational_default"|"none"}`.
 - `PUT /api/user-preference/default-provider` body `{provider_id:string|null}` → 동일 read model. active provider가 아니면 `422 INVALID_PROVIDER`.
