@@ -264,28 +264,28 @@ Artifacts:
 API p95 in milliseconds, 10 measured iterations after 3 warmups:
 
 | Case                         | M2-Perf-14 current p95 | M2-Perf-15 p95 | Change |
-| ---------------------------- | ---------------------: | --------------: | -----: |
-| Normalized exact             |                  50.31 |            3.76 | -92.5% |
-| Normalized prefix            |                  94.15 |            5.62 | -94.0% |
-| Normalized contains          |                  85.39 |            6.71 | -92.1% |
-| No-result suggestions        |                 107.13 |            3.00 | -97.2% |
-| High candidate partial query |                  41.75 |           17.28 | -58.6% |
+| ---------------------------- | ---------------------: | -------------: | -----: |
+| Normalized exact             |                  50.31 |           3.76 | -92.5% |
+| Normalized prefix            |                  94.15 |           5.62 | -94.0% |
+| Normalized contains          |                  85.39 |           6.71 | -92.1% |
+| No-result suggestions        |                 107.13 |           3.00 | -97.2% |
+| High candidate partial query |                  41.75 |          17.28 | -58.6% |
 
 Representative EXPLAIN comparison:
 
-| Case and shape               | Before rows scanned | After rows scanned | After index used                             | After seq scan | After sort | After execution ms |
-| ---------------------------- | ------------------: | -----------------: | -------------------------------------------- | -------------- | ---------- | -----------------: |
-| Exact `ILIKE $1`             |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.205 |
-| Exact prefix                 |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.183 |
-| Exact contains               |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.191 |
-| Prefix starts-with           |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.257 |
-| Prefix contains              |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.343 |
-| Contains contains            |             100,000 |                224 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              2.069 |
-| No-result contains           |             100,000 |                  0 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.032 |
-| High-candidate `star` prefix |              22,605 |             22,605 | `song_aliases_normalized_alias_idx`          | No             | Yes        |             12.161 |
-| High-candidate `star` contains |            22,705 |             22,705 | `song_aliases_normalized_alias_idx`          | No             | Yes        |             12.300 |
-| Detail lookup by alias ID    |                   1 |                  1 | `song_aliases_pkey`                          | No             | Yes        |              0.039 |
-| Detail with song and entries |                   4 |                  4 | `song_aliases_pkey`, `songs_pkey`, entry idx | No             | Yes        |              0.078 |
+| Case and shape                 | Before rows scanned | After rows scanned | After index used                             | After seq scan | After sort | After execution ms |
+| ------------------------------ | ------------------: | -----------------: | -------------------------------------------- | -------------- | ---------- | -----------------: |
+| Exact `ILIKE $1`               |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.205 |
+| Exact prefix                   |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.183 |
+| Exact contains                 |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.191 |
+| Prefix starts-with             |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.257 |
+| Prefix contains                |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.343 |
+| Contains contains              |             100,000 |                224 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              2.069 |
+| No-result contains             |             100,000 |                  0 | `song_aliases_normalized_alias_trgm_idx`     | No             | Yes        |              0.032 |
+| High-candidate `star` prefix   |              22,605 |             22,605 | `song_aliases_normalized_alias_idx`          | No             | Yes        |             12.161 |
+| High-candidate `star` contains |              22,705 |             22,705 | `song_aliases_normalized_alias_idx`          | No             | Yes        |             12.300 |
+| Detail lookup by alias ID      |                   1 |                  1 | `song_aliases_pkey`                          | No             | Yes        |              0.039 |
+| Detail with song and entries   |                   4 |                  4 | `song_aliases_pkey`, `songs_pkey`, entry idx | No             | Yes        |              0.078 |
 
 The normalized exact/prefix/contains candidate shapes no longer perform full
 100,000-row alias-table scans. Sorts still occur because the current query shape

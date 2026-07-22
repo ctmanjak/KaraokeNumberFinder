@@ -111,25 +111,18 @@
       "case_label": "Normalized exact",
       "query": "Neon exact anthem",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE $1\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "neonexactanthem",
-        50
-      ],
+      "params": ["neonexactanthem", 50],
       "rows_planned": 10,
       "rows_scanned": 2,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -138,12 +131,7 @@
       "planning_time_ms": 0.377,
       "execution_time_ms": 0.205,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -181,12 +169,7 @@
               "Actual Total Time": 0.145,
               "Actual Rows": 1,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -289,25 +272,18 @@
       "case_label": "Normalized exact",
       "query": "Neon exact anthem",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ($1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "neonexactanthem",
-        100
-      ],
+      "params": ["neonexactanthem", 100],
       "rows_planned": 10,
       "rows_scanned": 2,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -316,12 +292,7 @@
       "planning_time_ms": 0.57,
       "execution_time_ms": 0.183,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -359,12 +330,7 @@
               "Actual Total Time": 0.128,
               "Actual Rows": 1,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -467,25 +433,18 @@
       "case_label": "Normalized exact",
       "query": "Neon exact anthem",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ('%' || $1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "neonexactanthem",
-        200
-      ],
+      "params": ["neonexactanthem", 200],
       "rows_planned": 10,
       "rows_scanned": 2,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -494,12 +453,7 @@
       "planning_time_ms": 0.584,
       "execution_time_ms": 0.191,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -537,12 +491,7 @@
               "Actual Total Time": 0.13,
               "Actual Rows": 1,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -645,26 +594,18 @@
       "case_label": "Normalized exact",
       "query": "Neon exact anthem",
       "sql": "SELECT id, song_id, alias, language, alias_type, normalized_alias, chosung_alias\nFROM song_aliases\nWHERE id = ANY($1::varchar[])\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC",
-      "params": [
-        [
-          "synthetic_10k_alias_000001_02"
-        ]
-      ],
+      "params": [["synthetic_10k_alias_000001_02"]],
       "rows_planned": 1,
       "rows_scanned": 1,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_pkey"
-        ]
+        "names": ["song_aliases_pkey"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -673,10 +614,7 @@
       "planning_time_ms": 0.186,
       "execution_time_ms": 0.039,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -690,12 +628,7 @@
           "Actual Total Time": 0.019,
           "Actual Rows": 1,
           "Actual Loops": 1,
-          "Sort Key": [
-            "normalized_alias",
-            "song_id",
-            "alias",
-            "id"
-          ],
+          "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
           "Sort Method": "quicksort",
           "Sort Space Used": 25,
           "Sort Space Type": "Memory",
@@ -768,20 +701,14 @@
       "case_label": "Normalized exact",
       "query": "Neon exact anthem",
       "sql": "SELECT\n  a.id AS alias_id,\n  a.song_id,\n  a.alias,\n  a.language,\n  a.alias_type,\n  a.normalized_alias,\n  a.chosung_alias,\n  s.id AS song_id,\n  s.original_language,\n  s.canonical_title,\n  s.display_title,\n  s.canonical_artist,\n  s.release_year,\n  s.tie_in,\n  e.id AS karaoke_entry_id,\n  e.provider_id,\n  e.karaoke_number,\n  e.version_info,\n  e.availability_status,\n  e.last_verified_at\nFROM song_aliases a\nJOIN songs s ON s.id = a.song_id\nLEFT JOIN karaoke_entries e ON e.song_id = s.id\nWHERE a.id = ANY($1::varchar[])\nORDER BY a.normalized_alias ASC, a.song_id ASC, a.alias ASC, a.id ASC,\n  e.provider_id ASC, e.availability_status ASC, e.version_info ASC,\n  e.karaoke_number ASC, e.id ASC",
-      "params": [
-        [
-          "synthetic_10k_alias_000001_02"
-        ]
-      ],
+      "params": [["synthetic_10k_alias_000001_02"]],
       "rows_planned": 2,
       "rows_scanned": 4,
       "rows_filtered": 0,
       "rows_returned": 2,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
@@ -798,11 +725,7 @@
       "planning_time_ms": 1.041,
       "execution_time_ms": 0.078,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Nested Loop",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Nested Loop", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -1015,25 +938,18 @@
       "case_label": "Normalized prefix",
       "query": "star pressure prefix 000002",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE $1\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "starpressureprefix000002",
-        50
-      ],
+      "params": ["starpressureprefix000002", 50],
       "rows_planned": 10,
       "rows_scanned": 0,
       "rows_filtered": 0,
       "rows_returned": 0,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -1042,12 +958,7 @@
       "planning_time_ms": 0.156,
       "execution_time_ms": 0.239,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -1085,12 +996,7 @@
               "Actual Total Time": 0.186,
               "Actual Rows": 0,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -1193,25 +1099,18 @@
       "case_label": "Normalized prefix",
       "query": "star pressure prefix 000002",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ($1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "starpressureprefix000002",
-        100
-      ],
+      "params": ["starpressureprefix000002", 100],
       "rows_planned": 10,
       "rows_scanned": 2,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -1220,12 +1119,7 @@
       "planning_time_ms": 0.118,
       "execution_time_ms": 0.257,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -1263,12 +1157,7 @@
               "Actual Total Time": 0.205,
               "Actual Rows": 1,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -1371,25 +1260,18 @@
       "case_label": "Normalized prefix",
       "query": "star pressure prefix 000002",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ('%' || $1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "starpressureprefix000002",
-        200
-      ],
+      "params": ["starpressureprefix000002", 200],
       "rows_planned": 10,
       "rows_scanned": 2,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -1398,12 +1280,7 @@
       "planning_time_ms": 0.124,
       "execution_time_ms": 0.343,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -1441,12 +1318,7 @@
               "Actual Total Time": 0.294,
               "Actual Rows": 1,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -1549,26 +1421,18 @@
       "case_label": "Normalized prefix",
       "query": "star pressure prefix 000002",
       "sql": "SELECT id, song_id, alias, language, alias_type, normalized_alias, chosung_alias\nFROM song_aliases\nWHERE id = ANY($1::varchar[])\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC",
-      "params": [
-        [
-          "synthetic_10k_alias_000002_04"
-        ]
-      ],
+      "params": [["synthetic_10k_alias_000002_04"]],
       "rows_planned": 1,
       "rows_scanned": 1,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_pkey"
-        ]
+        "names": ["song_aliases_pkey"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -1577,10 +1441,7 @@
       "planning_time_ms": 0.227,
       "execution_time_ms": 0.044,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -1594,12 +1455,7 @@
           "Actual Total Time": 0.015,
           "Actual Rows": 1,
           "Actual Loops": 1,
-          "Sort Key": [
-            "normalized_alias",
-            "song_id",
-            "alias",
-            "id"
-          ],
+          "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
           "Sort Method": "quicksort",
           "Sort Space Used": 25,
           "Sort Space Type": "Memory",
@@ -1672,20 +1528,14 @@
       "case_label": "Normalized prefix",
       "query": "star pressure prefix 000002",
       "sql": "SELECT\n  a.id AS alias_id,\n  a.song_id,\n  a.alias,\n  a.language,\n  a.alias_type,\n  a.normalized_alias,\n  a.chosung_alias,\n  s.id AS song_id,\n  s.original_language,\n  s.canonical_title,\n  s.display_title,\n  s.canonical_artist,\n  s.release_year,\n  s.tie_in,\n  e.id AS karaoke_entry_id,\n  e.provider_id,\n  e.karaoke_number,\n  e.version_info,\n  e.availability_status,\n  e.last_verified_at\nFROM song_aliases a\nJOIN songs s ON s.id = a.song_id\nLEFT JOIN karaoke_entries e ON e.song_id = s.id\nWHERE a.id = ANY($1::varchar[])\nORDER BY a.normalized_alias ASC, a.song_id ASC, a.alias ASC, a.id ASC,\n  e.provider_id ASC, e.availability_status ASC, e.version_info ASC,\n  e.karaoke_number ASC, e.id ASC",
-      "params": [
-        [
-          "synthetic_10k_alias_000002_04"
-        ]
-      ],
+      "params": [["synthetic_10k_alias_000002_04"]],
       "rows_planned": 2,
       "rows_scanned": 4,
       "rows_filtered": 0,
       "rows_returned": 2,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
@@ -1702,11 +1552,7 @@
       "planning_time_ms": 1.04,
       "execution_time_ms": 0.098,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Nested Loop",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Nested Loop", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -1919,25 +1765,18 @@
       "case_label": "Normalized contains",
       "query": "middlecore000003",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE $1\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "middlecore000003",
-        50
-      ],
+      "params": ["middlecore000003", 50],
       "rows_planned": 10,
       "rows_scanned": 0,
       "rows_filtered": 0,
       "rows_returned": 0,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -1946,12 +1785,7 @@
       "planning_time_ms": 0.113,
       "execution_time_ms": 0.48,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -1989,12 +1823,7 @@
               "Actual Total Time": 0.411,
               "Actual Rows": 0,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -2097,25 +1926,18 @@
       "case_label": "Normalized contains",
       "query": "middlecore000003",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ($1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "middlecore000003",
-        100
-      ],
+      "params": ["middlecore000003", 100],
       "rows_planned": 10,
       "rows_scanned": 0,
       "rows_filtered": 0,
       "rows_returned": 0,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -2124,12 +1946,7 @@
       "planning_time_ms": 0.119,
       "execution_time_ms": 0.508,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -2167,12 +1984,7 @@
               "Actual Total Time": 0.46,
               "Actual Rows": 0,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -2275,25 +2087,18 @@
       "case_label": "Normalized contains",
       "query": "middlecore000003",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ('%' || $1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "middlecore000003",
-        200
-      ],
+      "params": ["middlecore000003", 200],
       "rows_planned": 10,
       "rows_scanned": 224,
       "rows_filtered": 111,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -2302,12 +2107,7 @@
       "planning_time_ms": 0.126,
       "execution_time_ms": 2.069,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -2345,12 +2145,7 @@
               "Actual Total Time": 2.028,
               "Actual Rows": 1,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -2453,26 +2248,18 @@
       "case_label": "Normalized contains",
       "query": "middlecore000003",
       "sql": "SELECT id, song_id, alias, language, alias_type, normalized_alias, chosung_alias\nFROM song_aliases\nWHERE id = ANY($1::varchar[])\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC",
-      "params": [
-        [
-          "synthetic_10k_alias_000003_06"
-        ]
-      ],
+      "params": [["synthetic_10k_alias_000003_06"]],
       "rows_planned": 1,
       "rows_scanned": 1,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_pkey"
-        ]
+        "names": ["song_aliases_pkey"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -2481,10 +2268,7 @@
       "planning_time_ms": 0.023,
       "execution_time_ms": 0.02,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -2498,12 +2282,7 @@
           "Actual Total Time": 0.012,
           "Actual Rows": 1,
           "Actual Loops": 1,
-          "Sort Key": [
-            "normalized_alias",
-            "song_id",
-            "alias",
-            "id"
-          ],
+          "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
           "Sort Method": "quicksort",
           "Sort Space Used": 25,
           "Sort Space Type": "Memory",
@@ -2576,20 +2355,14 @@
       "case_label": "Normalized contains",
       "query": "middlecore000003",
       "sql": "SELECT\n  a.id AS alias_id,\n  a.song_id,\n  a.alias,\n  a.language,\n  a.alias_type,\n  a.normalized_alias,\n  a.chosung_alias,\n  s.id AS song_id,\n  s.original_language,\n  s.canonical_title,\n  s.display_title,\n  s.canonical_artist,\n  s.release_year,\n  s.tie_in,\n  e.id AS karaoke_entry_id,\n  e.provider_id,\n  e.karaoke_number,\n  e.version_info,\n  e.availability_status,\n  e.last_verified_at\nFROM song_aliases a\nJOIN songs s ON s.id = a.song_id\nLEFT JOIN karaoke_entries e ON e.song_id = s.id\nWHERE a.id = ANY($1::varchar[])\nORDER BY a.normalized_alias ASC, a.song_id ASC, a.alias ASC, a.id ASC,\n  e.provider_id ASC, e.availability_status ASC, e.version_info ASC,\n  e.karaoke_number ASC, e.id ASC",
-      "params": [
-        [
-          "synthetic_10k_alias_000003_06"
-        ]
-      ],
+      "params": [["synthetic_10k_alias_000003_06"]],
       "rows_planned": 2,
       "rows_scanned": 4,
       "rows_filtered": 0,
       "rows_returned": 2,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
@@ -2606,11 +2379,7 @@
       "planning_time_ms": 0.252,
       "execution_time_ms": 0.054,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Nested Loop",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Nested Loop", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -2823,25 +2592,18 @@
       "case_label": "Hangul chosung prefix",
       "query": "ㅅㅌ",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE $1\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "ᄉᄐ",
-        50
-      ],
+      "params": ["ᄉᄐ", 50],
       "rows_planned": 10,
       "rows_scanned": 0,
       "rows_filtered": 0,
       "rows_returned": 0,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -2850,12 +2612,7 @@
       "planning_time_ms": 0.105,
       "execution_time_ms": 0.026,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -2893,12 +2650,7 @@
               "Actual Total Time": 0.011,
               "Actual Rows": 0,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -3001,25 +2753,18 @@
       "case_label": "Hangul chosung prefix",
       "query": "ㅅㅌ",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ($1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "ᄉᄐ",
-        100
-      ],
+      "params": ["ᄉᄐ", 100],
       "rows_planned": 10,
       "rows_scanned": 0,
       "rows_filtered": 0,
       "rows_returned": 0,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -3028,12 +2773,7 @@
       "planning_time_ms": 0.102,
       "execution_time_ms": 0.024,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -3071,12 +2811,7 @@
               "Actual Total Time": 0.009,
               "Actual Rows": 0,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -3179,19 +2914,14 @@
       "case_label": "Hangul chosung prefix",
       "query": "ㅅㅌ",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ('%' || $1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "ᄉᄐ",
-        200
-      ],
+      "params": ["ᄉᄐ", 200],
       "rows_planned": 10,
       "rows_scanned": 100000,
       "rows_filtered": 100000,
       "rows_returned": 0,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": false,
@@ -3199,18 +2929,12 @@
       },
       "sequential_scan": {
         "occurred": true,
-        "relations": [
-          "song_aliases"
-        ]
+        "relations": ["song_aliases"]
       },
       "planning_time_ms": 0.104,
       "execution_time_ms": 43.771,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Seq Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Seq Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -3248,12 +2972,7 @@
               "Actual Total Time": 43.753,
               "Actual Rows": 0,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -3326,19 +3045,14 @@
       "case_label": "Hangul chosung prefix",
       "query": "ㅅㅌ",
       "sql": "SELECT id\nFROM song_aliases\nWHERE chosung_alias ILIKE ($1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "ㅅㅌ",
-        100
-      ],
+      "params": ["ㅅㅌ", 100],
       "rows_planned": 1,
       "rows_scanned": 100000,
       "rows_filtered": 99999,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": false,
@@ -3346,18 +3060,12 @@
       },
       "sequential_scan": {
         "occurred": true,
-        "relations": [
-          "song_aliases"
-        ]
+        "relations": ["song_aliases"]
       },
       "planning_time_ms": 0.403,
       "execution_time_ms": 14.822,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Seq Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Seq Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -3395,12 +3103,7 @@
               "Actual Total Time": 14.809,
               "Actual Rows": 1,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -3473,26 +3176,18 @@
       "case_label": "Hangul chosung prefix",
       "query": "ㅅㅌ",
       "sql": "SELECT id, song_id, alias, language, alias_type, normalized_alias, chosung_alias\nFROM song_aliases\nWHERE id = ANY($1::varchar[])\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC",
-      "params": [
-        [
-          "synthetic_10k_alias_000004_02"
-        ]
-      ],
+      "params": [["synthetic_10k_alias_000004_02"]],
       "rows_planned": 1,
       "rows_scanned": 1,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_pkey"
-        ]
+        "names": ["song_aliases_pkey"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -3501,10 +3196,7 @@
       "planning_time_ms": 0.043,
       "execution_time_ms": 0.037,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -3518,12 +3210,7 @@
           "Actual Total Time": 0.026,
           "Actual Rows": 1,
           "Actual Loops": 1,
-          "Sort Key": [
-            "normalized_alias",
-            "song_id",
-            "alias",
-            "id"
-          ],
+          "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
           "Sort Method": "quicksort",
           "Sort Space Used": 25,
           "Sort Space Type": "Memory",
@@ -3596,20 +3283,14 @@
       "case_label": "Hangul chosung prefix",
       "query": "ㅅㅌ",
       "sql": "SELECT\n  a.id AS alias_id,\n  a.song_id,\n  a.alias,\n  a.language,\n  a.alias_type,\n  a.normalized_alias,\n  a.chosung_alias,\n  s.id AS song_id,\n  s.original_language,\n  s.canonical_title,\n  s.display_title,\n  s.canonical_artist,\n  s.release_year,\n  s.tie_in,\n  e.id AS karaoke_entry_id,\n  e.provider_id,\n  e.karaoke_number,\n  e.version_info,\n  e.availability_status,\n  e.last_verified_at\nFROM song_aliases a\nJOIN songs s ON s.id = a.song_id\nLEFT JOIN karaoke_entries e ON e.song_id = s.id\nWHERE a.id = ANY($1::varchar[])\nORDER BY a.normalized_alias ASC, a.song_id ASC, a.alias ASC, a.id ASC,\n  e.provider_id ASC, e.availability_status ASC, e.version_info ASC,\n  e.karaoke_number ASC, e.id ASC",
-      "params": [
-        [
-          "synthetic_10k_alias_000004_02"
-        ]
-      ],
+      "params": [["synthetic_10k_alias_000004_02"]],
       "rows_planned": 2,
       "rows_scanned": 4,
       "rows_filtered": 0,
       "rows_returned": 2,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
@@ -3626,11 +3307,7 @@
       "planning_time_ms": 0.306,
       "execution_time_ms": 0.072,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Nested Loop",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Nested Loop", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -3843,25 +3520,18 @@
       "case_label": "No-result suggestions",
       "query": "near misss melody",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE $1\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "nearmisssmelody",
-        50
-      ],
+      "params": ["nearmisssmelody", 50],
       "rows_planned": 10,
       "rows_scanned": 0,
       "rows_filtered": 0,
       "rows_returned": 0,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -3870,12 +3540,7 @@
       "planning_time_ms": 0.11,
       "execution_time_ms": 0.037,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -3913,12 +3578,7 @@
               "Actual Total Time": 0.021,
               "Actual Rows": 0,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -4021,25 +3681,18 @@
       "case_label": "No-result suggestions",
       "query": "near misss melody",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ($1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "nearmisssmelody",
-        100
-      ],
+      "params": ["nearmisssmelody", 100],
       "rows_planned": 10,
       "rows_scanned": 0,
       "rows_filtered": 0,
       "rows_returned": 0,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -4048,12 +3701,7 @@
       "planning_time_ms": 0.446,
       "execution_time_ms": 0.083,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -4091,12 +3739,7 @@
               "Actual Total Time": 0.031,
               "Actual Rows": 0,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -4199,25 +3842,18 @@
       "case_label": "No-result suggestions",
       "query": "near misss melody",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ('%' || $1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "nearmisssmelody",
-        200
-      ],
+      "params": ["nearmisssmelody", 200],
       "rows_planned": 10,
       "rows_scanned": 0,
       "rows_filtered": 0,
       "rows_returned": 0,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -4226,12 +3862,7 @@
       "planning_time_ms": 0.123,
       "execution_time_ms": 0.032,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -4269,12 +3900,7 @@
               "Actual Total Time": 0.016,
               "Actual Rows": 0,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -4377,24 +4003,18 @@
       "case_label": "No-result suggestions",
       "query": "near misss melody",
       "sql": "SELECT id, song_id, alias, language, alias_type, normalized_alias, chosung_alias\nFROM song_aliases\nWHERE id = ANY($1::varchar[])\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC",
-      "params": [
-        []
-      ],
+      "params": [[]],
       "rows_planned": 1,
       "rows_scanned": 0,
       "rows_filtered": 0,
       "rows_returned": 0,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_pkey"
-        ]
+        "names": ["song_aliases_pkey"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -4403,10 +4023,7 @@
       "planning_time_ms": 0.177,
       "execution_time_ms": 0.024,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -4420,12 +4037,7 @@
           "Actual Total Time": 0.006,
           "Actual Rows": 0,
           "Actual Loops": 1,
-          "Sort Key": [
-            "normalized_alias",
-            "song_id",
-            "alias",
-            "id"
-          ],
+          "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
           "Sort Method": "quicksort",
           "Sort Space Used": 25,
           "Sort Space Type": "Memory",
@@ -4498,18 +4110,14 @@
       "case_label": "No-result suggestions",
       "query": "near misss melody",
       "sql": "SELECT\n  a.id AS alias_id,\n  a.song_id,\n  a.alias,\n  a.language,\n  a.alias_type,\n  a.normalized_alias,\n  a.chosung_alias,\n  s.id AS song_id,\n  s.original_language,\n  s.canonical_title,\n  s.display_title,\n  s.canonical_artist,\n  s.release_year,\n  s.tie_in,\n  e.id AS karaoke_entry_id,\n  e.provider_id,\n  e.karaoke_number,\n  e.version_info,\n  e.availability_status,\n  e.last_verified_at\nFROM song_aliases a\nJOIN songs s ON s.id = a.song_id\nLEFT JOIN karaoke_entries e ON e.song_id = s.id\nWHERE a.id = ANY($1::varchar[])\nORDER BY a.normalized_alias ASC, a.song_id ASC, a.alias ASC, a.id ASC,\n  e.provider_id ASC, e.availability_status ASC, e.version_info ASC,\n  e.karaoke_number ASC, e.id ASC",
-      "params": [
-        []
-      ],
+      "params": [[]],
       "rows_planned": 2,
       "rows_scanned": 0,
       "rows_filtered": 0,
       "rows_returned": 0,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
@@ -4526,11 +4134,7 @@
       "planning_time_ms": 0.708,
       "execution_time_ms": 0.046,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Nested Loop",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Nested Loop", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -4743,25 +4347,18 @@
       "case_label": "Valid provider filter",
       "query": "provider filter anthem",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE $1\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "providerfilteranthem",
-        50
-      ],
+      "params": ["providerfilteranthem", 50],
       "rows_planned": 10,
       "rows_scanned": 2,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -4770,12 +4367,7 @@
       "planning_time_ms": 0.107,
       "execution_time_ms": 0.222,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -4813,12 +4405,7 @@
               "Actual Total Time": 0.182,
               "Actual Rows": 1,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -4921,25 +4508,18 @@
       "case_label": "Valid provider filter",
       "query": "provider filter anthem",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ($1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "providerfilteranthem",
-        100
-      ],
+      "params": ["providerfilteranthem", 100],
       "rows_planned": 10,
       "rows_scanned": 2,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -4948,12 +4528,7 @@
       "planning_time_ms": 0.219,
       "execution_time_ms": 0.41,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -4991,12 +4566,7 @@
               "Actual Total Time": 0.366,
               "Actual Rows": 1,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -5099,25 +4669,18 @@
       "case_label": "Valid provider filter",
       "query": "provider filter anthem",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ('%' || $1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "providerfilteranthem",
-        200
-      ],
+      "params": ["providerfilteranthem", 200],
       "rows_planned": 10,
       "rows_scanned": 2,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -5126,12 +4689,7 @@
       "planning_time_ms": 0.183,
       "execution_time_ms": 0.206,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -5169,12 +4727,7 @@
               "Actual Total Time": 0.175,
               "Actual Rows": 1,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -5277,26 +4830,18 @@
       "case_label": "Valid provider filter",
       "query": "provider filter anthem",
       "sql": "SELECT id, song_id, alias, language, alias_type, normalized_alias, chosung_alias\nFROM song_aliases\nWHERE id = ANY($1::varchar[])\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC",
-      "params": [
-        [
-          "synthetic_10k_alias_000006_02"
-        ]
-      ],
+      "params": [["synthetic_10k_alias_000006_02"]],
       "rows_planned": 1,
       "rows_scanned": 1,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_pkey"
-        ]
+        "names": ["song_aliases_pkey"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -5305,10 +4850,7 @@
       "planning_time_ms": 0.025,
       "execution_time_ms": 0.021,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -5322,12 +4864,7 @@
           "Actual Total Time": 0.013,
           "Actual Rows": 1,
           "Actual Loops": 1,
-          "Sort Key": [
-            "normalized_alias",
-            "song_id",
-            "alias",
-            "id"
-          ],
+          "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
           "Sort Method": "quicksort",
           "Sort Space Used": 25,
           "Sort Space Type": "Memory",
@@ -5400,20 +4937,14 @@
       "case_label": "Valid provider filter",
       "query": "provider filter anthem",
       "sql": "SELECT\n  a.id AS alias_id,\n  a.song_id,\n  a.alias,\n  a.language,\n  a.alias_type,\n  a.normalized_alias,\n  a.chosung_alias,\n  s.id AS song_id,\n  s.original_language,\n  s.canonical_title,\n  s.display_title,\n  s.canonical_artist,\n  s.release_year,\n  s.tie_in,\n  e.id AS karaoke_entry_id,\n  e.provider_id,\n  e.karaoke_number,\n  e.version_info,\n  e.availability_status,\n  e.last_verified_at\nFROM song_aliases a\nJOIN songs s ON s.id = a.song_id\nLEFT JOIN karaoke_entries e ON e.song_id = s.id\nWHERE a.id = ANY($1::varchar[])\nORDER BY a.normalized_alias ASC, a.song_id ASC, a.alias ASC, a.id ASC,\n  e.provider_id ASC, e.availability_status ASC, e.version_info ASC,\n  e.karaoke_number ASC, e.id ASC",
-      "params": [
-        [
-          "synthetic_10k_alias_000006_02"
-        ]
-      ],
+      "params": [["synthetic_10k_alias_000006_02"]],
       "rows_planned": 2,
       "rows_scanned": 4,
       "rows_filtered": 0,
       "rows_returned": 2,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
@@ -5430,11 +4961,7 @@
       "planning_time_ms": 0.248,
       "execution_time_ms": 0.056,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Nested Loop",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Nested Loop", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -5647,25 +5174,18 @@
       "case_label": "Invalid provider filter",
       "query": "provider filter anthem",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE $1\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "providerfilteranthem",
-        50
-      ],
+      "params": ["providerfilteranthem", 50],
       "rows_planned": 10,
       "rows_scanned": 2,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -5674,12 +5194,7 @@
       "planning_time_ms": 0.23,
       "execution_time_ms": 0.175,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -5717,12 +5232,7 @@
               "Actual Total Time": 0.152,
               "Actual Rows": 1,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -5825,25 +5335,18 @@
       "case_label": "Invalid provider filter",
       "query": "provider filter anthem",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ($1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "providerfilteranthem",
-        100
-      ],
+      "params": ["providerfilteranthem", 100],
       "rows_planned": 10,
       "rows_scanned": 2,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -5852,12 +5355,7 @@
       "planning_time_ms": 0.111,
       "execution_time_ms": 0.232,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -5895,12 +5393,7 @@
               "Actual Total Time": 0.202,
               "Actual Rows": 1,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -6003,25 +5496,18 @@
       "case_label": "Invalid provider filter",
       "query": "provider filter anthem",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ('%' || $1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "providerfilteranthem",
-        200
-      ],
+      "params": ["providerfilteranthem", 200],
       "rows_planned": 10,
       "rows_scanned": 2,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -6030,12 +5516,7 @@
       "planning_time_ms": 0.113,
       "execution_time_ms": 0.206,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -6073,12 +5554,7 @@
               "Actual Total Time": 0.171,
               "Actual Rows": 1,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -6181,26 +5657,18 @@
       "case_label": "Invalid provider filter",
       "query": "provider filter anthem",
       "sql": "SELECT id, song_id, alias, language, alias_type, normalized_alias, chosung_alias\nFROM song_aliases\nWHERE id = ANY($1::varchar[])\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC",
-      "params": [
-        [
-          "synthetic_10k_alias_000006_02"
-        ]
-      ],
+      "params": [["synthetic_10k_alias_000006_02"]],
       "rows_planned": 1,
       "rows_scanned": 1,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_pkey"
-        ]
+        "names": ["song_aliases_pkey"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -6209,10 +5677,7 @@
       "planning_time_ms": 0.022,
       "execution_time_ms": 0.018,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -6226,12 +5691,7 @@
           "Actual Total Time": 0.011,
           "Actual Rows": 1,
           "Actual Loops": 1,
-          "Sort Key": [
-            "normalized_alias",
-            "song_id",
-            "alias",
-            "id"
-          ],
+          "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
           "Sort Method": "quicksort",
           "Sort Space Used": 25,
           "Sort Space Type": "Memory",
@@ -6304,20 +5764,14 @@
       "case_label": "Invalid provider filter",
       "query": "provider filter anthem",
       "sql": "SELECT\n  a.id AS alias_id,\n  a.song_id,\n  a.alias,\n  a.language,\n  a.alias_type,\n  a.normalized_alias,\n  a.chosung_alias,\n  s.id AS song_id,\n  s.original_language,\n  s.canonical_title,\n  s.display_title,\n  s.canonical_artist,\n  s.release_year,\n  s.tie_in,\n  e.id AS karaoke_entry_id,\n  e.provider_id,\n  e.karaoke_number,\n  e.version_info,\n  e.availability_status,\n  e.last_verified_at\nFROM song_aliases a\nJOIN songs s ON s.id = a.song_id\nLEFT JOIN karaoke_entries e ON e.song_id = s.id\nWHERE a.id = ANY($1::varchar[])\nORDER BY a.normalized_alias ASC, a.song_id ASC, a.alias ASC, a.id ASC,\n  e.provider_id ASC, e.availability_status ASC, e.version_info ASC,\n  e.karaoke_number ASC, e.id ASC",
-      "params": [
-        [
-          "synthetic_10k_alias_000006_02"
-        ]
-      ],
+      "params": [["synthetic_10k_alias_000006_02"]],
       "rows_planned": 2,
       "rows_scanned": 4,
       "rows_filtered": 0,
       "rows_returned": 2,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
@@ -6334,11 +5788,7 @@
       "planning_time_ms": 0.252,
       "execution_time_ms": 0.055,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Nested Loop",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Nested Loop", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -6551,25 +6001,18 @@
       "case_label": "High candidate partial query",
       "query": "star",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE $1\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "star",
-        50
-      ],
+      "params": ["star", 50],
       "rows_planned": 10,
       "rows_scanned": 0,
       "rows_filtered": 0,
       "rows_returned": 0,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -6578,12 +6021,7 @@
       "planning_time_ms": 0.102,
       "execution_time_ms": 0.088,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -6621,12 +6059,7 @@
               "Actual Total Time": 0.059,
               "Actual Rows": 0,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -6729,25 +6162,18 @@
       "case_label": "High candidate partial query",
       "query": "star",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ($1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "star",
-        100
-      ],
+      "params": ["star", 100],
       "rows_planned": 100,
       "rows_scanned": 22605,
       "rows_filtered": 22504,
       "rows_returned": 100,
       "sort": {
         "occurred": true,
-        "methods": [
-          "Incremental Sort"
-        ]
+        "methods": ["Incremental Sort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -6756,11 +6182,7 @@
       "planning_time_ms": 0.132,
       "execution_time_ms": 12.161,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Incremental Sort",
-        "Index Scan"
-      ],
+      "node_types": ["Limit", "Incremental Sort", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -6798,20 +6220,11 @@
               "Actual Total Time": 12.142,
               "Actual Rows": 100,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
-              "Presorted Key": [
-                "normalized_alias"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
+              "Presorted Key": ["normalized_alias"],
               "Full-sort Groups": {
                 "Group Count": 4,
-                "Sort Methods Used": [
-                  "quicksort"
-                ],
+                "Sort Methods Used": ["quicksort"],
                 "Sort Space Memory": {
                   "Average Sort Space Used": 33,
                   "Peak Sort Space Used": 33
@@ -6888,25 +6301,18 @@
       "case_label": "High candidate partial query",
       "query": "star",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ('%' || $1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "star",
-        200
-      ],
+      "params": ["star", 200],
       "rows_planned": 200,
       "rows_scanned": 22705,
       "rows_filtered": 22504,
       "rows_returned": 200,
       "sort": {
         "occurred": true,
-        "methods": [
-          "Incremental Sort"
-        ]
+        "methods": ["Incremental Sort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -6915,11 +6321,7 @@
       "planning_time_ms": 0.099,
       "execution_time_ms": 12.3,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Incremental Sort",
-        "Index Scan"
-      ],
+      "node_types": ["Limit", "Incremental Sort", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -6957,20 +6359,11 @@
               "Actual Total Time": 12.27,
               "Actual Rows": 200,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
-              "Presorted Key": [
-                "normalized_alias"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
+              "Presorted Key": ["normalized_alias"],
               "Full-sort Groups": {
                 "Group Count": 7,
-                "Sort Methods Used": [
-                  "quicksort"
-                ],
+                "Sort Methods Used": ["quicksort"],
                 "Sort Space Memory": {
                   "Average Sort Space Used": 33,
                   "Peak Sort Space Used": 33
@@ -7107,15 +6500,11 @@
       "rows_returned": 50,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_pkey"
-        ]
+        "names": ["song_aliases_pkey"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -7124,10 +6513,7 @@
       "planning_time_ms": 0.072,
       "execution_time_ms": 0.116,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -7141,12 +6527,7 @@
           "Actual Total Time": 0.107,
           "Actual Rows": 50,
           "Actual Loops": 1,
-          "Sort Key": [
-            "normalized_alias",
-            "song_id",
-            "alias",
-            "id"
-          ],
+          "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
           "Sort Method": "quicksort",
           "Sort Space Used": 33,
           "Sort Space Type": "Memory",
@@ -7279,9 +6660,7 @@
       "rows_returned": 132,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
@@ -7298,11 +6677,7 @@
       "planning_time_ms": 0.292,
       "execution_time_ms": 0.402,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Nested Loop",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Nested Loop", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -7515,25 +6890,18 @@
       "case_label": "High entry-count payload",
       "query": "payload fanout anthem",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE $1\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "payloadfanoutanthem",
-        50
-      ],
+      "params": ["payloadfanoutanthem", 50],
       "rows_planned": 10,
       "rows_scanned": 2,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -7542,12 +6910,7 @@
       "planning_time_ms": 0.107,
       "execution_time_ms": 0.159,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -7585,12 +6948,7 @@
               "Actual Total Time": 0.135,
               "Actual Rows": 1,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -7693,25 +7051,18 @@
       "case_label": "High entry-count payload",
       "query": "payload fanout anthem",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ($1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "payloadfanoutanthem",
-        100
-      ],
+      "params": ["payloadfanoutanthem", 100],
       "rows_planned": 10,
       "rows_scanned": 2,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -7720,12 +7071,7 @@
       "planning_time_ms": 0.111,
       "execution_time_ms": 0.146,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -7763,12 +7109,7 @@
               "Actual Total Time": 0.124,
               "Actual Rows": 1,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -7871,25 +7212,18 @@
       "case_label": "High entry-count payload",
       "query": "payload fanout anthem",
       "sql": "SELECT id\nFROM song_aliases\nWHERE normalized_alias ILIKE ('%' || $1 || '%')\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC\nLIMIT $2",
-      "params": [
-        "payloadfanoutanthem",
-        200
-      ],
+      "params": ["payloadfanoutanthem", 200],
       "rows_planned": 10,
       "rows_scanned": 2,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_normalized_alias_trgm_idx"
-        ]
+        "names": ["song_aliases_normalized_alias_trgm_idx"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -7898,12 +7232,7 @@
       "planning_time_ms": 0.137,
       "execution_time_ms": 0.16,
       "plan_root": "Limit",
-      "node_types": [
-        "Limit",
-        "Sort",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "node_types": ["Limit", "Sort", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Limit",
@@ -7941,12 +7270,7 @@
               "Actual Total Time": 0.133,
               "Actual Rows": 1,
               "Actual Loops": 1,
-              "Sort Key": [
-                "normalized_alias",
-                "song_id",
-                "alias",
-                "id"
-              ],
+              "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
               "Sort Method": "quicksort",
               "Sort Space Used": 25,
               "Sort Space Type": "Memory",
@@ -8049,26 +7373,18 @@
       "case_label": "High entry-count payload",
       "query": "payload fanout anthem",
       "sql": "SELECT id, song_id, alias, language, alias_type, normalized_alias, chosung_alias\nFROM song_aliases\nWHERE id = ANY($1::varchar[])\nORDER BY normalized_alias ASC, song_id ASC, alias ASC, id ASC",
-      "params": [
-        [
-          "synthetic_10k_alias_000008_02"
-        ]
-      ],
+      "params": [["synthetic_10k_alias_000008_02"]],
       "rows_planned": 1,
       "rows_scanned": 1,
       "rows_filtered": 0,
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
-        "names": [
-          "song_aliases_pkey"
-        ]
+        "names": ["song_aliases_pkey"]
       },
       "sequential_scan": {
         "occurred": false,
@@ -8077,10 +7393,7 @@
       "planning_time_ms": 0.182,
       "execution_time_ms": 0.026,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -8094,12 +7407,7 @@
           "Actual Total Time": 0.009,
           "Actual Rows": 1,
           "Actual Loops": 1,
-          "Sort Key": [
-            "normalized_alias",
-            "song_id",
-            "alias",
-            "id"
-          ],
+          "Sort Key": ["normalized_alias", "song_id", "alias", "id"],
           "Sort Method": "quicksort",
           "Sort Space Used": 25,
           "Sort Space Type": "Memory",
@@ -8172,20 +7480,14 @@
       "case_label": "High entry-count payload",
       "query": "payload fanout anthem",
       "sql": "SELECT\n  a.id AS alias_id,\n  a.song_id,\n  a.alias,\n  a.language,\n  a.alias_type,\n  a.normalized_alias,\n  a.chosung_alias,\n  s.id AS song_id,\n  s.original_language,\n  s.canonical_title,\n  s.display_title,\n  s.canonical_artist,\n  s.release_year,\n  s.tie_in,\n  e.id AS karaoke_entry_id,\n  e.provider_id,\n  e.karaoke_number,\n  e.version_info,\n  e.availability_status,\n  e.last_verified_at\nFROM song_aliases a\nJOIN songs s ON s.id = a.song_id\nLEFT JOIN karaoke_entries e ON e.song_id = s.id\nWHERE a.id = ANY($1::varchar[])\nORDER BY a.normalized_alias ASC, a.song_id ASC, a.alias ASC, a.id ASC,\n  e.provider_id ASC, e.availability_status ASC, e.version_info ASC,\n  e.karaoke_number ASC, e.id ASC",
-      "params": [
-        [
-          "synthetic_10k_alias_000008_02"
-        ]
-      ],
+      "params": [["synthetic_10k_alias_000008_02"]],
       "rows_planned": 2,
       "rows_scanned": 24,
       "rows_filtered": 0,
       "rows_returned": 22,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": true,
@@ -8202,11 +7504,7 @@
       "planning_time_ms": 0.648,
       "execution_time_ms": 0.146,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Nested Loop",
-        "Index Scan"
-      ],
+      "node_types": ["Sort", "Nested Loop", "Index Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -8426,9 +7724,7 @@
       "rows_returned": 11,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": false,
@@ -8436,17 +7732,12 @@
       },
       "sequential_scan": {
         "occurred": true,
-        "relations": [
-          "karaoke_providers"
-        ]
+        "relations": ["karaoke_providers"]
       },
       "planning_time_ms": 0.232,
       "execution_time_ms": 0.033,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Seq Scan"
-      ],
+      "node_types": ["Sort", "Seq Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -8460,11 +7751,7 @@
           "Actual Total Time": 0.015,
           "Actual Rows": 11,
           "Actual Loops": 1,
-          "Sort Key": [
-            "display_order",
-            "name",
-            "id"
-          ],
+          "Sort Key": ["display_order", "name", "id"],
           "Sort Method": "quicksort",
           "Sort Space Used": 26,
           "Sort Space Type": "Memory",
@@ -8542,9 +7829,7 @@
       "rows_returned": 1,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": false,
@@ -8552,17 +7837,12 @@
       },
       "sequential_scan": {
         "occurred": true,
-        "relations": [
-          "karaoke_providers"
-        ]
+        "relations": ["karaoke_providers"]
       },
       "planning_time_ms": 0.017,
       "execution_time_ms": 0.011,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Seq Scan"
-      ],
+      "node_types": ["Sort", "Seq Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -8576,11 +7856,7 @@
           "Actual Total Time": 0.006,
           "Actual Rows": 1,
           "Actual Loops": 1,
-          "Sort Key": [
-            "display_order",
-            "name",
-            "id"
-          ],
+          "Sort Key": ["display_order", "name", "id"],
           "Sort Method": "quicksort",
           "Sort Space Used": 25,
           "Sort Space Type": "Memory",
@@ -8651,18 +7927,14 @@
       "case_label": null,
       "query": null,
       "sql": "SELECT id, name, country, is_active, display_order, is_default, last_catalog_updated_at\nFROM karaoke_providers\nWHERE country = $1 AND is_active = true\nORDER BY display_order ASC, name ASC, id ASC",
-      "params": [
-        "KR"
-      ],
+      "params": ["KR"],
       "rows_planned": 4,
       "rows_scanned": 12,
       "rows_filtered": 8,
       "rows_returned": 4,
       "sort": {
         "occurred": true,
-        "methods": [
-          "quicksort"
-        ]
+        "methods": ["quicksort"]
       },
       "index": {
         "used": false,
@@ -8670,17 +7942,12 @@
       },
       "sequential_scan": {
         "occurred": true,
-        "relations": [
-          "karaoke_providers"
-        ]
+        "relations": ["karaoke_providers"]
       },
       "planning_time_ms": 0.04,
       "execution_time_ms": 0.013,
       "plan_root": "Sort",
-      "node_types": [
-        "Sort",
-        "Seq Scan"
-      ],
+      "node_types": ["Sort", "Seq Scan"],
       "plan": {
         "Plan": {
           "Node Type": "Sort",
@@ -8694,11 +7961,7 @@
           "Actual Total Time": 0.008,
           "Actual Rows": 4,
           "Actual Loops": 1,
-          "Sort Key": [
-            "display_order",
-            "name",
-            "id"
-          ],
+          "Sort Key": ["display_order", "name", "id"],
           "Sort Method": "quicksort",
           "Sort Space Used": 25,
           "Sort Space Type": "Memory",
