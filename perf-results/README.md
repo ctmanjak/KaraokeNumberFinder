@@ -139,15 +139,15 @@ alias recommendation:
 
 Artifacts:
 
-| Dataset | Baseline | EXPLAIN |
-| ------- | -------- | ------- |
+| Dataset                            | Baseline                                                                           | EXPLAIN                                                                           |
+| ---------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | `synthetic-10k-songs-100k-aliases` | `baseline-local-synthetic-10k-songs-100k-aliases-m2-perf-15-20260708T034343Z.json` | `explain-local-synthetic-10k-songs-100k-aliases-m2-perf-15-20260708T034343Z.json` |
 
 Run metadata:
 
-| DB scope | Songs | Aliases | Entries | Providers | Concurrent index build time | New index size |
-| -------- | ----: | ------: | ------: | --------: | --------------------------: | -------------: |
-| local-only `karaoke-synthetic-postgres` | 10,000 | 100,000 | 22,520 | 12 | 0.495s wall time | 5,312KB |
+| DB scope                                |  Songs | Aliases | Entries | Providers | Concurrent index build time | New index size |
+| --------------------------------------- | -----: | ------: | ------: | --------: | --------------------------: | -------------: |
+| local-only `karaoke-synthetic-postgres` | 10,000 | 100,000 |  22,520 |        12 |            0.495s wall time |        5,312KB |
 
 The concurrent Prisma migration path was also validated against a fresh local
 temporary DB. Manual `CREATE INDEX CONCURRENTLY` operations must be run as a
@@ -166,11 +166,11 @@ current-index baseline:
 
 Representative normalized candidate EXPLAIN results:
 
-| Shape                  | Before rows scanned | After rows scanned | After index used                         | After seq scan |
-| ---------------------- | ------------------: | -----------------: | ---------------------------------------- | -------------- |
-| Exact `ILIKE $1`       |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx` | No             |
-| Prefix `ILIKE $1 || %` |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx` | No             |
-| Contains `ILIKE %$1%`  |             100,000 |                224 | `song_aliases_normalized_alias_trgm_idx` | No             |
+| Shape                 | Before rows scanned | After rows scanned | After index used                         | After seq scan |
+| --------------------- | ------------------: | -----------------: | ---------------------------------------- | -------------- |
+| Exact `ILIKE $1`      |             100,000 |                  2 | `song_aliases_normalized_alias_trgm_idx` | No             |
+| Prefix `ILIKE $1      |                     |                 %` | 100,000                                  | 2              | `song_aliases_normalized_alias_trgm_idx` | No  |
+| Contains `ILIKE %$1%` |             100,000 |                224 | `song_aliases_normalized_alias_trgm_idx` | No             |
 
 The run used only the local synthetic DB. Neon and production-like databases
 were not used. M2-Perf-15 did not add a `chosung_alias` trigram index, pattern

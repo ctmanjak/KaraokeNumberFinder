@@ -224,15 +224,15 @@ Proposed decision gates:
 
 ## M2-Perf-13 Ticket Definition
 
-| Field | Definition |
-| ----- | ---------- |
-| Title | `[M2-Perf-13] synthetic 1k/10k local perf result summary and search optimization decision draft` |
-| Goal | Summarize `[M2-Perf-12]` local synthetic measurement evidence and turn it into a clear next-step decision point for search/index optimization work. |
-| Scope | Review existing perf docs, inspect the 1k/10k baseline/query-shape/EXPLAIN artifacts, document row counts, validation status, p95, SQL count, rows scanned, index usage, tooling issues, and next ticket candidates. |
-| Non-goals | Do not change schema, migrations, indexes, generated Prisma Client, DB data, `.env`, search behavior, or search optimization code. Do not run DB reads/writes as part of this documentation ticket. |
-| Inputs | `scripts/perf/README.md`, `scripts/perf/synthetic-scale-plan.md`, `scripts/perf/search-optimization-decision.md`, `scripts/perf/synthetic-dataset-contract.md`, and the six M2-Perf-12 JSON artifacts under `perf-results/`. |
-| Expected output | Updated decision documentation plus an optional `perf-results/README.md` run summary that a follow-up optimization ticket can cite directly. |
-| Safety rules | Documentation-only. No `.env` edits, DB connections, DB writes, migrations, Prisma schema edits, index add/drop, generated Prisma Client changes, `next-env.d.ts` edits, or search optimization code changes. |
+| Field           | Definition                                                                                                                                                                                                                   |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Title           | `[M2-Perf-13] synthetic 1k/10k local perf result summary and search optimization decision draft`                                                                                                                             |
+| Goal            | Summarize `[M2-Perf-12]` local synthetic measurement evidence and turn it into a clear next-step decision point for search/index optimization work.                                                                          |
+| Scope           | Review existing perf docs, inspect the 1k/10k baseline/query-shape/EXPLAIN artifacts, document row counts, validation status, p95, SQL count, rows scanned, index usage, tooling issues, and next ticket candidates.         |
+| Non-goals       | Do not change schema, migrations, indexes, generated Prisma Client, DB data, `.env`, search behavior, or search optimization code. Do not run DB reads/writes as part of this documentation ticket.                          |
+| Inputs          | `scripts/perf/README.md`, `scripts/perf/synthetic-scale-plan.md`, `scripts/perf/search-optimization-decision.md`, `scripts/perf/synthetic-dataset-contract.md`, and the six M2-Perf-12 JSON artifacts under `perf-results/`. |
+| Expected output | Updated decision documentation plus an optional `perf-results/README.md` run summary that a follow-up optimization ticket can cite directly.                                                                                 |
+| Safety rules    | Documentation-only. No `.env` edits, DB connections, DB writes, migrations, Prisma schema edits, index add/drop, generated Prisma Client changes, `next-env.d.ts` edits, or search optimization code changes.                |
 
 ## M2-Perf-12 Synthetic Local Measurement Summary
 
@@ -247,17 +247,17 @@ Artifacts summarized here:
 
 Run metadata:
 
-| Dataset label | Started at | DB label | Iterations | Warmup | Fixture |
-| ------------- | ---------- | -------- | ---------: | -----: | ------- |
-| `synthetic-1k-songs-10k-aliases` | 2026-07-07T12:51:34Z | `local` | 10 | 3 | `perf-results/search-measurement-fixture-synthetic-1k-songs-10k-aliases.csv` |
-| `synthetic-10k-songs-100k-aliases` | 2026-07-07T13:02:59Z | `local` | 10 | 3 | `perf-results/search-measurement-fixture-synthetic-10k-songs-100k-aliases.csv` |
+| Dataset label                      | Started at           | DB label | Iterations | Warmup | Fixture                                                                        |
+| ---------------------------------- | -------------------- | -------- | ---------: | -----: | ------------------------------------------------------------------------------ |
+| `synthetic-1k-songs-10k-aliases`   | 2026-07-07T12:51:34Z | `local`  |         10 |      3 | `perf-results/search-measurement-fixture-synthetic-1k-songs-10k-aliases.csv`   |
+| `synthetic-10k-songs-100k-aliases` | 2026-07-07T13:02:59Z | `local`  |         10 |      3 | `perf-results/search-measurement-fixture-synthetic-10k-songs-100k-aliases.csv` |
 
 Observed row counts:
 
-| Dataset label | Songs | Song aliases | Karaoke entries | Karaoke providers |
-| ------------- | ----: | -----------: | --------------: | ----------------: |
-| `synthetic-1k-songs-10k-aliases` | 1,000 | 10,000 | 2,258 | 6 |
-| `synthetic-10k-songs-100k-aliases` | 10,000 | 100,000 | 22,520 | 12 |
+| Dataset label                      |  Songs | Song aliases | Karaoke entries | Karaoke providers |
+| ---------------------------------- | -----: | -----------: | --------------: | ----------------: |
+| `synthetic-1k-songs-10k-aliases`   |  1,000 |       10,000 |           2,258 |                 6 |
+| `synthetic-10k-songs-100k-aliases` | 10,000 |      100,000 |          22,520 |                12 |
 
 Validation status:
 
@@ -273,16 +273,16 @@ Validation status:
 
 Baseline local p95 summary:
 
-| Case | 1k API p95 ms | 10k API p95 ms | 1k service p95 ms | 10k service p95 ms |
-| ---- | ------------: | -------------: | ----------------: | -----------------: |
-| Normalized exact | 21.79 | 85.80 | 13.16 | 129.38 |
-| Normalized prefix | 20.30 | 93.21 | 23.28 | 97.60 |
-| Normalized contains | 14.37 | 85.99 | 19.51 | 84.63 |
-| Hangul chosung prefix | 16.19 | 83.92 | 16.42 | 86.37 |
-| No-result suggestions | 26.12 | 110.24 | 14.14 | 121.05 |
-| Valid provider filter | 17.99 | 50.33 | 17.67 | 47.90 |
-| High candidate partial query | 40.47 | 43.80 | 12.96 | 52.17 |
-| High entry-count payload | 12.28 | 49.98 | 10.29 | 47.80 |
+| Case                         | 1k API p95 ms | 10k API p95 ms | 1k service p95 ms | 10k service p95 ms |
+| ---------------------------- | ------------: | -------------: | ----------------: | -----------------: |
+| Normalized exact             |         21.79 |          85.80 |             13.16 |             129.38 |
+| Normalized prefix            |         20.30 |          93.21 |             23.28 |              97.60 |
+| Normalized contains          |         14.37 |          85.99 |             19.51 |              84.63 |
+| Hangul chosung prefix        |         16.19 |          83.92 |             16.42 |              86.37 |
+| No-result suggestions        |         26.12 |         110.24 |             14.14 |             121.05 |
+| Valid provider filter        |         17.99 |          50.33 |             17.67 |              47.90 |
+| High candidate partial query |         40.47 |          43.80 |             12.96 |              52.17 |
+| High entry-count payload     |         12.28 |          49.98 |             10.29 |              47.80 |
 
 Interpretation:
 
@@ -295,17 +295,17 @@ Interpretation:
 
 Query-shape SQL count summary:
 
-| Case | Actual SQL queries | Client method calls | Candidate groups | Unique alias IDs | Relation load |
-| ---- | -----------------: | ------------------: | ---------------: | ---------------: | ------------- |
-| Normalized exact | 6 | 4 | 2 | 1 | Batched, not N+1 |
-| Normalized prefix | 7 | 5 | 3 | 1 | Batched, not N+1 |
-| Normalized contains | 7 | 5 | 3 | 1 | Batched, not N+1 |
-| Hangul chosung prefix | 8 | 6 | 4 | 1 | Batched, not N+1 |
-| No-result suggestions | 5 | 5 | 3 | 0 | Detail not executed |
-| Valid provider filter | 6 | 4 | 2 | 1 | Batched, not N+1 |
-| High candidate partial query | 6 | 4 | 2 | 100 | Batched, not N+1 |
-| High entry-count payload | 6 | 4 | 2 | 1 | Batched, not N+1 |
-| Invalid provider API path | 1 | 1 | 0 | 0 | Detail not executed |
+| Case                         | Actual SQL queries | Client method calls | Candidate groups | Unique alias IDs | Relation load       |
+| ---------------------------- | -----------------: | ------------------: | ---------------: | ---------------: | ------------------- |
+| Normalized exact             |                  6 |                   4 |                2 |                1 | Batched, not N+1    |
+| Normalized prefix            |                  7 |                   5 |                3 |                1 | Batched, not N+1    |
+| Normalized contains          |                  7 |                   5 |                3 |                1 | Batched, not N+1    |
+| Hangul chosung prefix        |                  8 |                   6 |                4 |                1 | Batched, not N+1    |
+| No-result suggestions        |                  5 |                   5 |                3 |                0 | Detail not executed |
+| Valid provider filter        |                  6 |                   4 |                2 |                1 | Batched, not N+1    |
+| High candidate partial query |                  6 |                   4 |                2 |              100 | Batched, not N+1    |
+| High entry-count payload     |                  6 |                   4 |                2 |                1 | Batched, not N+1    |
+| Invalid provider API path    |                  1 |                   1 |                0 |                0 | Detail not executed |
 
 The 1k and 10k query-shape counts match for the representative cases. Scale
 pressure is therefore not from extra Prisma round trips in these runs; it is
@@ -313,18 +313,18 @@ from larger alias scans and larger payloads within the same query shape.
 
 EXPLAIN rows scanned and index usage:
 
-| Shape | 1k/10k alias run | 10k/100k alias run | Index usage |
-| ----- | ---------------: | -----------------: | ----------- |
-| Exact `normalized_alias ILIKE $1` | 10,000 scanned, 1 returned | 100,000 scanned, 1 returned | No index |
-| Prefix `normalized_alias ILIKE ($1 || '%')` representative exact/prefix cases | 10,000 scanned, 1 returned | 100,000 scanned, 1 returned | No index |
-| Contains `normalized_alias ILIKE ('%' || $1 || '%')` representative cases | 10,000 scanned, 1 returned | 100,000 scanned, 1 returned | No index |
-| Chosung `chosung_alias ILIKE ($1 || '%')` | 10,000 scanned, 1 returned | 100,000 scanned, 1 returned | No index |
-| High-candidate `star` prefix | 2,355 scanned, 100 returned | 22,605 scanned, 100 returned | `song_aliases_normalized_alias_idx` used |
-| High-candidate `star` contains | 2,455 scanned, 200 returned | 22,705 scanned, 200 returned | `song_aliases_normalized_alias_idx` used |
-| Detail lookup by alias ID | 1 scanned, 1 returned | 1 scanned, 1 returned | `song_aliases_pkey` used |
-| Detail with song and entries | 4 scanned, 2 returned | 4 scanned, 2 returned | PK and `karaoke_entries_song_status_idx` used |
-| Provider active lookup | 6 scanned, 5 returned | 12 scanned, 11 returned | No index, small table |
-| `GET /api/providers` active country order | 2 scanned, 2 returned | 4 scanned, 4 returned | `karaoke_providers_country_active_order_idx` used |
+| Shape                                     |            1k/10k alias run |                      10k/100k alias run | Index usage                                       |
+| ----------------------------------------- | --------------------------: | --------------------------------------: | ------------------------------------------------- |
+| Exact `normalized_alias ILIKE $1`         |  10,000 scanned, 1 returned |             100,000 scanned, 1 returned | No index                                          |
+| Prefix `normalized_alias ILIKE ($1        |                             | '%')` representative exact/prefix cases | 10,000 scanned, 1 returned                        | 100,000 scanned, 1 returned | No index                   |
+| Contains `normalized_alias ILIKE ('%'     |                             |                                      $1 |                                                   | '%')` representative cases  | 10,000 scanned, 1 returned | 100,000 scanned, 1 returned | No index |
+| Chosung `chosung_alias ILIKE ($1          |                             |                                   '%')` | 10,000 scanned, 1 returned                        | 100,000 scanned, 1 returned | No index                   |
+| High-candidate `star` prefix              | 2,355 scanned, 100 returned |            22,605 scanned, 100 returned | `song_aliases_normalized_alias_idx` used          |
+| High-candidate `star` contains            | 2,455 scanned, 200 returned |            22,705 scanned, 200 returned | `song_aliases_normalized_alias_idx` used          |
+| Detail lookup by alias ID                 |       1 scanned, 1 returned |                   1 scanned, 1 returned | `song_aliases_pkey` used                          |
+| Detail with song and entries              |       4 scanned, 2 returned |                   4 scanned, 2 returned | PK and `karaoke_entries_song_status_idx` used     |
+| Provider active lookup                    |       6 scanned, 5 returned |                 12 scanned, 11 returned | No index, small table                             |
+| `GET /api/providers` active country order |       2 scanned, 2 returned |                   4 scanned, 4 returned | `karaoke_providers_country_active_order_idx` used |
 
 The strongest scale signal is that exact, representative prefix, representative
 contains, and chosung searches scan the full alias table at 100k aliases. The
@@ -392,13 +392,13 @@ recommendation to apply, defer, or reject each option.
 
 ### Deferred options
 
-| Option | Reason to defer |
-| ------ | ---------------- |
-| Direct migration/index application | M2-Perf-12 is enough to justify an experiment, not a production migration. |
-| Search query rewrite or raw SQL CTE | Behavioral/ranking risk is higher than a pure plan experiment. |
-| Payload trimming | Payload growth is visible, but latency is still below gate and relation loading is batched. |
-| Pagination/cursor API | Result volume evidence is limited to capped synthetic cases; user-facing semantics are not defined. |
-| External search engine | Operational cost is too high before in-DB options are measured. |
+| Option                              | Reason to defer                                                                                     |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Direct migration/index application  | M2-Perf-12 is enough to justify an experiment, not a production migration.                          |
+| Search query rewrite or raw SQL CTE | Behavioral/ranking risk is higher than a pure plan experiment.                                      |
+| Payload trimming                    | Payload growth is visible, but latency is still below gate and relation loading is batched.         |
+| Pagination/cursor API               | Result volume evidence is limited to capped synthetic cases; user-facing semantics are not defined. |
+| External search engine              | Operational cost is too high before in-DB options are measured.                                     |
 
 ### Risks
 
@@ -439,14 +439,14 @@ Created Notion tickets:
 
 Deferred candidate tickets after M2-Perf-08:
 
-| Candidate                              | Trigger                                                                             |
-| -------------------------------------- | ----------------------------------------------------------------------------------- |
-| `[M2-Perf-14] PostgreSQL search index strategy spike for synthetic 100k aliases` | M2-Perf-12 EXPLAIN shows full alias-table scans at 100k aliases, even though warm local p95 remains below gate. |
-| `[M2-Perf-16] reduce search DB round-trips with raw SQL query shape` | After M2-Perf-15, production has the normalized trigram index, but current seed timing still shows route latency dominated by provider, candidate, and alias-detail DB round trips. Notion: https://app.notion.com/p/3974c60a73038187a57eca2d04bbc2a3 |
-| Search payload trimming proposal       | Response bytes or relation-load timing grows with entries per song/provider.        |
-| Pagination/cursor design               | Result counts exceed first-page needs and stable cursor semantics become necessary. |
-| Synthetic fixture contract completion  | Fixture projection blocks reliable case ID, provider filter, and dataset-label validation across tools. |
-| Synthetic import scalability hardening | Large local imports continue to hit stack, transaction timeout, or batching limits. |
+| Candidate                                                                        | Trigger                                                                                                                                                                                                                                               |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[M2-Perf-14] PostgreSQL search index strategy spike for synthetic 100k aliases` | M2-Perf-12 EXPLAIN shows full alias-table scans at 100k aliases, even though warm local p95 remains below gate.                                                                                                                                       |
+| `[M2-Perf-16] reduce search DB round-trips with raw SQL query shape`             | After M2-Perf-15, production has the normalized trigram index, but current seed timing still shows route latency dominated by provider, candidate, and alias-detail DB round trips. Notion: https://app.notion.com/p/3974c60a73038187a57eca2d04bbc2a3 |
+| Search payload trimming proposal                                                 | Response bytes or relation-load timing grows with entries per song/provider.                                                                                                                                                                          |
+| Pagination/cursor design                                                         | Result counts exceed first-page needs and stable cursor semantics become necessary.                                                                                                                                                                   |
+| Synthetic fixture contract completion                                            | Fixture projection blocks reliable case ID, provider filter, and dataset-label validation across tools.                                                                                                                                               |
+| Synthetic import scalability hardening                                           | Large local imports continue to hit stack, transaction timeout, or batching limits.                                                                                                                                                                   |
 
 ## Final Status
 
