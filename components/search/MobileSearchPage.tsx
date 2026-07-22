@@ -11,6 +11,7 @@ import {
 import { useOptionalAuth } from "@/components/auth/AuthProvider";
 import { isCurrentSharedAuthUser } from "@/components/auth/shared-auth-user";
 import { GoogleLoginDialog } from "@/components/auth/GoogleLoginDialog";
+import { useResetAuthNavigationPending } from "@/components/auth/use-reset-auth-navigation-pending";
 import {
   fetchProviders,
   fetchSearchResults,
@@ -173,6 +174,8 @@ export function MobileSearchPage({
   const loadedPersonalizationAuthKey = useRef<string | null>(null);
   const sharedAuth = useOptionalAuth();
   const sharedAuthRef = useRef(sharedAuth);
+
+  useResetAuthNavigationPending(setLoginSubmitting);
 
   useLayoutEffect(() => {
     sharedAuthRef.current = sharedAuth;

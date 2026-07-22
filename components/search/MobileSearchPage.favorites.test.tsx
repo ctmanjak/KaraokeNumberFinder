@@ -123,6 +123,23 @@ describe("MobileSearchPage favorites", () => {
         window.sessionStorage.getItem(PENDING_FAVORITE_STORAGE_KEY) ?? "{}"
       )
     ).toMatchObject({ version: 1, song_id: "song-a" });
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "로그인 준비 중"
+        }) as HTMLButtonElement
+      ).disabled
+    ).toBe(true);
+
+    fireEvent(window, new Event("pageshow"));
+
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Google로 로그인"
+        }) as HTMLButtonElement
+      ).disabled
+    ).toBe(false);
   });
 
   it("keeps search usable and offers retry when login start fails", async () => {
