@@ -50,6 +50,16 @@ export function createAuthOptions(
       }
     },
     emailAndPassword: { enabled: false },
+    user: {
+      additionalFields: {
+        role: {
+          type: "string",
+          required: false,
+          defaultValue: "user",
+          input: false
+        }
+      }
+    },
     session: {
       expiresIn: SESSION_IDLE_TTL_SECONDS,
       updateAge: SESSION_UPDATE_AGE_SECONDS,

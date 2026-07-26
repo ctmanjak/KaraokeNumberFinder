@@ -2,6 +2,11 @@
 
 This directory contains the Prisma setup for the public search schema and the M3 authentication and user-data schema.
 
+The admin song-entry feature adds the least-privilege `User.role` enum through
+`20260722090000_add_admin_role`. Every user defaults to `user`; promotion is an
+explicit operator action documented in
+[`docs/admin-song-add.md`](../docs/admin-song-add.md).
+
 `schema.prisma` contains:
 
 - Prisma Client generator using the Prisma 7 `prisma-client` provider

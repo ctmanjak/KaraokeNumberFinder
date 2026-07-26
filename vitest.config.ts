@@ -15,6 +15,9 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    env: {
+      ADMIN_CATALOG_MODE: "on"
+    },
     include: ["**/*.test.ts", "**/*.test.tsx"],
     poolOptions: {
       forks: { execArgv: disableNodeWebStorage },

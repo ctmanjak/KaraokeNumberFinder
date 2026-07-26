@@ -413,7 +413,8 @@ function browserSessionBody(
       id: user.id,
       ...(typeof user.name === "string" ? { name: user.name } : {}),
       ...(typeof user.email === "string" ? { email: user.email } : {}),
-      ...(typeof user.image === "string" ? { image: user.image } : {})
+      ...(typeof user.image === "string" ? { image: user.image } : {}),
+      is_admin: user.role === "admin"
     }
   };
 }
