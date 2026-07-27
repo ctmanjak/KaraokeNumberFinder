@@ -181,7 +181,11 @@ function requireExactKeys(
   allowedKeys: readonly string[]
 ): void {
   const allowed = new Set(allowedKeys);
-  if (Object.keys(input).some((key) => !allowed.has(key))) {
+  const inputKeys = Object.keys(input);
+  if (
+    inputKeys.length !== allowedKeys.length ||
+    inputKeys.some((key) => !allowed.has(key))
+  ) {
     invalid();
   }
 }

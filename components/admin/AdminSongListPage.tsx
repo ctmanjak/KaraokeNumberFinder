@@ -384,6 +384,7 @@ function CatalogNotEnabledState() {
 function formatUpdatedAt(value: string): string {
   return new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "medium",
-    timeStyle: "short"
+    timeStyle: "short",
+    timeZone: "Asia/Seoul"
   }).format(new Date(value));
 }

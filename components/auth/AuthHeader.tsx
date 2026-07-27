@@ -6,8 +6,11 @@ import { useEffect, useRef, useState } from "react";
 import { fetchAdminCatalogAccess } from "@/lib/admin-catalog/client";
 import { createGoogleSignInUrl } from "@/lib/auth/client";
 import type { AllowedAuthCallbackPath } from "@/lib/auth/policy";
+import { createRequestTimeout } from "@/lib/http/client";
 import { useAuth } from "./AuthProvider";
 import { useResetAuthNavigationPending } from "./use-reset-auth-navigation-pending";
+
+const ADMIN_CATALOG_MENU_TIMEOUT_MS = 8_000;
 
 export function AuthHeader({
   navigateToAuth = (url) => window.location.assign(url)
@@ -78,19 +81,28 @@ export function AuthHeader({
     }
 
     const controller = new AbortController();
+    const request = createRequestTimeout(
+      ADMIN_CATALOG_MENU_TIMEOUT_MS,
+      controller.signal
+    );
     queueMicrotask(async () => {
       try {
-        const enabled = await fetchAdminCatalogAccess(fetch, controller.signal);
-        if (!controller.signal.aborted) {
+        const enabled = await fetchAdminCatalogAccess(fetch, request.signal);
+        if (!request.signal.aborted) {
           setAdminCatalogMenuEnabled(enabled);
         }
       } catch {
         if (!controller.signal.aborted) {
           setAdminCatalogMenuEnabled(false);
         }
+      } finally {
+        request.clear();
       }
     });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      request.clear();
+    };
   }, [adminActorId, menuOpen]);
 
   async function handleLogin(): Promise<void> {

@@ -44,6 +44,10 @@ export function AdminSongPage() {
   >(null);
   const [aliases, setAliases] = useState<AliasDraft[]>([]);
   const [entries, setEntries] = useState<EntryDraft[]>([]);
+  const optionsLoadIdentity =
+    auth.state.status === "authenticated"
+      ? `${auth.state.user.id}:${auth.state.user.is_admin}`
+      : auth.state.status;
 
   useEffect(() => {
     if (auth.state.status !== "authenticated" || !auth.state.user.is_admin) {
@@ -73,7 +77,9 @@ export function AdminSongPage() {
       }
     });
     return () => controller.abort();
-  }, [auth.state]);
+    // The authenticated administrator identity is the only options-load trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [optionsLoadIdentity]);
 
   if (auth.state.status === "loading") {
     return <AdminState title="권한을 확인하는 중입니다." />;
@@ -282,17 +288,18 @@ export function AdminSongPage() {
             <button
               className="tertiary-button"
               type="button"
-              onClick={() =>
+              onClick={() => {
+                const key = nextKey.current++;
                 setAliases((current) => [
                   ...current,
                   {
-                    key: nextKey.current++,
+                    key,
                     alias: "",
                     language: "ko",
                     alias_type: "translated_title"
                   }
-                ])
-              }
+                ]);
+              }}
             >
               별칭 추가
             </button>
@@ -386,12 +393,13 @@ export function AdminSongPage() {
             <button
               className="tertiary-button"
               type="button"
-              onClick={() =>
+              onClick={() => {
+                const key = nextKey.current++;
                 setEntries((current) => [
                   ...current,
-                  newEntry(nextKey.current++, options.providers[0].id)
-                ])
-              }
+                  newEntry(key, options.providers[0].id)
+                ]);
+              }}
             >
               번호 행 추가
             </button>

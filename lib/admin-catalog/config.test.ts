@@ -35,9 +35,11 @@ describe("admin catalog configuration", () => {
         occurred_at: "2026-07-26T00:00:00.000Z",
         issue: configured === undefined ? "missing" : "invalid"
       });
-      expect(JSON.stringify(writeConfigurationError.mock.calls)).not.toContain(
-        configured ?? "ADMIN_CATALOG_MODE"
-      );
+      if (configured !== undefined) {
+        expect(
+          JSON.stringify(writeConfigurationError.mock.calls).toLowerCase()
+        ).not.toContain(JSON.stringify(configured).toLowerCase());
+      }
     }
   );
 

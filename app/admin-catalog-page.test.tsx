@@ -2,10 +2,6 @@
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { forbidden } from "next/navigation";
-import {
-  getAccessFallbackHTTPStatus,
-  isHTTPAccessFallbackError
-} from "next/dist/client/components/http-access-fallback/http-access-fallback";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Forbidden from "./forbidden";
 
@@ -24,11 +20,9 @@ describe("administrator catalog HTTP forbidden page", () => {
       interruption = error;
     }
 
-    expect(isHTTPAccessFallbackError(interruption)).toBe(true);
-    if (!isHTTPAccessFallbackError(interruption)) {
-      throw new Error("Expected a Next.js HTTP access interruption.");
-    }
-    expect(getAccessFallbackHTTPStatus(interruption)).toBe(403);
+    expect(interruption).toEqual(
+      expect.objectContaining({ digest: "NEXT_HTTP_ERROR_FALLBACK;403" })
+    );
   });
 
   it("has the required accessible heading and safe navigation only", () => {

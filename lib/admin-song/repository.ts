@@ -13,6 +13,9 @@ import type {
   AdminSongOptions
 } from "./types";
 
+const ADMIN_SONG_SEARCH_BATCH_SIZE = 100;
+export const MAX_ADMIN_SONG_SEARCH_SCAN_BATCHES = 5;
+
 export type AdminSongRepositoryErrorCode =
   "FORBIDDEN" | "DUPLICATE_SONG" | "PROVIDER_NOT_FOUND" | "CONFLICT";
 
@@ -56,11 +59,23 @@ export function createPrismaAdminSongRepository(
 
       const matches: AdminSongListRecord[] = [];
       let scanCursor = query.cursor;
-      const batchSize = query.normalizedQuery === null ? query.limit + 1 : 100;
+      let scanComplete = false;
+      let scannedBatches = 0;
+      const batchSize =
+        query.normalizedQuery === null
+          ? query.limit + 1
+          : ADMIN_SONG_SEARCH_BATCH_SIZE;
+      const maxScanBatches =
+        query.normalizedQuery === null ? 1 : MAX_ADMIN_SONG_SEARCH_SCAN_BATCHES;
 
-      while (matches.length < query.limit + 1) {
+      while (
+        matches.length < query.limit + 1 &&
+        scannedBatches < maxScanBatches
+      ) {
         const songs = await readAdminSongBatch(db, scanCursor, batchSize);
+        scannedBatches += 1;
         if (songs.length === 0) {
+          scanComplete = true;
           break;
         }
 
@@ -74,7 +89,12 @@ export function createPrismaAdminSongRepository(
         }
 
         const lastScanned = songs.at(-1);
-        if (lastScanned === undefined || songs.length < batchSize) {
+        if (lastScanned === undefined) {
+          scanComplete = true;
+          break;
+        }
+        if (songs.length < batchSize) {
+          scanComplete = true;
           break;
         }
         scanCursor = {
@@ -134,7 +154,9 @@ export function createPrismaAdminSongRepository(
         })),
         nextCursorKey: hasMore
           ? toCursorKey(pageSongs[pageSongs.length - 1])
-          : null
+          : scanComplete
+            ? null
+            : scanCursor
       };
     },
 

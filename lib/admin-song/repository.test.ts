@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "../generated/prisma/client";
 import {
   AdminSongRepositoryError,
-  createPrismaAdminSongRepository
+  createPrismaAdminSongRepository,
+  MAX_ADMIN_SONG_SEARCH_SCAN_BATCHES
 } from "./repository";
 import type { AdminSongInput } from "./types";
 
@@ -93,6 +94,71 @@ describe("admin song repository", () => {
       id: "song-b"
     });
     expect(second.items.map((item) => item.id)).toEqual(["song-c"]);
+    expect(second.nextCursorKey).toBeNull();
+  });
+
+  it("paginates matching songs across multiple 100-row scan batches without gaps or duplicates", async () => {
+    const matchingIndexes = new Set([99, 199, 204]);
+    const songs = Array.from({ length: 205 }, (_, index) =>
+      listSong(
+        `song-${String(index).padStart(3, "0")}`,
+        matchingIndexes.has(index) ? `Needle ${index}` : `Other ${index}`,
+        `Display ${index}`,
+        "Artist",
+        []
+      )
+    );
+    const repository = createPrismaAdminSongRepository(listDb(songs));
+    const collected: string[] = [];
+    let cursor = null;
+
+    do {
+      const page = await repository.list("admin-user", {
+        query: "needle",
+        normalizedQuery: "needle",
+        cursor,
+        limit: 2
+      });
+      collected.push(...page.items.map((item) => item.id));
+      cursor = page.nextCursorKey;
+    } while (cursor !== null);
+
+    expect(collected).toEqual(["song-099", "song-199", "song-204"]);
+    expect(new Set(collected).size).toBe(collected.length);
+  });
+
+  it("returns the last scanned position when the search scan budget is exhausted", async () => {
+    const scannedRows = MAX_ADMIN_SONG_SEARCH_SCAN_BATCHES * 100;
+    const songs = Array.from({ length: scannedRows + 1 }, (_, index) =>
+      listSong(
+        `song-${String(index).padStart(4, "0")}`,
+        `Other ${index}`,
+        `Display ${index}`,
+        "Artist",
+        []
+      )
+    );
+    const repository = createPrismaAdminSongRepository(listDb(songs));
+
+    const first = await repository.list("admin-user", {
+      query: "missing",
+      normalizedQuery: "missing",
+      cursor: null,
+      limit: 20
+    });
+    const second = await repository.list("admin-user", {
+      query: "missing",
+      normalizedQuery: "missing",
+      cursor: first.nextCursorKey,
+      limit: 20
+    });
+
+    expect(first.items).toEqual([]);
+    expect(first.nextCursorKey).toEqual({
+      updatedAt: "2026-07-26T00:00:00.000000Z",
+      id: `song-${String(scannedRows - 1).padStart(4, "0")}`
+    });
+    expect(second.items).toEqual([]);
     expect(second.nextCursorKey).toBeNull();
   });
 

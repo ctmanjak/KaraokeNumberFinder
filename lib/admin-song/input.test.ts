@@ -80,6 +80,15 @@ describe("admin song input", () => {
       })
     ).toThrowError(expect.objectContaining({ code: "VALIDATION_ERROR" }));
   });
+
+  it("rejects a request with a missing key", () => {
+    const missingKey: Partial<ReturnType<typeof validInput>> = validInput();
+    delete missingKey.verification_note;
+
+    expect(() => parseAdminSongInput(missingKey)).toThrowError(
+      expect.objectContaining({ code: "VALIDATION_ERROR" })
+    );
+  });
 });
 
 function validInput() {
