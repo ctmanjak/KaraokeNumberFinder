@@ -7,6 +7,7 @@ import { getServerAuth } from "../auth/server";
 import { authCookiePolicy, SESSION_IDLE_TTL_SECONDS } from "../auth/policy";
 import { getPrismaClient } from "../db/prisma";
 import { readAuthEnvironment } from "../auth/env";
+import { E2E_FIXTURE_MARKER } from "./constants";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -16,7 +17,10 @@ export async function readBrowserE2EFixtures(): Promise<Response> {
   const prisma = getPrismaClient();
   const [songs, providers] = await Promise.all([
     prisma.song.findMany({
-      where: { aliases: { some: {} } },
+      where: {
+        verifiedBy: { not: E2E_FIXTURE_MARKER },
+        aliases: { some: {} }
+      },
       orderBy: { id: "asc" },
       take: 3,
       select: {

@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 
 import { Client } from "pg";
 
+import { E2E_FIXTURE_MARKER } from "../lib/e2e/constants";
 import { buildAliasSearchFields } from "../lib/search/normalize";
-import { expect, test } from "./fixtures";
+import { controlHeaders, expect, test, type E2ECatalog } from "./fixtures";
 
 test("administrator edits one aggregate, preserves ids, and explicitly reloads after stale conflict", async ({
   page,
@@ -22,6 +23,13 @@ test("administrator edits one aggregate, preserves ids, and explicitly reloads a
 
   try {
     await createSongFixture(database, songId, providerId);
+    const catalogResponse = await page.request.get("/api/e2e/control", {
+      headers: controlHeaders()
+    });
+    expect(catalogResponse.status()).toBe(200);
+    const publicCatalog = (await catalogResponse.json()) as E2ECatalog;
+    expect(publicCatalog.songs.map(({ id }) => id)).not.toContain(songId);
+
     await users.loginAdmin(page.request, admin);
     await page.goto(`/admin/songs/${encodeURIComponent(songId)}`);
 
@@ -152,7 +160,7 @@ async function createSongFixture(
        normalized_canonical_title, normalized_canonical_artist,
        release_year, source_name, verified_by, created_at, updated_at
      ) VALUES (
-       $1, 'en', $2, $3, $4, $5, $6, 2024, 'E2E fixture', 'e2e', now(), now()
+       $1, 'en', $2, $3, $4, $5, $6, 2024, 'E2E fixture', $7, now(), now()
      )`,
     [
       songId,
@@ -160,7 +168,8 @@ async function createSongFixture(
       displayTitle,
       canonicalArtist,
       buildAliasSearchFields(canonicalTitle).normalizedAlias,
-      buildAliasSearchFields(canonicalArtist).normalizedAlias
+      buildAliasSearchFields(canonicalArtist).normalizedAlias,
+      E2E_FIXTURE_MARKER
     ]
   );
   for (const [id, value, type] of [
@@ -175,7 +184,7 @@ async function createSongFixture(
          id, song_id, alias, language, alias_type, normalized_alias,
          chosung_alias, source_name, verified_by, created_at, updated_at
        ) VALUES (
-         $1, $2, $3, 'en', $4::alias_type, $5, $6, 'E2E fixture', 'e2e',
+         $1, $2, $3, 'en', $4::alias_type, $5, $6, 'E2E fixture', $7,
          now(), now()
        )`,
       [
@@ -184,7 +193,8 @@ async function createSongFixture(
         value,
         type,
         search.normalizedAlias,
-        search.chosungAlias || null
+        search.chosungAlias || null,
+        E2E_FIXTURE_MARKER
       ]
     );
   }
