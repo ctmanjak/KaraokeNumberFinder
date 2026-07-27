@@ -161,7 +161,7 @@ export async function completeMockGoogleLogin(options: {
     { times: 1 }
   );
 
-  await triggerOAuthBoundary(options.trigger, () => oauthState);
+  await triggerOAuthBoundary(options.page, options.trigger, () => oauthState);
   expect(oauthState).toBeDefined();
   const returnURL = new URL(options.returnTo ?? "/", baseURL).href;
   const loginResponse = await options.users.login(
@@ -209,7 +209,7 @@ export async function completeMockGoogleFailure(options: {
     { times: 1 }
   );
 
-  await triggerOAuthBoundary(options.trigger, () => oauthState);
+  await triggerOAuthBoundary(options.page, options.trigger, () => oauthState);
   if (callbackURL === undefined) {
     throw new Error("Mock Google callback was not captured.");
   }
@@ -224,11 +224,13 @@ export async function completeMockGoogleFailure(options: {
 }
 
 async function triggerOAuthBoundary(
+  page: Page,
   trigger: Locator,
   readState: () => string | undefined
 ): Promise<void> {
   await trigger.click();
   await expect.poll(readState, { timeout: 6_000 }).not.toBeUndefined();
+  await expect(page).toHaveTitle("Mock Google");
 }
 
 function uniqueTestClientIP(): string {
