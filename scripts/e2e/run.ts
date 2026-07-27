@@ -16,6 +16,7 @@ const environment: NodeJS.ProcessEnv = {
   M3_TEST_DATABASE_URL: testDatabaseURL,
   KNF_RUNTIME_ENV: "e2e",
   KNF_E2E_AUTH_ENABLED: "1",
+  ADMIN_CATALOG_MODE: "on",
   BETTER_AUTH_SECRET: randomBytes(48).toString("base64url"),
   BETTER_AUTH_URL: baseURL,
   AUTH_TRUSTED_ORIGIN: baseURL,

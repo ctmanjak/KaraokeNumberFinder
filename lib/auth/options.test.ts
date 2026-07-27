@@ -41,6 +41,11 @@ describe("createAuthOptions", () => {
 
     expect(Object.keys(options.socialProviders ?? {})).toEqual(["google"]);
     expect(options.emailAndPassword?.enabled).toBe(false);
+    expect(options.user?.additionalFields?.role).toMatchObject({
+      type: "string",
+      defaultValue: "user",
+      input: false
+    });
     expect(google.disableIdTokenSignIn).toBe(true);
     expect(options.advanced?.database?.generateId).toBe("uuid");
     expect(options.account?.storeStateStrategy).toBe("database");

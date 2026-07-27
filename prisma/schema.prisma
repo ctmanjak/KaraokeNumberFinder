@@ -31,6 +31,13 @@ enum AvailabilityStatus {
   @@map("availability_status")
 }
 
+enum UserRole {
+  user
+  admin
+
+  @@map("user_role")
+}
+
 model Song {
   id               String         @id @db.VarChar(128)
   originalLanguage String         @map("original_language") @db.VarChar(16)
@@ -131,6 +138,7 @@ model User {
   name          String          @db.VarChar(256)
   email         String          @db.VarChar(320)
   emailVerified Boolean         @default(false) @map("email_verified")
+  role          UserRole        @default(user)
   image         String?         @db.Text
   createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)

@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import { parseSafeAuthCallbackPath } from "./redirect";
 
 describe("parseSafeAuthCallbackPath", () => {
-  it.each(["/", "/favorites", "/settings"])("allows %s", (path) => {
-    expect(parseSafeAuthCallbackPath(path)).toBe(path);
-  });
+  it.each(["/", "/favorites", "/settings", "/admin/songs", "/admin/songs/new"])(
+    "allows %s",
+    (path) => {
+      expect(parseSafeAuthCallbackPath(path)).toBe(path);
+    }
+  );
 
   it.each([
     "https://evil.example/",

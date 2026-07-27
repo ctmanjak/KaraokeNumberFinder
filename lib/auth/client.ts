@@ -12,6 +12,7 @@ export type BrowserAuthUser = Readonly<{
   name?: string;
   email?: string;
   image?: string;
+  is_admin: boolean;
 }>;
 
 export type BrowserAuthState =
@@ -211,11 +212,13 @@ function readSafeSessionUser(value: unknown): BrowserAuthUser | undefined {
   const name = safeTrimmedString(user.name, 200);
   const email = safeEmail(user.email);
   const image = safeImageUrl(user.image);
+  const isAdmin = user.is_admin === true;
   return {
     id,
     ...(name === undefined ? {} : { name }),
     ...(email === undefined ? {} : { email }),
-    ...(image === undefined ? {} : { image })
+    ...(image === undefined ? {} : { image }),
+    is_admin: isAdmin
   };
 }
 

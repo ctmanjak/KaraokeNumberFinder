@@ -136,9 +136,14 @@ describe("global auth header", () => {
     expect(menuButton.getAttribute("aria-expanded")).toBe("false");
     expect(menuButton.getAttribute("aria-haspopup")).toBe("menu");
     expect(menuButton.getAttribute("aria-controls")).toBe("global-user-menu");
+    const favoritesLink = screen.getByRole("link", { name: "즐겨찾기" });
+    expect(favoritesLink.closest("nav")?.getAttribute("aria-label")).toBe(
+      "주요 메뉴"
+    );
 
     fireEvent.click(menuButton);
     expect(menuButton.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getAllByRole("link", { name: "즐겨찾기" })).toHaveLength(1);
     expect(screen.getByRole("link", { name: "설정" })).toBeTruthy();
     const outsideButton = screen.getByRole("button", { name: "세션 만료" });
     fireEvent.pointerDown(outsideButton);
@@ -159,6 +164,103 @@ describe("global auth header", () => {
       await screen.findByRole("button", { name: "Google 로그인" })
     ).toBeTruthy();
     expect(screen.queryByText("Alice")).toBeNull();
+  });
+
+  it("shows song creation only to an admin session", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          user: { id: "admin-a", name: "Admin", is_admin: true }
+        })
+      )
+      .mockResolvedValueOnce(jsonResponse({ enabled: true }));
+    vi.stubGlobal("fetch", fetcher);
+
+    renderHeader();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Admin 사용자 메뉴" })
+    );
+    expect(await screen.findByRole("link", { name: "노래 관리" })).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "노래 관리" }).getAttribute("href")
+    ).toBe("/admin/songs");
+    expect(fetcher).toHaveBeenCalledWith(
+      "/api/admin/catalog-access",
+      expect.objectContaining({ cache: "no-store" })
+    );
+  });
+
+  it("does not render the catalog entry for an admin when the feature is off", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          user: { id: "admin-a", name: "Admin", is_admin: true }
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            error: {
+              code: "ADMIN_CATALOG_NOT_ENABLED",
+              message: "Catalog access is unavailable.",
+              request_id: "request-off"
+            }
+          },
+          403
+        )
+      );
+    vi.stubGlobal("fetch", fetcher);
+
+    renderHeader();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Admin 사용자 메뉴" })
+    );
+    await waitFor(() =>
+      expect(fetcher).toHaveBeenCalledWith(
+        "/api/admin/catalog-access",
+        expect.objectContaining({ cache: "no-store" })
+      )
+    );
+    expect(screen.queryByRole("link", { name: "노래 관리" })).toBeNull();
+    expect(screen.queryByText(/준비 중/)).toBeNull();
+  });
+
+  it("rechecks the runtime catalog mode whenever an admin reopens the menu", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          user: { id: "admin-a", name: "Admin", is_admin: true }
+        })
+      )
+      .mockResolvedValueOnce(jsonResponse({ enabled: true }))
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            error: {
+              code: "ADMIN_CATALOG_NOT_ENABLED",
+              message: "Catalog access is unavailable.",
+              request_id: "request-off"
+            }
+          },
+          403
+        )
+      );
+    vi.stubGlobal("fetch", fetcher);
+
+    renderHeader();
+    const menuButton = await screen.findByRole("button", {
+      name: "Admin 사용자 메뉴"
+    });
+    fireEvent.click(menuButton);
+    expect(await screen.findByRole("link", { name: "노래 관리" })).toBeTruthy();
+
+    fireEvent.click(menuButton);
+    fireEvent.click(menuButton);
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3));
+    expect(screen.queryByRole("link", { name: "노래 관리" })).toBeNull();
   });
 
   it("does not let a slow refresh overwrite a completed logout", async () => {

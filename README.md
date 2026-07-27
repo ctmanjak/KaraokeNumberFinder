@@ -22,7 +22,8 @@
 단계      초기 MVP
 초점      모바일 검색 루프
 데이터    검수 CSV seed -> PostgreSQL
-인증      이후 milestone에서 구현
+인증      Google OAuth와 DB session 구현 완료
+관리      역할 기반 관리자 노래 추가 기능
 ```
 
 ## 해결하려는 문제
@@ -119,6 +120,10 @@ npx prisma migrate dev --name add_core_search_schema
 ```
 
 Prisma Client는 `lib/generated/prisma`에 생성되며 저장소에 커밋하지 않습니다.
+
+## Admin
+
+`ADMIN_CATALOG_MODE=on`이고 `admin` 역할인 로그인 사용자는 `/admin/songs`에서 카탈로그를 검색하고 `/admin/songs/new`에서 곡 기본 정보, 검색 별칭과 제공사별 예약 번호를 한 transaction으로 추가할 수 있습니다. 로컬 예시는 `.env.example`, test와 브라우저 E2E harness는 각 test 설정에서 `on`을 명시합니다. production에서 값이 누락되거나 `off|on` 이외이면 fail-closed `off`로 처리됩니다. 역할은 기본적으로 모든 사용자에게 `user`가 부여되며 공개 API나 화면에서 승격할 수 없습니다. migration 적용과 최초 관리자 지정 절차는 [관리자 전용 노래 추가 기능 문서](docs/admin-song-add.md)를 따릅니다.
 
 ## Public API
 
