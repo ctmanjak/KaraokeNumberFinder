@@ -1,12 +1,18 @@
 import { buildAliasSearchFields } from "../search/normalize";
 import { personalizationError } from "../personalization";
 import {
-  ADMIN_ALIAS_TYPES,
+  normalizeSongIdentity,
+  SongIdentityValidationError
+} from "../song-identity/normalize";
+import {
+  ADMIN_EDITABLE_ALIAS_TYPES,
   ADMIN_AVAILABILITY_STATUSES,
   type AdminAliasType,
+  type AdminEditableAliasType,
   type AdminAvailabilityStatus,
   type AdminSongInput
 } from "./types";
+import { adminSongValidationError } from "./validation";
 
 const LANGUAGE_PATTERN = /^[a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-[A-Z]{2})?$/u;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
@@ -38,29 +44,26 @@ export function parseAdminSongInput(value: unknown): AdminSongInput {
   const displayTitle = requiredString(input.display_title, 512);
   const canonicalArtist = requiredString(input.canonical_artist, 512);
   const sourceName = requiredString(input.source_name, 256);
+  try {
+    normalizeSongIdentity({
+      canonical_title: canonicalTitle,
+      canonical_artist: canonicalArtist
+    });
+  } catch (error) {
+    if (error instanceof SongIdentityValidationError) {
+      invalid(error.field);
+    }
+    throw error;
+  }
   const aliases = array(input.aliases, MAX_ALIASES).map(parseAlias);
   const karaokeEntries = array(input.karaoke_entries, MAX_ENTRIES, true).map(
     parseEntry
   );
 
-  rejectDuplicateAliases([
-    {
-      alias: canonicalTitle,
-      language: originalLanguage,
-      alias_type: "canonical_title"
-    },
-    {
-      alias: displayTitle,
-      language: originalLanguage,
-      alias_type: "display_title"
-    },
-    {
-      alias: canonicalArtist,
-      language: originalLanguage,
-      alias_type: "artist"
-    },
-    ...aliases
-  ]);
+  rejectDuplicateAliases(
+    [canonicalTitle, displayTitle, canonicalArtist],
+    aliases
+  );
   rejectDuplicateEntries(karaokeEntries);
 
   return {
@@ -82,14 +85,14 @@ function parseAlias(value: unknown) {
   const alias = record(value);
   requireExactKeys(alias, ["alias", "language", "alias_type"]);
   const aliasType = requiredString(alias.alias_type, 64);
-  if (!(ADMIN_ALIAS_TYPES as readonly string[]).includes(aliasType)) {
-    invalid();
+  if (!(ADMIN_EDITABLE_ALIAS_TYPES as readonly string[]).includes(aliasType)) {
+    invalid("aliases.alias_type");
   }
 
   return {
     alias: requiredString(alias.alias, 512),
     language: requiredString(alias.language, 16, LANGUAGE_PATTERN),
-    alias_type: aliasType as AdminAliasType
+    alias_type: aliasType as AdminEditableAliasType
   };
 }
 
@@ -129,19 +132,27 @@ function parseEntry(value: unknown) {
 }
 
 function rejectDuplicateAliases(
-  aliases: ReadonlyArray<{ alias: string; alias_type: AdminAliasType }>
+  systemAliases: readonly string[],
+  aliases: ReadonlyArray<{
+    alias: string;
+    alias_type: AdminAliasType;
+    language?: string;
+  }>
 ): void {
   const keys = new Set<string>();
-  for (const alias of aliases) {
-    const normalized = buildAliasSearchFields(alias.alias).normalizedAlias;
+  for (const alias of systemAliases) {
+    const normalized = buildAliasSearchFields(alias).normalizedAlias;
     if (normalized === "") {
       invalid();
     }
-    const key = `${alias.alias_type}\u0000${normalized}`;
-    if (keys.has(key)) {
+    keys.add(normalized);
+  }
+  for (const alias of aliases) {
+    const normalized = buildAliasSearchFields(alias.alias).normalizedAlias;
+    if (normalized === "" || keys.has(normalized)) {
       invalid();
     }
-    keys.add(key);
+    keys.add(normalized);
   }
 }
 
@@ -182,12 +193,10 @@ function requireExactKeys(
 ): void {
   const allowed = new Set(allowedKeys);
   const inputKeys = Object.keys(input);
-  if (
-    inputKeys.length !== allowedKeys.length ||
-    inputKeys.some((key) => !allowed.has(key))
-  ) {
-    invalid();
-  }
+  const unknown = inputKeys.find((key) => !allowed.has(key));
+  if (unknown !== undefined) invalid(unknown);
+  const missing = allowedKeys.find((key) => !Object.hasOwn(input, key));
+  if (missing !== undefined) invalid(missing);
 }
 
 function requiredString(
@@ -263,6 +272,7 @@ function nullableDate(value: unknown): string | null {
   return date;
 }
 
-function invalid(): never {
+function invalid(path?: string): never {
+  if (path !== undefined) throw adminSongValidationError(path);
   throw personalizationError("VALIDATION_ERROR");
 }

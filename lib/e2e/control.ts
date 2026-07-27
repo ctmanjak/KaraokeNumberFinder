@@ -65,7 +65,7 @@ export async function createBrowserE2ESession(
     !hasExactKeys(
       body,
       ["action", "display_name", "user_id"],
-      ["oauth_state"]
+      ["oauth_state", "is_admin"]
     ) ||
     body.action !== "login" ||
     typeof body.user_id !== "string" ||
@@ -74,6 +74,7 @@ export async function createBrowserE2ESession(
     body.display_name.trim() !== body.display_name ||
     body.display_name.length === 0 ||
     body.display_name.length > MAX_DISPLAY_NAME_LENGTH ||
+    (body.is_admin !== undefined && typeof body.is_admin !== "boolean") ||
     (body.oauth_state !== undefined &&
       (typeof body.oauth_state !== "string" ||
         body.oauth_state.length < 32 ||
@@ -106,11 +107,13 @@ export async function createBrowserE2ESession(
         id: body.user_id as string,
         name: body.display_name as string,
         email: `${body.user_id as string}@e2e.invalid`,
-        emailVerified: true
+        emailVerified: true,
+        role: body.is_admin === true ? "admin" : "user"
       },
       update: {
         name: body.display_name as string,
-        emailVerified: true
+        emailVerified: true,
+        role: body.is_admin === true ? "admin" : "user"
       }
     });
     await transaction.session.create({
@@ -153,7 +156,11 @@ export async function createBrowserE2ESession(
   return new Response(
     JSON.stringify({
       authenticated: true,
-      user: { id: body.user_id, name: body.display_name }
+      user: {
+        id: body.user_id,
+        name: body.display_name,
+        is_admin: body.is_admin === true
+      }
     }),
     { status: 200, headers }
   );

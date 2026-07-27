@@ -16,7 +16,18 @@ export type PersonalizationErrorCode =
   (typeof PERSONALIZATION_ERROR_CODES)[number];
 
 export type PersonalizationHttpStatus =
-  400 | 401 | 403 | 404 | 409 | 422 | 429 | 500;
+  400 | 401 | 403 | 404 | 409 | 413 | 415 | 422 | 429 | 500 | 503;
+
+export type PersonalizationValidationIssue = Readonly<{
+  path: string;
+  message: string;
+  max?: number;
+}>;
+
+export type PersonalizationErrorDetails = Readonly<{
+  issues?: readonly PersonalizationValidationIssue[];
+  [key: string]: unknown;
+}>;
 
 type ErrorDefinition = {
   status: PersonalizationHttpStatus;
@@ -71,7 +82,8 @@ export class PersonalizationApiError<
   constructor(
     code: TCode,
     status: PersonalizationHttpStatus,
-    publicMessage: string
+    publicMessage: string,
+    readonly details?: PersonalizationErrorDetails
   ) {
     super(publicMessage);
     this.name = "PersonalizationApiError";
@@ -96,6 +108,7 @@ export type PersonalizationErrorEnvelope = {
     code: string;
     message: string;
     request_id: string;
+    details?: PersonalizationErrorDetails;
   };
 };
 
@@ -114,6 +127,7 @@ export function personalizationDomainError<TCode extends string>(definition: {
   code: TCode;
   status: PersonalizationHttpStatus;
   publicMessage: string;
+  details?: PersonalizationErrorDetails;
 }): PersonalizationApiError<TCode> {
   if (
     !/^[A-Z][A-Z0-9_]*$/u.test(definition.code) ||
@@ -126,7 +140,8 @@ export function personalizationDomainError<TCode extends string>(definition: {
   return new PersonalizationApiError(
     definition.code,
     definition.status,
-    definition.publicMessage
+    definition.publicMessage,
+    definition.details
   );
 }
 
@@ -159,7 +174,8 @@ export function createPersonalizationErrorResponse(
     error: {
       code: apiError.code,
       message: apiError.message,
-      request_id: requestId
+      request_id: requestId,
+      ...(apiError.details === undefined ? {} : { details: apiError.details })
     }
   };
   const headers = new Headers({

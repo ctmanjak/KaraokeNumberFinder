@@ -33,7 +33,12 @@
     "perf:query-shape": "vite-node scripts/perf/query-shape.ts",
     "db:validate": "prisma validate",
     "db:generate": "prisma generate",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:admin-song-preflight": "vite-node scripts/admin-song/preflight.ts",
+    "db:admin-song-backfill": "vite-node scripts/admin-song/backfill.ts",
+    "perf:admin-song-prepare": "vite-node scripts/admin-song/prepare-perf.ts",
+    "perf:admin-song-duplicate": "vite-node scripts/admin-song/perf.ts",
+    "perf:admin-song-duplicate-api": "vite-node scripts/admin-song/perf-api.ts"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "1.6.23",

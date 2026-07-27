@@ -16,7 +16,9 @@ const ADMIN_REQUEST_TIMEOUT_MS = 8_000;
 export class AdminSongClientError extends Error {
   constructor(
     readonly code: string,
-    readonly status: number | undefined
+    readonly status: number | undefined,
+    readonly payload?: unknown,
+    readonly retryAfter?: string | null
   ) {
     super(code);
     this.name = "AdminSongClientError";

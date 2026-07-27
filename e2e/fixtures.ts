@@ -29,6 +29,7 @@ type E2EUsers = Readonly<{
     user: E2EUser,
     oauthState?: string
   ): Promise<APIResponse>;
+  loginAdmin(request: APIRequestContext, user: E2EUser): Promise<APIResponse>;
 }>;
 
 const baseURL = process.env.BETTER_AUTH_URL ?? "https://127.0.0.1:3443";
@@ -66,6 +67,22 @@ export const test = base.extend<{
             user_id: user.id,
             display_name: user.name,
             ...(oauthState === undefined ? {} : { oauth_state: oauthState })
+          }
+        });
+        expect(response.status()).toBe(200);
+        return response;
+      },
+      async loginAdmin(apiRequest, user) {
+        const response = await apiRequest.post("/api/e2e/control", {
+          headers: {
+            ...controlHeaders(),
+            "content-type": "application/json"
+          },
+          data: {
+            action: "login",
+            user_id: user.id,
+            display_name: user.name,
+            is_admin: true
           }
         });
         expect(response.status()).toBe(200);

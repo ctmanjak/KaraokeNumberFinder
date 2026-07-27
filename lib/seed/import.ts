@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import { buildAliasSearchFields } from "../search/normalize";
+import { normalizeSongIdentity } from "../song-identity/normalize";
 import { parseCsv, recordsFromCsvRows, type CsvRecord } from "./csv";
 import {
   formatSeedValidationIssue,
@@ -33,6 +35,8 @@ export type SongImportData = {
   canonicalTitle: string;
   displayTitle: string;
   canonicalArtist: string;
+  normalizedCanonicalTitle: string;
+  normalizedCanonicalArtist: string;
   releaseYear: number | null;
   tieIn: string | null;
   sourceUrl: string | null;
@@ -184,6 +188,7 @@ export async function importSeedDirectory(
     for (const table of tables) {
       await upsertTable(tx, table, rowPlansByFile.get(table.file) ?? []);
     }
+    await ensureSystemAliases(tx, tables);
   });
 
   return { ...plan, mode, applied: true };
@@ -353,12 +358,18 @@ function parseProvider(record: CsvRecord): ProviderImportData {
 }
 
 function parseSong(record: CsvRecord): SongImportData {
+  const identity = normalizeSongIdentity({
+    canonical_title: record.values.canonical_title,
+    canonical_artist: record.values.canonical_artist
+  });
   return {
     id: record.values.id,
     originalLanguage: record.values.original_language,
     canonicalTitle: record.values.canonical_title,
     displayTitle: record.values.display_title,
     canonicalArtist: record.values.canonical_artist,
+    normalizedCanonicalTitle: identity.normalizedCanonicalTitle,
+    normalizedCanonicalArtist: identity.normalizedCanonicalArtist,
     releaseYear: nullableInteger(record.values.release_year),
     tieIn: nullableString(record.values.tie_in),
     sourceUrl: nullableString(record.values.source_url),
@@ -422,6 +433,80 @@ async function upsertTable(
       create: row,
       update: withoutId(row)
     });
+  }
+}
+
+async function ensureSystemAliases(
+  tx: SeedImportTransactionClient,
+  tables: readonly SeedImportTable[]
+): Promise<void> {
+  const songTable = tables.find(
+    (table): table is SeedImportTable<"songs.csv"> => table.file === "songs.csv"
+  );
+  const aliasTable = tables.find(
+    (table): table is SeedImportTable<"song_aliases.csv"> =>
+      table.file === "song_aliases.csv"
+  );
+  if (songTable === undefined || aliasTable === undefined) {
+    throw new Error("Song and alias seed tables are required.");
+  }
+  for (const song of songTable.data) {
+    const systemValues = [
+      {
+        aliasType: "canonical_title",
+        alias: song.canonicalTitle
+      },
+      {
+        aliasType: "display_title",
+        alias: song.displayTitle
+      },
+      {
+        aliasType: "artist",
+        alias: song.canonicalArtist
+      }
+    ] as const;
+    for (const system of systemValues) {
+      const search = buildAliasSearchFields(system.alias);
+      const existing = aliasTable.data.find(
+        (alias) =>
+          alias.songId === song.id &&
+          alias.aliasType === system.aliasType &&
+          alias.normalizedAlias === search.normalizedAlias
+      );
+      if (existing !== undefined) {
+        continue;
+      }
+      const row: AliasImportData = {
+        id: `alias_system_${song.id}_${system.aliasType}`,
+        songId: song.id,
+        alias: system.alias,
+        language: song.originalLanguage,
+        aliasType: system.aliasType,
+        normalizedAlias: search.normalizedAlias,
+        chosungAlias: search.chosungAlias || null,
+        sourceUrl: song.sourceUrl,
+        sourceName: song.sourceName,
+        verifiedBy: song.verifiedBy,
+        verificationNote: song.verificationNote
+      };
+      const [stored] = await tx.songAlias.findMany({
+        where: { id: { in: [row.id] } }
+      });
+      if (
+        stored !== undefined &&
+        sameImportData(
+          stored as unknown as Record<string, unknown>,
+          row as unknown as Record<string, unknown>
+        )
+      ) {
+        continue;
+      }
+      await tx.songAlias.upsert({
+        where: { id: row.id },
+        create: row,
+        update: withoutId(row)
+      });
+    }
   }
 }
 

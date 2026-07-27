@@ -9,7 +9,7 @@ import {
 import { encodeAdminSongCursor } from "./cursor";
 import type { AdminSongListQuery } from "./list-contract";
 import {
-  ADMIN_ALIAS_TYPES,
+  ADMIN_EDITABLE_ALIAS_TYPES,
   ADMIN_AVAILABILITY_STATUSES,
   type AdminSongInput
 } from "./types";
@@ -21,7 +21,7 @@ export function createAdminSongService(repository: AdminSongRepository) {
     async getOptions(userId: string) {
       try {
         return {
-          alias_types: ADMIN_ALIAS_TYPES,
+          alias_types: ADMIN_EDITABLE_ALIAS_TYPES,
           availability_statuses: ADMIN_AVAILABILITY_STATUSES,
           providers: await repository.getOptions(userId)
         };

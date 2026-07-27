@@ -138,6 +138,8 @@ async function createSong(prisma: PrismaClient): Promise<string> {
       canonicalTitle: "Favorite Integration Test Song",
       displayTitle: "Favorite Integration Test Song",
       canonicalArtist: "Favorite Integration Test Artist",
+      normalizedCanonicalTitle: "favoriteintegrationtestsong",
+      normalizedCanonicalArtist: "favoriteintegrationtestartist",
       verifiedBy: "m3-favorite-integration-test"
     },
     select: { id: true }

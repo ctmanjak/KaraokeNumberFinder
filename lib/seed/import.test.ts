@@ -51,6 +51,8 @@ describe("importSeedDirectory", () => {
           canonicalTitle: "Fixture Original Title",
           displayTitle: "Old Display Title",
           canonicalArtist: "Fixture Artist",
+          normalizedCanonicalTitle: "fixturetitle",
+          normalizedCanonicalArtist: "fixtureartist",
           releaseYear: 2024,
           tieIn: "Fixture Series OP",
           sourceUrl: "https://example.com/song",
@@ -129,11 +131,13 @@ describe("importSeedDirectory", () => {
       "songAlias:alias_fixture_001_ko",
       "songAlias:alias_fixture_001_ro",
       "karaokeEntry:entry_fixture_001_alpha",
-      "karaokeEntry:entry_fixture_001_beta"
+      "karaokeEntry:entry_fixture_001_beta",
+      "songAlias:alias_system_song_fixture_001_canonical_title",
+      "songAlias:alias_system_song_fixture_001_artist"
     ]);
     expect(db.store.karaokeProvider.size).toBe(2);
     expect(db.store.song.size).toBe(1);
-    expect(db.store.songAlias.size).toBe(2);
+    expect(db.store.songAlias.size).toBe(4);
     expect(db.store.karaokeEntry.size).toBe(2);
   });
 

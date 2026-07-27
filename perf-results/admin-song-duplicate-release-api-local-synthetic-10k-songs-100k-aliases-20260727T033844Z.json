@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-27T03:38:44.099Z",
+  "dataset": {
+    "label": "synthetic-10k-songs-100k-aliases",
+    "songs": 10000,
+    "aliases": 100000,
+    "environment": "local-disposable-release-build-api"
+  },
+  "gate": {
+    "p95_ms": 100,
+    "candidate_limit": 5,
+    "passed": true
+  },
+  "scenarios": [
+    {
+      "scenario": "exact_hit",
+      "warmup": 5,
+      "iterations": 30,
+      "p50_ms": 54.154,
+      "p95_ms": 57.251,
+      "min_ms": 51.612,
+      "max_ms": 108.671,
+      "max_candidates": 1,
+      "candidate_query_count": 1,
+      "max_response_bytes": 1007,
+      "passed": true
+    },
+    {
+      "scenario": "none",
+      "warmup": 5,
+      "iterations": 30,
+      "p50_ms": 49.463,
+      "p95_ms": 50.906,
+      "min_ms": 47.611,
+      "max_ms": 50.987,
+      "max_candidates": 0,
+      "candidate_query_count": 1,
+      "max_response_bytes": 41,
+      "passed": true
+    },
+    {
+      "scenario": "title_prefix",
+      "warmup": 5,
+      "iterations": 30,
+      "p50_ms": 53.47,
+      "p95_ms": 70.336,
+      "min_ms": 51.457,
+      "max_ms": 117.936,
+      "max_candidates": 5,
+      "candidate_query_count": 1,
+      "max_response_bytes": 4448,
+      "passed": true
+    },
+    {
+      "scenario": "high_candidate_partial",
+      "warmup": 5,
+      "iterations": 30,
+      "p50_ms": 48.769,
+      "p95_ms": 51.255,
+      "min_ms": 46.903,
+      "max_ms": 51.471,
+      "max_candidates": 5,
+      "candidate_query_count": 1,
+      "max_response_bytes": 4262,
+      "passed": true
+    },
+    {
+      "scenario": "display_title_match",
+      "warmup": 5,
+      "iterations": 30,
+      "p50_ms": 49.699,
+      "p95_ms": 88.454,
+      "min_ms": 48.011,
+      "max_ms": 89.897,
+      "max_candidates": 1,
+      "candidate_query_count": 1,
+      "max_response_bytes": 993,
+      "passed": true
+    },
+    {
+      "scenario": "saved_alias_match",
+      "warmup": 5,
+      "iterations": 30,
+      "p50_ms": 50.067,
+      "p95_ms": 51.793,
+      "min_ms": 47.7,
+      "max_ms": 52.732,
+      "max_candidates": 1,
+      "candidate_query_count": 1,
+      "max_response_bytes": 1007,
+      "passed": true
+    },
+    {
+      "scenario": "title_and_artist_signals",
+      "warmup": 5,
+      "iterations": 30,
+      "p50_ms": 64.79,
+      "p95_ms": 83.523,
+      "min_ms": 62.683,
+      "max_ms": 118.316,
+      "max_candidates": 1,
+      "candidate_query_count": 1,
+      "max_response_bytes": 1007,
+      "passed": true
+    },
+    {
+      "scenario": "exclude_current_song",
+      "warmup": 5,
+      "iterations": 30,
+      "p50_ms": 51.967,
+      "p95_ms": 53.547,
+      "min_ms": 50.321,
+      "max_ms": 55.484,
+      "max_candidates": 0,
+      "candidate_query_count": 1,
+      "max_response_bytes": 41,
+      "passed": true
+    }
+  ]
+}

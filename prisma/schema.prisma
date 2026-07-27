@@ -39,23 +39,26 @@ enum UserRole {
 }
 
 model Song {
-  id               String         @id @db.VarChar(128)
-  originalLanguage String         @map("original_language") @db.VarChar(16)
-  canonicalTitle   String         @map("canonical_title") @db.VarChar(512)
-  displayTitle     String         @map("display_title") @db.VarChar(512)
-  canonicalArtist  String         @map("canonical_artist") @db.VarChar(512)
-  releaseYear      Int?           @map("release_year")
-  tieIn            String?        @map("tie_in") @db.VarChar(512)
-  sourceUrl        String?        @map("source_url") @db.Text
-  sourceName       String?        @map("source_name") @db.VarChar(256)
-  verifiedBy       String         @map("verified_by") @db.VarChar(128)
-  verificationNote String?        @map("verification_note") @db.Text
-  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
-  aliases          SongAlias[]
-  karaokeEntries   KaraokeEntry[]
-  favorites        Favorite[]
+  id                        String         @id @db.VarChar(128)
+  originalLanguage          String         @map("original_language") @db.VarChar(16)
+  canonicalTitle            String         @map("canonical_title") @db.VarChar(512)
+  displayTitle              String         @map("display_title") @db.VarChar(512)
+  canonicalArtist           String         @map("canonical_artist") @db.VarChar(512)
+  normalizedCanonicalTitle  String         @map("normalized_canonical_title") @db.VarChar(512)
+  normalizedCanonicalArtist String         @map("normalized_canonical_artist") @db.VarChar(512)
+  releaseYear               Int?           @map("release_year")
+  tieIn                     String?        @map("tie_in") @db.VarChar(512)
+  sourceUrl                 String?        @map("source_url") @db.Text
+  sourceName                String?        @map("source_name") @db.VarChar(256)
+  verifiedBy                String         @map("verified_by") @db.VarChar(128)
+  verificationNote          String?        @map("verification_note") @db.Text
+  createdAt                 DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  aliases                   SongAlias[]
+  karaokeEntries            KaraokeEntry[]
+  favorites                 Favorite[]
 
+  @@unique([normalizedCanonicalTitle, normalizedCanonicalArtist], map: "songs_normalized_canonical_title_artist_key")
   @@index([originalLanguage], map: "songs_original_language_idx")
   @@index([displayTitle], map: "songs_display_title_idx")
   @@index([canonicalTitle], map: "songs_canonical_title_idx")
