@@ -35,8 +35,8 @@ export type SongImportData = {
   canonicalTitle: string;
   displayTitle: string;
   canonicalArtist: string;
-  normalizedCanonicalTitle: string;
-  normalizedCanonicalArtist: string;
+  normalizedCanonicalTitle: string | null;
+  normalizedCanonicalArtist: string | null;
   releaseYear: number | null;
   tieIn: string | null;
   sourceUrl: string | null;
@@ -171,7 +171,8 @@ export async function importSeedDirectory(
   }
 
   const tables = readSeedImportTables(seedDir);
-  const plan = await buildSeedImportPlan(db, tables, validation);
+  const planningTables = includeSystemAliasCandidates(tables);
+  const plan = await buildSeedImportPlan(db, planningTables, validation);
 
   if (mode === "dry-run") {
     return { ...plan, mode, applied: false };
@@ -440,6 +441,44 @@ async function ensureSystemAliases(
   tx: SeedImportTransactionClient,
   tables: readonly SeedImportTable[]
 ): Promise<void> {
+  for (const row of buildSystemAliasCandidates(tables)) {
+    const [stored] = await tx.songAlias.findMany({
+      where: { id: { in: [row.id] } }
+    });
+    if (
+      stored !== undefined &&
+      sameImportData(
+        stored as unknown as Record<string, unknown>,
+        row as unknown as Record<string, unknown>
+      )
+    ) {
+      continue;
+    }
+    await tx.songAlias.upsert({
+      where: { id: row.id },
+      create: row,
+      update: withoutId(row)
+    });
+  }
+}
+
+function includeSystemAliasCandidates(
+  tables: readonly SeedImportTable[]
+): SeedImportTable[] {
+  const candidates = buildSystemAliasCandidates(tables);
+  return tables.map((table) =>
+    table.file === "song_aliases.csv"
+      ? ({
+          ...table,
+          data: [...(table.data as AliasImportData[]), ...candidates]
+        } as SeedImportTable)
+      : table
+  );
+}
+
+function buildSystemAliasCandidates(
+  tables: readonly SeedImportTable[]
+): AliasImportData[] {
   const songTable = tables.find(
     (table): table is SeedImportTable<"songs.csv"> => table.file === "songs.csv"
   );
@@ -450,6 +489,7 @@ async function ensureSystemAliases(
   if (songTable === undefined || aliasTable === undefined) {
     throw new Error("Song and alias seed tables are required.");
   }
+  const candidates: AliasImportData[] = [];
   for (const song of songTable.data) {
     const systemValues = [
       {
@@ -489,25 +529,10 @@ async function ensureSystemAliases(
         verifiedBy: song.verifiedBy,
         verificationNote: song.verificationNote
       };
-      const [stored] = await tx.songAlias.findMany({
-        where: { id: { in: [row.id] } }
-      });
-      if (
-        stored !== undefined &&
-        sameImportData(
-          stored as unknown as Record<string, unknown>,
-          row as unknown as Record<string, unknown>
-        )
-      ) {
-        continue;
-      }
-      await tx.songAlias.upsert({
-        where: { id: row.id },
-        create: row,
-        update: withoutId(row)
-      });
+      candidates.push(row);
     }
   }
+  return candidates;
 }
 
 function modelFor(

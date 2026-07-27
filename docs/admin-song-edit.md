@@ -33,11 +33,14 @@ The normalized song identity rollout is intentionally split:
 4. Re-run preflight. Contract is allowed only when empty identities, stored/raw
    drift, exact duplicate groups, and missing/duplicate corresponding system
    aliases are all zero.
-5. Apply
+5. Execute
+   `prisma/contract-migrations/20260727091000_contract_song_normalized_identity/create-index-concurrently.sql`
+   as its own database command. After it succeeds, apply
    `prisma/contract-migrations/20260727091000_contract_song_normalized_identity/migration.sql`
-   only after promoting it into a new, later `prisma/migrations/<timestamp>_contract_song_normalized_identity/`
-   directory in the contract release. It adds `NOT NULL` and the fixed
-   `songs_normalized_canonical_title_artist_key` composite unique constraint.
+   as the short contract transaction. Promote both steps into a new, later
+   contract release only after the data gates pass. They add `NOT NULL` and the
+   fixed `songs_normalized_canonical_title_artist_key` composite unique
+   constraint without building the index inside the constraint transaction.
 
 Do not run all rollout phases as one unattended existing-database deployment.
 The expand application release, preflight/backfill, and contract step are

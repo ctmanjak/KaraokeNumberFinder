@@ -9,11 +9,7 @@ import type {
   AdminEditableAliasType,
   AdminSongOptions
 } from "@/lib/admin-song/types";
-import { checkAdminSongDuplicate } from "@/lib/admin-song-duplicate/client";
-import type {
-  CandidateSummary,
-  DuplicateCheckResult
-} from "@/lib/admin-song-duplicate/types";
+import type { CandidateSummary } from "@/lib/admin-song-duplicate/types";
 import {
   fetchAdminSongDetail,
   updateAdminSongDetail
@@ -23,7 +19,7 @@ import type {
   AdminSongPatchInput
 } from "@/lib/admin-song-detail/types";
 import { AdminSongClientError } from "@/lib/admin-song/client";
-import { normalizeSearchText } from "@/lib/search/normalize";
+import { useDuplicateCheck, type DuplicateState } from "./useDuplicateCheck";
 
 type SongDraft = {
   original_language: string;
@@ -67,25 +63,10 @@ type EditDraft = {
   entries: EntryDraft[];
 };
 
-type DuplicateState =
-  | { status: "idle" }
-  | { status: "checking" | "retrying" }
-  | ({ status: "none" | "possible" | "exact" } & DuplicateCheckResult)
-  | {
-      status: "error";
-      message: string;
-      retryAfter?: string;
-    };
-
 export function AdminSongDetailPage({ songId }: Readonly<{ songId: string }>) {
   const auth = useAuth();
   const nextKey = useRef(1);
   const statusRef = useRef<HTMLDivElement>(null);
-  const duplicateController = useRef<AbortController | null>(null);
-  const duplicateSequence = useRef(0);
-  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const manualNoAutoRetry = useRef(false);
-  const previousFingerprint = useRef("");
   const [detail, setDetail] = useState<AdminSongDetail | null>(null);
   const [options, setOptions] = useState<AdminSongOptions | null>(null);
   const [draft, setDraft] = useState<EditDraft | null>(null);
@@ -93,16 +74,36 @@ export function AdminSongDetailPage({ songId }: Readonly<{ songId: string }>) {
     "loading" | "ready" | "not_found" | "forbidden" | "error"
   >("loading");
   const [reloadKey, setReloadKey] = useState(0);
-  const [duplicateNonce, setDuplicateNonce] = useState(0);
-  const [duplicate, setDuplicate] = useState<DuplicateState>({
-    status: "idle"
-  });
-  const [acknowledged, setAcknowledged] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
   const [catalogDisabled, setCatalogDisabled] = useState(false);
+  const identityChanged =
+    detail !== null &&
+    draft !== null &&
+    (draft.song.original_language !== detail.song.original_language ||
+      draft.song.canonical_title !== detail.song.canonical_title ||
+      draft.song.display_title !== detail.song.display_title ||
+      draft.song.canonical_artist !== detail.song.canonical_artist);
+  const {
+    state: duplicate,
+    acknowledged,
+    setAcknowledged,
+    reset: resetDuplicate,
+    retry: retryDuplicate
+  } = useDuplicateCheck({
+    songId,
+    identityChanged,
+    catalogDisabled,
+    identity: {
+      originalLanguage: draft?.song.original_language ?? "",
+      canonicalTitle: draft?.song.canonical_title ?? "",
+      displayTitle: draft?.song.display_title ?? "",
+      canonicalArtist: draft?.song.canonical_artist ?? ""
+    },
+    onCatalogDisabled: setCatalogDisabled
+  });
 
   const loadIdentity =
     auth.state.status === "authenticated"
@@ -124,8 +125,7 @@ export function AdminSongDetailPage({ songId }: Readonly<{ songId: string }>) {
         setDetail(loadedDetail);
         setOptions(loadedOptions);
         setDraft(toDraft(loadedDetail));
-        setDuplicate({ status: "idle" });
-        setAcknowledged(false);
+        resetDuplicate();
         setStale(false);
         setCatalogDisabled(false);
         setSaveError(null);
@@ -173,144 +173,6 @@ export function AdminSongDetailPage({ songId }: Readonly<{ songId: string }>) {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
-
-  const identityChanged =
-    detail !== null &&
-    draft !== null &&
-    (draft.song.original_language !== detail.song.original_language ||
-      draft.song.canonical_title !== detail.song.canonical_title ||
-      draft.song.display_title !== detail.song.display_title ||
-      draft.song.canonical_artist !== detail.song.canonical_artist);
-  const canonicalNormalized = normalizeSearchText(
-    draft?.song.canonical_title ?? ""
-  );
-  const artistNormalized = normalizeSearchText(
-    draft?.song.canonical_artist ?? ""
-  );
-  const displayNormalized = normalizeSearchText(
-    draft?.song.display_title ?? ""
-  );
-  const duplicateCanonicalTitle = draft?.song.canonical_title ?? "";
-  const duplicateDisplayTitle = draft?.song.display_title ?? "";
-  const duplicateCanonicalArtist = draft?.song.canonical_artist ?? "";
-  const duplicateInputValid =
-    canonicalNormalized !== "" &&
-    artistNormalized !== "" &&
-    (draft?.song.canonical_title.length ?? 0) <= 512 &&
-    (draft?.song.canonical_artist.length ?? 0) <= 512;
-  const fingerprint =
-    draft === null
-      ? ""
-      : [
-          draft.song.original_language,
-          canonicalNormalized,
-          displayNormalized,
-          artistNormalized
-        ].join("\u0000");
-
-  useEffect(() => {
-    if (!identityChanged || !duplicateInputValid || catalogDisabled) {
-      duplicateController.current?.abort();
-      if (retryTimer.current !== null) clearTimeout(retryTimer.current);
-      previousFingerprint.current = fingerprint;
-      queueMicrotask(() => {
-        setDuplicate({ status: "idle" });
-        setAcknowledged(false);
-      });
-      return;
-    }
-
-    const isNewFingerprint = previousFingerprint.current !== fingerprint;
-    previousFingerprint.current = fingerprint;
-    if (isNewFingerprint) {
-      queueMicrotask(() => setAcknowledged(false));
-      manualNoAutoRetry.current = false;
-    }
-    duplicateController.current?.abort();
-    if (retryTimer.current !== null) clearTimeout(retryTimer.current);
-    const controller = new AbortController();
-    duplicateController.current = controller;
-    const sequence = ++duplicateSequence.current;
-    const allowAutoRetry = !manualNoAutoRetry.current;
-    manualNoAutoRetry.current = false;
-    queueMicrotask(() => setDuplicate({ status: "checking" }));
-
-    const run = async (attempt: number) => {
-      try {
-        const result = await checkAdminSongDuplicate(
-          {
-            canonical_title: duplicateCanonicalTitle,
-            display_title: duplicateDisplayTitle,
-            canonical_artist: duplicateCanonicalArtist,
-            exclude_song_id: songId
-          },
-          fetch,
-          controller.signal
-        );
-        if (
-          controller.signal.aborted ||
-          sequence !== duplicateSequence.current
-        ) {
-          return;
-        }
-        setDuplicate({ status: result.classification, ...result });
-        setAcknowledged(false);
-      } catch (error) {
-        if (
-          controller.signal.aborted ||
-          sequence !== duplicateSequence.current
-        ) {
-          return;
-        }
-        if (
-          error instanceof AdminSongClientError &&
-          error.code === "ADMIN_CATALOG_NOT_ENABLED"
-        ) {
-          setCatalogDisabled(true);
-          setDuplicate({
-            status: "error",
-            message: duplicateErrorMessage(error)
-          });
-          return;
-        }
-        const retryable =
-          !(error instanceof AdminSongClientError) ||
-          (error.status !== undefined && error.status >= 500);
-        if (attempt === 0 && allowAutoRetry && retryable) {
-          setDuplicate({ status: "retrying" });
-          retryTimer.current = setTimeout(() => {
-            void run(1);
-          }, 1_000);
-          return;
-        }
-        setDuplicate({
-          status: "error",
-          message: duplicateErrorMessage(error),
-          ...(error instanceof AdminSongClientError &&
-          error.retryAfter !== null &&
-          error.retryAfter !== undefined
-            ? { retryAfter: error.retryAfter }
-            : {})
-        });
-      }
-    };
-    const debounce = setTimeout(() => void run(0), 500);
-    return () => {
-      clearTimeout(debounce);
-      if (retryTimer.current !== null) clearTimeout(retryTimer.current);
-      controller.abort();
-    };
-  }, [
-    catalogDisabled,
-    duplicateCanonicalArtist,
-    duplicateCanonicalTitle,
-    duplicateDisplayTitle,
-    duplicateInputValid,
-    duplicateNonce,
-    fingerprint,
-    identityChanged,
-    songId
-  ]);
 
   useEffect(() => {
     if (saveError !== null || stale) {
@@ -372,6 +234,7 @@ export function AdminSongDetailPage({ songId }: Readonly<{ songId: string }>) {
     identityChanged &&
     (duplicate.status === "checking" ||
       duplicate.status === "retrying" ||
+      duplicate.status === "invalid" ||
       duplicate.status === "error" ||
       duplicate.status === "idle" ||
       duplicate.status === "exact" ||
@@ -398,8 +261,7 @@ export function AdminSongDetailPage({ songId }: Readonly<{ songId: string }>) {
       );
       setDetail(result.detail);
       setDraft(toDraft(result.detail));
-      setDuplicate({ status: "idle" });
-      setAcknowledged(false);
+      resetDuplicate();
       setSaveSuccess("변경사항을 저장했습니다.");
       setStale(false);
     } catch (error) {
@@ -416,14 +278,7 @@ export function AdminSongDetailPage({ songId }: Readonly<{ songId: string }>) {
           error.code === "DUPLICATE_SONG" ||
           error.code === "POSSIBLE_DUPLICATE_CONFIRMATION_REQUIRED"
         ) {
-          const candidates = candidatesFromError(error);
-          setDuplicate({
-            status: error.code === "DUPLICATE_SONG" ? "exact" : "possible",
-            classification:
-              error.code === "DUPLICATE_SONG" ? "exact" : "possible",
-            candidates
-          });
-          setAcknowledged(false);
+          retryDuplicate();
           setSaveError(
             error.code === "DUPLICATE_SONG"
               ? "같은 원제와 가수의 곡이 이미 있습니다."
@@ -671,19 +526,17 @@ export function AdminSongDetailPage({ songId }: Readonly<{ songId: string }>) {
               className="tertiary-button"
               type="button"
               disabled={draft.aliases.length >= detail.limits.aliases}
-              onClick={() =>
+              onClick={() => {
+                const alias = newAlias(`new-${nextKey.current++}`);
                 setDraft((current) =>
                   current === null
                     ? current
                     : {
                         ...current,
-                        aliases: [
-                          ...current.aliases,
-                          newAlias(`new-${nextKey.current++}`)
-                        ]
+                        aliases: [...current.aliases, alias]
                       }
-                )
-              }
+                );
+              }}
             >
               별칭 추가
             </button>
@@ -713,22 +566,20 @@ export function AdminSongDetailPage({ songId }: Readonly<{ songId: string }>) {
                 draft.entries.length >= detail.limits.karaoke_entries ||
                 options.providers.length === 0
               }
-              onClick={() =>
+              onClick={() => {
+                const entry = newEntry(
+                  `new-${nextKey.current++}`,
+                  options.providers[0].id
+                );
                 setDraft((current) =>
                   current === null
                     ? current
                     : {
                         ...current,
-                        entries: [
-                          ...current.entries,
-                          newEntry(
-                            `new-${nextKey.current++}`,
-                            options.providers[0].id
-                          )
-                        ]
+                        entries: [...current.entries, entry]
                       }
-                )
-              }
+                );
+              }}
             >
               제공사 수록 정보 추가
             </button>
@@ -739,10 +590,7 @@ export function AdminSongDetailPage({ songId }: Readonly<{ songId: string }>) {
               state={duplicate}
               acknowledged={acknowledged}
               onAcknowledged={setAcknowledged}
-              onRetry={() => {
-                manualNoAutoRetry.current = true;
-                setDuplicateNonce((value) => value + 1);
-              }}
+              onRetry={retryDuplicate}
             />
           ) : null}
 
@@ -937,6 +785,13 @@ function DuplicatePanel({
         {state.status === "checking"
           ? "중복 확인 중…"
           : "중복 확인을 다시 시도하는 중…"}
+      </div>
+    );
+  }
+  if (state.status === "invalid") {
+    return (
+      <div className="status-box status-box-error" role="alert">
+        <p>{state.message}</p>
       </div>
     );
   }
@@ -1265,21 +1120,6 @@ function nullable(value: string): string | null {
   return trimmed === "" ? null : trimmed;
 }
 
-function duplicateErrorMessage(error: unknown): string {
-  if (error instanceof AdminSongClientError) {
-    if (error.status === 429) {
-      return "중복 확인 요청이 제한되었습니다. 안내된 시간 이후 다시 시도해 주세요.";
-    }
-    if (error.code === "ADMIN_CATALOG_NOT_ENABLED") {
-      return "관리자 카탈로그가 비활성화되었습니다.";
-    }
-    if (error.status !== undefined && error.status < 500) {
-      return "중복 확인 요청을 처리할 수 없습니다. 입력과 권한을 확인해 주세요.";
-    }
-  }
-  return "중복 확인에 실패했습니다.";
-}
-
 function saveErrorMessage(error: AdminSongClientError): string {
   if (error.code === "VALIDATION_ERROR") {
     return "필수 입력과 각 행의 출처·확인일·검수 메모를 확인해 주세요.";
@@ -1291,23 +1131,4 @@ function saveErrorMessage(error: AdminSongClientError): string {
     return "시스템 별칭 데이터 정리가 필요해 현재 곡을 수정할 수 없습니다.";
   }
   return "저장하지 못했습니다. 입력은 유지됩니다.";
-}
-
-function candidatesFromError(error: AdminSongClientError): CandidateSummary[] {
-  const payload = error.payload;
-  if (
-    typeof payload !== "object" ||
-    payload === null ||
-    !("error" in payload) ||
-    typeof payload.error !== "object" ||
-    payload.error === null ||
-    !("details" in payload.error) ||
-    typeof payload.error.details !== "object" ||
-    payload.error.details === null ||
-    !("candidates" in payload.error.details) ||
-    !Array.isArray(payload.error.details.candidates)
-  ) {
-    return [];
-  }
-  return payload.error.details.candidates as CandidateSummary[];
 }

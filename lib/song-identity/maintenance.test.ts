@@ -72,6 +72,14 @@ describe("song identity maintenance", () => {
     expect(result.before.release_blocked).toBe(true);
     expect(result.updated_song_count).toBe(1);
     expect(result.after.release_blocked).toBe(false);
+    expect(String(query.mock.calls[5]?.[0])).toContain(
+      "FROM unnest($1::text[], $2::text[], $3::text[])"
+    );
+    expect(query.mock.calls[5]?.[1]).toEqual([
+      ["song_a"],
+      ["lemon"],
+      ["artist"]
+    ]);
     expect(query.mock.calls.at(-1)?.[0]).toBe("COMMIT");
   });
 

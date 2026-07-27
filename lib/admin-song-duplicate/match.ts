@@ -1,6 +1,10 @@
 import { normalizeSearchText } from "../search/normalize";
 import { normalizeSongIdentity } from "../song-identity/normalize";
-import type { DuplicateCheckInput, DuplicateMatchStrength } from "./types";
+import {
+  DUPLICATE_MIN_PARTIAL_INPUT_LENGTH,
+  type DuplicateCheckInput,
+  type DuplicateMatchStrength
+} from "./types";
 
 export type NormalizedDuplicateInput = Readonly<{
   canonicalTitle: string;
@@ -37,7 +41,9 @@ export function duplicateMatchStrength(
   normalizedInput: string
 ): DuplicateMatchStrength | null {
   if (normalizedCandidate === normalizedInput) return "exact";
-  if (Array.from(normalizedInput).length < 2) return null;
+  if (Array.from(normalizedInput).length < DUPLICATE_MIN_PARTIAL_INPUT_LENGTH) {
+    return null;
+  }
   if (normalizedCandidate.startsWith(normalizedInput)) return "prefix";
   if (normalizedCandidate.includes(normalizedInput)) return "partial";
   return null;

@@ -81,4 +81,31 @@ describe("actual JSON request byte limits", () => {
       expect.objectContaining({ code: "UNSUPPORTED_MEDIA_TYPE", status: 415 })
     );
   });
+
+  it("accepts only balanced optional quotes around the UTF-8 charset", () => {
+    for (const charset of ["utf-8", '"utf-8"']) {
+      expect(() =>
+        requireJsonContentType(
+          new Request("https://knf.example/test", {
+            headers: {
+              "content-type": `application/json; charset=${charset}`
+            }
+          })
+        )
+      ).not.toThrow();
+    }
+    for (const charset of ['"utf-8', 'utf-8"']) {
+      expect(() =>
+        requireJsonContentType(
+          new Request("https://knf.example/test", {
+            headers: {
+              "content-type": `application/json; charset=${charset}`
+            }
+          })
+        )
+      ).toThrowError(
+        expect.objectContaining({ code: "UNSUPPORTED_MEDIA_TYPE", status: 415 })
+      );
+    }
+  });
 });

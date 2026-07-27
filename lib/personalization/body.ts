@@ -73,7 +73,7 @@ export function requireJsonContentType(request: Request): void {
   if (parameters.length > 1) throw unsupportedMediaTypeError();
   if (
     parameters.length === 1 &&
-    !/^charset\s*=\s*"?utf-8"?$/iu.test(parameters[0].trim())
+    !/^charset\s*=\s*(?:utf-8|"utf-8")$/iu.test(parameters[0].trim())
   ) {
     throw unsupportedMediaTypeError();
   }

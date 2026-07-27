@@ -51,6 +51,7 @@ export type SongIdentityPreflightReport = Readonly<{
 }>;
 
 type MaintenanceClient = Pick<PoolClient, "query">;
+const BACKFILL_BATCH_SIZE = 500;
 
 export async function preflightSongIdentity(
   client: MaintenanceClient
@@ -231,27 +232,33 @@ export async function backfillSongIdentity(
       ORDER BY id ASC
       FOR UPDATE
     `);
-    for (const row of rows.rows) {
-      const identity = normalizeSongIdentity({
-        canonical_title: row.canonical_title,
-        canonical_artist: row.canonical_artist
-      });
+    for (const batch of batches(rows.rows, BACKFILL_BATCH_SIZE)) {
+      const ids: string[] = [];
+      const titles: string[] = [];
+      const artists: string[] = [];
+      for (const row of batch) {
+        const identity = normalizeSongIdentity({
+          canonical_title: row.canonical_title,
+          canonical_artist: row.canonical_artist
+        });
+        ids.push(row.id);
+        titles.push(identity.normalizedCanonicalTitle);
+        artists.push(identity.normalizedCanonicalArtist);
+      }
       const update = await client.query(
         `
-          UPDATE songs
-          SET normalized_canonical_title = $2,
-              normalized_canonical_artist = $3
-          WHERE id = $1
+          UPDATE songs AS song
+          SET normalized_canonical_title = input.title,
+              normalized_canonical_artist = input.artist
+          FROM unnest($1::text[], $2::text[], $3::text[])
+            AS input(id, title, artist)
+          WHERE song.id = input.id
             AND (
-              normalized_canonical_title IS DISTINCT FROM $2
-              OR normalized_canonical_artist IS DISTINCT FROM $3
+              song.normalized_canonical_title IS DISTINCT FROM input.title
+              OR song.normalized_canonical_artist IS DISTINCT FROM input.artist
             )
         `,
-        [
-          row.id,
-          identity.normalizedCanonicalTitle,
-          identity.normalizedCanonicalArtist
-        ]
+        [ids, titles, artists]
       );
       updatedSongCount += update.rowCount ?? 0;
     }
@@ -272,6 +279,15 @@ export async function backfillSongIdentity(
       await client.query("ROLLBACK");
     }
     throw error;
+  }
+}
+
+function* batches<T>(
+  rows: readonly T[],
+  size: number
+): Generator<readonly T[]> {
+  for (let index = 0; index < rows.length; index += size) {
+    yield rows.slice(index, index + size);
   }
 }
 

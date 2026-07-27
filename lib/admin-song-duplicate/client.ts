@@ -4,7 +4,11 @@ import {
   readJson
 } from "../http/client";
 import { AdminSongClientError } from "../admin-song/client";
-import type { DuplicateCheckInput, DuplicateCheckResult } from "./types";
+import {
+  DUPLICATE_CANDIDATE_LIMIT,
+  type DuplicateCheckInput,
+  type DuplicateCheckResult
+} from "./types";
 
 const DUPLICATE_CHECK_CLIENT_TIMEOUT_MS = 4_000;
 
@@ -59,7 +63,7 @@ function isDuplicateCheckResult(value: unknown): value is DuplicateCheckResult {
     return false;
   }
   return (
-    value.candidates.length <= 5 &&
+    value.candidates.length <= DUPLICATE_CANDIDATE_LIMIT &&
     value.candidates.every(
       (candidate) =>
         typeof candidate === "object" &&
@@ -69,7 +73,9 @@ function isDuplicateCheckResult(value: unknown): value is DuplicateCheckResult {
         "display_title" in candidate &&
         typeof candidate.display_title === "string" &&
         "canonical_artist" in candidate &&
-        typeof candidate.canonical_artist === "string"
+        typeof candidate.canonical_artist === "string" &&
+        "match_evidence" in candidate &&
+        Array.isArray(candidate.match_evidence)
     )
   );
 }

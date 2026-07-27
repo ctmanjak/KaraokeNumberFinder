@@ -89,7 +89,7 @@ describe("importSeedDirectory", () => {
         }),
         expect.objectContaining({
           file: "song_aliases.csv",
-          create: 2,
+          create: 4,
           update: 0,
           skip: 0
         }),
@@ -98,6 +98,20 @@ describe("importSeedDirectory", () => {
           create: 2,
           update: 0,
           skip: 0
+        })
+      ])
+    );
+    expect(result.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          file: "song_aliases.csv",
+          id: "alias_system_song_fixture_001_canonical_title",
+          action: "create"
+        }),
+        expect.objectContaining({
+          file: "song_aliases.csv",
+          id: "alias_system_song_fixture_001_artist",
+          action: "create"
         })
       ])
     );

@@ -21,9 +21,20 @@ export function withAdminSongDuplicateMetrics(
   return async (request: Request): Promise<Response> => {
     const startedAt = clock();
     duplicateChecksInFlight += 1;
-    let response: Response;
     try {
-      response = await handler(request);
+      const response = await handler(request);
+      writeMetric(
+        {
+          event: "admin_song.duplicate_check",
+          route: "song_duplicate_check_api",
+          http_status: response.status,
+          latency_ms: elapsed(clock(), startedAt),
+          timeout: response.status === 503,
+          in_flight: duplicateChecksInFlight
+        },
+        writer
+      );
+      return response;
     } catch (error) {
       writeMetric(
         {
@@ -40,18 +51,6 @@ export function withAdminSongDuplicateMetrics(
     } finally {
       duplicateChecksInFlight -= 1;
     }
-    writeMetric(
-      {
-        event: "admin_song.duplicate_check",
-        route: "song_duplicate_check_api",
-        http_status: response.status,
-        latency_ms: elapsed(clock(), startedAt),
-        timeout: response.status === 503,
-        in_flight: duplicateChecksInFlight + 1
-      },
-      writer
-    );
-    return response;
   };
 }
 

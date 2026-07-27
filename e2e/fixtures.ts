@@ -32,6 +32,11 @@ type E2EUsers = Readonly<{
   loginAdmin(request: APIRequestContext, user: E2EUser): Promise<APIResponse>;
 }>;
 
+type E2ELoginOptions = Readonly<{
+  isAdmin?: boolean;
+  oauthState?: string;
+}>;
+
 const baseURL = process.env.BETTER_AUTH_URL ?? "https://127.0.0.1:3443";
 
 export const test = base.extend<{
@@ -57,36 +62,10 @@ export const test = base.extend<{
         return { id, name: `E2E ${label} ${id.slice(0, 8)}` };
       },
       async login(apiRequest, user, oauthState) {
-        const response = await apiRequest.post("/api/e2e/control", {
-          headers: {
-            ...controlHeaders(),
-            "content-type": "application/json"
-          },
-          data: {
-            action: "login",
-            user_id: user.id,
-            display_name: user.name,
-            ...(oauthState === undefined ? {} : { oauth_state: oauthState })
-          }
-        });
-        expect(response.status()).toBe(200);
-        return response;
+        return loginE2EUser(apiRequest, user, { oauthState });
       },
       async loginAdmin(apiRequest, user) {
-        const response = await apiRequest.post("/api/e2e/control", {
-          headers: {
-            ...controlHeaders(),
-            "content-type": "application/json"
-          },
-          data: {
-            action: "login",
-            user_id: user.id,
-            display_name: user.name,
-            is_admin: true
-          }
-        });
-        expect(response.status()).toBe(200);
-        return response;
+        return loginE2EUser(apiRequest, user, { isAdmin: true });
       }
     });
 
@@ -104,6 +83,30 @@ export const test = base.extend<{
 });
 
 export { expect } from "@playwright/test";
+
+async function loginE2EUser(
+  request: APIRequestContext,
+  user: E2EUser,
+  options: E2ELoginOptions
+): Promise<APIResponse> {
+  const response = await request.post("/api/e2e/control", {
+    headers: {
+      ...controlHeaders(),
+      "content-type": "application/json"
+    },
+    data: {
+      action: "login",
+      user_id: user.id,
+      display_name: user.name,
+      ...(options.oauthState === undefined
+        ? {}
+        : { oauth_state: options.oauthState }),
+      ...(options.isAdmin === undefined ? {} : { is_admin: options.isAdmin })
+    }
+  });
+  expect(response.status()).toBe(200);
+  return response;
+}
 
 export function controlHeaders(): Record<string, string> {
   return {

@@ -2,6 +2,7 @@ import { Prisma, type PrismaClient } from "../generated/prisma/client";
 import { normalizeDuplicateInput } from "./match";
 import {
   DUPLICATE_CANDIDATE_LIMIT,
+  DUPLICATE_MIN_PARTIAL_INPUT_LENGTH,
   DUPLICATE_STATEMENT_TIMEOUT_MS,
   type CandidateMatchEvidence,
   type CandidateSummary,
@@ -112,7 +113,7 @@ export async function findDuplicateCandidatesInTransaction(
       )
         AND (
           alias.alias_type <> 'artist'
-          OR alias.normalized_alias = alias_song.normalized_canonical_artist
+          OR alias.normalized_alias <> alias_song.normalized_canonical_artist
         )
     ),
     scored_values AS (
@@ -124,7 +125,7 @@ export async function findDuplicateCandidatesInTransaction(
         candidate.matched_value,
         CASE
           WHEN candidate.normalized_value = input.value THEN 3
-          WHEN char_length(input.value) >= 2
+          WHEN char_length(input.value) >= ${DUPLICATE_MIN_PARTIAL_INPUT_LENGTH}
             AND strpos(candidate.normalized_value, input.value) = 1 THEN 2
           ELSE 1
         END AS strength
@@ -134,11 +135,11 @@ export async function findDuplicateCandidatesInTransaction(
        AND (
          candidate.normalized_value = input.value
          OR (
-           char_length(input.value) >= 2
+           char_length(input.value) >= ${DUPLICATE_MIN_PARTIAL_INPUT_LENGTH}
            AND strpos(candidate.normalized_value, input.value) = 1
          )
          OR (
-           char_length(input.value) >= 2
+           char_length(input.value) >= ${DUPLICATE_MIN_PARTIAL_INPUT_LENGTH}
            AND strpos(candidate.normalized_value, input.value) > 0
          )
        )

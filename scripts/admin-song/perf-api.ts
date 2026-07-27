@@ -11,6 +11,7 @@ import type {
   DuplicateCheckResult
 } from "../../lib/admin-song-duplicate/types";
 import { requireDisposableAdminSongDatabaseUrl } from "../../lib/song-identity/maintenance";
+import { requireRomanizedTitleAlias } from "./perf-fixture";
 
 type Scenario = Readonly<{ id: string; input: DuplicateCheckInput }>;
 
@@ -116,6 +117,9 @@ try {
   if (!evidence.gate.passed) process.exitCode = 1;
 } finally {
   await database
+    .query("DELETE FROM sessions WHERE user_id = $1", [userId])
+    .catch(() => undefined);
+  await database
     .query("DELETE FROM users WHERE id = $1 AND email LIKE '%@e2e.invalid'", [
       userId
     ])
@@ -212,6 +216,7 @@ async function readFixtureInputs(client: Client) {
       AND alias_type = 'romanized_title'
     LIMIT 1
   `);
+  const savedAliasTitle = requireRomanizedTitleAlias(savedAlias.rows);
   return {
     exactSongId: exact.id,
     exact: {
@@ -235,7 +240,7 @@ async function readFixtureInputs(client: Client) {
       canonical_artist: exact.canonical_artist
     },
     savedAlias: {
-      canonical_title: savedAlias.rows[0].alias,
+      canonical_title: savedAliasTitle,
       canonical_artist: saved.canonical_artist
     },
     both: {

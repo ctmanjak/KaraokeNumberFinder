@@ -57,7 +57,7 @@ function mapRepositoryError(error: unknown): never {
       status: 409,
       publicMessage:
         "A song with the same canonical title and artist already exists.",
-      details: { candidates: error.candidates }
+      details: { candidates: safeCandidates(error.candidates) }
     });
   }
   if (error.code === "POSSIBLE_DUPLICATE_CONFIRMATION_REQUIRED") {
@@ -66,7 +66,7 @@ function mapRepositoryError(error: unknown): never {
       status: 409,
       publicMessage:
         "The current possible duplicate candidates must be confirmed.",
-      details: { candidates: error.candidates }
+      details: { candidates: safeCandidates(error.candidates) }
     });
   }
   if (error.code === "PROVIDER_NOT_FOUND") {
@@ -84,11 +84,18 @@ function mapRepositoryError(error: unknown): never {
       }
     });
   }
-  if (error.code === "TIMEOUT") {
+  if (error.code === "DUPLICATE_CHECK_TIMEOUT") {
     throw personalizationDomainError({
       code: "DUPLICATE_CHECK_UNAVAILABLE",
       status: 503,
       publicMessage: "Duplicate checking is temporarily unavailable."
+    });
+  }
+  if (error.code === "TIMEOUT") {
+    throw personalizationDomainError({
+      code: "DATABASE_TIMEOUT",
+      status: 503,
+      publicMessage: "The database operation timed out."
     });
   }
   if (error.code === "SYSTEM_ALIAS_INVARIANT") {
@@ -103,4 +110,8 @@ function mapRepositoryError(error: unknown): never {
     status: 409,
     publicMessage: "The song could not be updated because the catalog changed."
   });
+}
+
+function safeCandidates(candidates: readonly { id: string }[]) {
+  return candidates.map(({ id }) => ({ id }));
 }

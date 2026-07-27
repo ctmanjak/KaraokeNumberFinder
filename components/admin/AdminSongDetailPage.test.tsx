@@ -146,6 +146,32 @@ describe("administrator song detail page", () => {
     ).toBe("noopener");
   });
 
+  it("shows invalid duplicate input separately without sending a check", async () => {
+    const fetcher = detailFetcher();
+    vi.stubGlobal("fetch", fetcher);
+
+    renderPage();
+    fireEvent.change(await screen.findByLabelText("원제"), {
+      target: { value: "---" }
+    });
+
+    expect(
+      await screen.findByText("원제에 검색 가능한 문자를 입력해 주세요.")
+    ).toBeTruthy();
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "변경사항 저장"
+        }) as HTMLButtonElement
+      ).disabled
+    ).toBe(true);
+    expect(
+      fetcher.mock.calls.filter(
+        ([input]) => input.toString() === "/api/admin/songs/duplicate-check"
+      )
+    ).toHaveLength(0);
+  });
+
   it("keeps the local draft on stale-write failure until explicit reload confirmation", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
     vi.stubGlobal("fetch", detailFetcher({ staleOnPatch: true }));

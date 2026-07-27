@@ -25,6 +25,24 @@ describe("administrator song aggregate contextual validation", () => {
       "karaoke_entries"
     ],
     [
+      "new entry source name",
+      () => ({
+        ...basePatch(),
+        karaoke_entries: [
+          ...basePatch().karaoke_entries,
+          {
+            provider_id: "tj",
+            karaoke_number: "54321",
+            version_info: "live",
+            availability_status: "available" as const,
+            last_verified_at: "2026-07-26",
+            source_name: "   "
+          }
+        ]
+      }),
+      "karaoke_entries.1.source_name"
+    ],
+    [
       "status date reconfirmation",
       () => ({
         ...basePatch(),

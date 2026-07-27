@@ -11,21 +11,28 @@ export const ADMIN_ALIAS_TYPES = [
   "alternate_spelling"
 ] as const;
 
+export type AdminAliasType = (typeof ADMIN_ALIAS_TYPES)[number];
+
 export const ADMIN_SYSTEM_ALIAS_TYPES = [
   "canonical_title",
   "display_title",
   "artist"
 ] as const;
 
-export const ADMIN_EDITABLE_ALIAS_TYPES = [
-  "romanized_title",
-  "english_title",
-  "translated_title",
-  "content",
-  "abbreviation",
-  "common_name",
-  "alternate_spelling"
-] as const;
+type AdminSystemAliasType = (typeof ADMIN_SYSTEM_ALIAS_TYPES)[number];
+
+export type AdminEditableAliasType = Exclude<
+  AdminAliasType,
+  AdminSystemAliasType
+>;
+
+export const ADMIN_EDITABLE_ALIAS_TYPES: readonly AdminEditableAliasType[] =
+  ADMIN_ALIAS_TYPES.filter(
+    (aliasType): aliasType is AdminEditableAliasType =>
+      !(ADMIN_SYSTEM_ALIAS_TYPES as readonly AdminAliasType[]).includes(
+        aliasType
+      )
+  );
 
 export const ADMIN_AVAILABILITY_STATUSES = [
   "available",
@@ -34,9 +41,6 @@ export const ADMIN_AVAILABILITY_STATUSES = [
   "unknown"
 ] as const;
 
-export type AdminAliasType = (typeof ADMIN_ALIAS_TYPES)[number];
-export type AdminEditableAliasType =
-  (typeof ADMIN_EDITABLE_ALIAS_TYPES)[number];
 export type AdminAvailabilityStatus =
   (typeof ADMIN_AVAILABILITY_STATUSES)[number];
 

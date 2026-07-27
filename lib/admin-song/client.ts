@@ -127,7 +127,9 @@ function clientError(response: Response, payload: unknown) {
   const error = readErrorEnvelope(payload);
   return new AdminSongClientError(
     error.code ?? "ADMIN_SONG_UNAVAILABLE",
-    response.status
+    response.status,
+    payload,
+    response.headers?.get("retry-after") ?? null
   );
 }
 

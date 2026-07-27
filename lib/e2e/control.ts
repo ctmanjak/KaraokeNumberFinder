@@ -19,6 +19,7 @@ export async function readBrowserE2EFixtures(): Promise<Response> {
     prisma.song.findMany({
       where: {
         verifiedBy: { not: E2E_FIXTURE_MARKER },
+        sourceName: { not: E2E_FIXTURE_MARKER },
         aliases: { some: {} }
       },
       orderBy: { id: "asc" },
@@ -105,6 +106,8 @@ export async function createBrowserE2ESession(
       });
     }
 
+    // Test-only logins intentionally replace the stored role, so a non-admin
+    // re-login may downgrade an existing E2E administrator.
     await transaction.user.upsert({
       where: { id: body.user_id as string },
       create: {

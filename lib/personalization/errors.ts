@@ -26,7 +26,7 @@ export type PersonalizationValidationIssue = Readonly<{
 
 export type PersonalizationErrorDetails = Readonly<{
   issues?: readonly PersonalizationValidationIssue[];
-  [key: string]: unknown;
+  candidates?: ReadonlyArray<Readonly<{ id: string }>>;
 }>;
 
 type ErrorDefinition = {
@@ -170,12 +170,16 @@ export function createPersonalizationErrorResponse(
 
   writeFailureEvent(event, options.writeSafeLog);
 
+  const details =
+    apiError.details === undefined
+      ? undefined
+      : sanitizeErrorDetails(apiError.details);
   const body: PersonalizationErrorEnvelope = {
     error: {
       code: apiError.code,
       message: apiError.message,
       request_id: requestId,
-      ...(apiError.details === undefined ? {} : { details: apiError.details })
+      ...(details === undefined ? {} : { details })
     }
   };
   const headers = new Headers({
@@ -192,6 +196,54 @@ export function createPersonalizationErrorResponse(
     status: apiError.status,
     headers
   });
+}
+
+function sanitizeErrorDetails(
+  value: PersonalizationErrorDetails
+): PersonalizationErrorDetails | undefined {
+  const record = value as Record<string, unknown>;
+  const issues = Array.isArray(record.issues)
+    ? record.issues.filter(isValidationIssue).map((issue) => ({
+        path: issue.path,
+        message: issue.message,
+        ...(typeof issue.max === "number" ? { max: issue.max } : {})
+      }))
+    : undefined;
+  const candidates = Array.isArray(record.candidates)
+    ? record.candidates
+        .filter(isCandidateReference)
+        .map((candidate) => ({ id: candidate.id }))
+    : undefined;
+  if (issues === undefined && candidates === undefined) return undefined;
+  return {
+    ...(issues === undefined ? {} : { issues }),
+    ...(candidates === undefined ? {} : { candidates })
+  };
+}
+
+function isValidationIssue(
+  value: unknown
+): value is PersonalizationValidationIssue {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "path" in value &&
+    typeof value.path === "string" &&
+    "message" in value &&
+    typeof value.message === "string" &&
+    (!("max" in value) || typeof value.max === "number")
+  );
+}
+
+function isCandidateReference(
+  value: unknown
+): value is Readonly<{ id: string }> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    typeof value.id === "string"
+  );
 }
 
 function writeFailureEvent(

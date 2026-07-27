@@ -55,7 +55,9 @@ export function parseAdminSongInput(value: unknown): AdminSongInput {
     }
     throw error;
   }
-  const aliases = array(input.aliases, MAX_ALIASES).map(parseAlias);
+  const aliases = array(input.aliases, MAX_ALIASES).map((alias, index) =>
+    parseAlias(alias, index)
+  );
   const karaokeEntries = array(input.karaoke_entries, MAX_ENTRIES, true).map(
     parseEntry
   );
@@ -81,12 +83,13 @@ export function parseAdminSongInput(value: unknown): AdminSongInput {
   };
 }
 
-function parseAlias(value: unknown) {
+function parseAlias(value: unknown, index: number) {
+  const path = `aliases.${index}`;
   const alias = record(value);
   requireExactKeys(alias, ["alias", "language", "alias_type"]);
   const aliasType = requiredString(alias.alias_type, 64);
   if (!(ADMIN_EDITABLE_ALIAS_TYPES as readonly string[]).includes(aliasType)) {
-    invalid("aliases.alias_type");
+    invalid(`${path}.alias_type`);
   }
 
   return {

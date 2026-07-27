@@ -46,6 +46,22 @@ describeDatabase("duplicate candidates on disposable PostgreSQL", () => {
         expect.objectContaining({ role: "artist", strength: "exact" })
       ])
     );
+    const artistAlias = await findDuplicateCandidates(prisma, {
+      canonical_title: "Lemon",
+      canonical_artist: "요네즈 켄시"
+    });
+    expect(artistAlias.classification).toBe("possible");
+    expect(artistAlias.candidates[0]).toMatchObject({
+      id: "song_ja_0006",
+      match_evidence: expect.arrayContaining([
+        expect.objectContaining({
+          role: "artist",
+          strength: "exact",
+          candidate_field: "alias.artist",
+          matched_value: "요네즈 켄시"
+        })
+      ])
+    });
     await expect(
       findDuplicateCandidates(prisma, {
         canonical_title: "No such title 987654321",

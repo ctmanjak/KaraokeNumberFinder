@@ -44,8 +44,8 @@ model Song {
   canonicalTitle            String         @map("canonical_title") @db.VarChar(512)
   displayTitle              String         @map("display_title") @db.VarChar(512)
   canonicalArtist           String         @map("canonical_artist") @db.VarChar(512)
-  normalizedCanonicalTitle  String         @map("normalized_canonical_title") @db.VarChar(512)
-  normalizedCanonicalArtist String         @map("normalized_canonical_artist") @db.VarChar(512)
+  normalizedCanonicalTitle  String?        @map("normalized_canonical_title") @db.VarChar(512)
+  normalizedCanonicalArtist String?        @map("normalized_canonical_artist") @db.VarChar(512)
   releaseYear               Int?           @map("release_year")
   tieIn                     String?        @map("tie_in") @db.VarChar(512)
   sourceUrl                 String?        @map("source_url") @db.Text
@@ -58,7 +58,6 @@ model Song {
   karaokeEntries            KaraokeEntry[]
   favorites                 Favorite[]
 
-  @@unique([normalizedCanonicalTitle, normalizedCanonicalArtist], map: "songs_normalized_canonical_title_artist_key")
   @@index([originalLanguage], map: "songs_original_language_idx")
   @@index([displayTitle], map: "songs_display_title_idx")
   @@index([canonicalTitle], map: "songs_canonical_title_idx")

@@ -49,4 +49,61 @@ describe("administrator song update audit", () => {
       "must-not-enter-audit"
     );
   });
+
+  it.each([
+    [422, "VALIDATION_ERROR", "rejected"],
+    [503, "DATABASE_TIMEOUT", "failed"]
+  ] as const)(
+    "records %i responses with %s as %s failures without response internals",
+    async (status, errorCode, outcome) => {
+      const writer = vi.fn();
+      const completion = createAdminSongUpdateAuditCompletion("song_1", writer);
+
+      await completion({
+        requestId: `request-${status}`,
+        actorUserId: "actor-1",
+        response: Response.json(
+          {
+            error: {
+              code: errorCode,
+              message: "must-not-enter-audit"
+            }
+          },
+          { status }
+        )
+      });
+
+      expect(writer).toHaveBeenCalledOnce();
+      expect(writer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          outcome,
+          http_status: status,
+          error_code: errorCode
+        })
+      );
+      expect(JSON.stringify(writer.mock.calls)).not.toContain(
+        "must-not-enter-audit"
+      );
+    }
+  );
+
+  it("swallows audit writer failures after one write attempt", async () => {
+    const writer = vi.fn(() => {
+      throw new Error("sink unavailable");
+    });
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const completion = createAdminSongUpdateAuditCompletion("song_1", writer);
+
+    await expect(
+      completion({
+        requestId: "request-writer-failure",
+        response: new Response(null, { status: 500 })
+      })
+    ).resolves.toBeUndefined();
+    expect(writer).toHaveBeenCalledOnce();
+    expect(consoleError).toHaveBeenCalledOnce();
+    consoleError.mockRestore();
+  });
 });

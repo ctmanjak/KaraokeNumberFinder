@@ -56,4 +56,5 @@ export type DuplicateCheckResult = Readonly<{
 }>;
 
 export const DUPLICATE_CANDIDATE_LIMIT = 5;
+export const DUPLICATE_MIN_PARTIAL_INPUT_LENGTH = 2;
 export const DUPLICATE_STATEMENT_TIMEOUT_MS = 1_000;

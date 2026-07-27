@@ -18,6 +18,13 @@ const contract = readFileSync(
   ),
   "utf8"
 );
+const concurrentIndex = readFileSync(
+  path.join(
+    root,
+    "prisma/contract-migrations/20260727091000_contract_song_normalized_identity/create-index-concurrently.sql"
+  ),
+  "utf8"
+);
 const rollback = readFileSync(
   path.join(
     root,
@@ -37,11 +44,21 @@ describe("ADMIN-T03 normalized song identity rollout", () => {
       /ALTER COLUMN "normalized_canonical_title" SET NOT NULL/u
     );
     expect(schema).toContain(
-      '@map("normalized_canonical_title") @db.VarChar(512)'
+      'normalizedCanonicalTitle  String?        @map("normalized_canonical_title") @db.VarChar(512)'
     );
     expect(schema).toContain(
-      'map: "songs_normalized_canonical_title_artist_key"'
+      'normalizedCanonicalArtist String?        @map("normalized_canonical_artist") @db.VarChar(512)'
     );
+    expect(schema).not.toContain(
+      "@@unique([normalizedCanonicalTitle, normalizedCanonicalArtist]"
+    );
+    expect(concurrentIndex).toMatch(/CREATE UNIQUE INDEX CONCURRENTLY/u);
+    expect(concurrentIndex).not.toMatch(/\bBEGIN\b|\bCOMMIT\b/u);
+    expect(contract).not.toMatch(/CREATE\s+(?:UNIQUE\s+)?INDEX/iu);
+    expect(contract).toMatch(/CHECK \([\s\S]*\) NOT VALID/u);
+    expect(contract).toMatch(/VALIDATE CONSTRAINT/u);
+    expect(contract).toMatch(/UNIQUE USING INDEX/u);
+    expect(contract).toContain("First execute create-index-concurrently.sql");
     expect(
       existsSync(
         path.join(

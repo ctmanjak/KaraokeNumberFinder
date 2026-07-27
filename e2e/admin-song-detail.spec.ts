@@ -72,7 +72,16 @@ test("administrator edits one aggregate, preserves ids, and explicitly reloads a
     );
     expect(detailResponse.status()).toBe(200);
     const detail = (await detailResponse.json()) as {
-      aliases: Array<{ id: string; alias: string }>;
+      aliases: Array<{
+        id: string;
+        alias: string;
+        language: string;
+        alias_type: string;
+        source_name: string | null;
+        source_url: string | null;
+        verification_note: string | null;
+        updated_at: string;
+      }>;
       karaoke_entries: Array<{ id: string }>;
       system_aliases: Array<{ id: string }>;
     };
@@ -160,7 +169,7 @@ async function createSongFixture(
        normalized_canonical_title, normalized_canonical_artist,
        release_year, source_name, verified_by, created_at, updated_at
      ) VALUES (
-       $1, 'en', $2, $3, $4, $5, $6, 2024, 'E2E fixture', $7, now(), now()
+       $1, 'en', $2, $3, $4, $5, $6, 2024, $7, $7, now(), now()
      )`,
     [
       songId,

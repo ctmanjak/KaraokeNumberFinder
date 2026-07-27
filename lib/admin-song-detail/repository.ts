@@ -86,6 +86,7 @@ export type AdminSongDetailRepositoryErrorCode =
   | "DUPLICATE_SONG"
   | "POSSIBLE_DUPLICATE_CONFIRMATION_REQUIRED"
   | "PROVIDER_NOT_FOUND"
+  | "DUPLICATE_CHECK_TIMEOUT"
   | "SYSTEM_ALIAS_INVARIANT"
   | "CONFLICT"
   | "TIMEOUT";
@@ -156,10 +157,20 @@ export function createPrismaAdminSongDetailRepository(
             validateAggregate(current, input, now());
             const identityChanged = hasIdentityChanged(current, input);
             if (identityChanged) {
-              const duplicate = await findDuplicateCandidatesInTransaction(
-                transaction,
-                duplicateInput
-              );
+              let duplicate;
+              try {
+                duplicate = await findDuplicateCandidatesInTransaction(
+                  transaction,
+                  duplicateInput
+                );
+              } catch (error) {
+                if (isStatementTimeout(error)) {
+                  throw new AdminSongDetailRepositoryError(
+                    "DUPLICATE_CHECK_TIMEOUT"
+                  );
+                }
+                throw error;
+              }
               if (duplicate.classification === "exact") {
                 throw new AdminSongDetailRepositoryError(
                   "DUPLICATE_SONG",
@@ -262,7 +273,9 @@ export function createPrismaAdminSongDetailRepository(
               throw candidateError;
             }
             if (candidateError instanceof DuplicateCheckRepositoryError) {
-              throw new AdminSongDetailRepositoryError("TIMEOUT");
+              throw new AdminSongDetailRepositoryError(
+                "DUPLICATE_CHECK_TIMEOUT"
+              );
             }
             throw candidateError;
           }
@@ -509,7 +522,9 @@ function validateEntryAggregate(
     }
     if (
       (existing === undefined || statusChanged) &&
-      !Object.hasOwn(entry, "source_name")
+      (!Object.hasOwn(entry, "source_name") ||
+        typeof entry.source_name !== "string" ||
+        entry.source_name.trim() === "")
     ) {
       throw adminSongValidationError(
         `${path}.source_name`,
@@ -610,7 +625,7 @@ async function applyEntries(
   verifiedBy: string,
   generateId: () => string
 ): Promise<void> {
-  for (const entry of input.karaoke_entries) {
+  for (const [index, entry] of input.karaoke_entries.entries()) {
     const data = {
       providerId: entry.provider_id,
       karaokeNumber: entry.karaoke_number,
@@ -636,12 +651,16 @@ async function applyEntries(
       verifiedBy
     };
     if (entry.id === undefined) {
+      const sourceName = entry.source_name;
+      if (typeof sourceName !== "string" || sourceName.trim() === "") {
+        throw adminSongValidationError(`karaoke_entries.${index}.source_name`);
+      }
       await transaction.karaokeEntry.create({
         data: {
           id: `entry_${generateId()}`,
           songId: current.id,
-          sourceName: entry.source_name ?? "",
-          ...data
+          ...data,
+          sourceName
         }
       });
     } else {

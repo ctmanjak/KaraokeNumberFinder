@@ -6,8 +6,12 @@ import { Client } from "pg";
 import { PrismaClient } from "../../lib/generated/prisma/client";
 import { findDuplicateCandidates } from "../../lib/admin-song-duplicate/repository";
 import { normalizeDuplicateInput } from "../../lib/admin-song-duplicate/match";
-import type { DuplicateCheckInput } from "../../lib/admin-song-duplicate/types";
+import {
+  DUPLICATE_MIN_PARTIAL_INPUT_LENGTH,
+  type DuplicateCheckInput
+} from "../../lib/admin-song-duplicate/types";
 import { requireDisposableAdminSongDatabaseUrl } from "../../lib/song-identity/maintenance";
+import { requireRomanizedTitleAlias } from "./perf-fixture";
 
 type Scenario = {
   id: string;
@@ -86,18 +90,19 @@ try {
       );
     }
     latency.sort((left, right) => left - right);
+    const p95 = percentile(latency, 0.95);
     results.push({
       scenario: scenario.id,
       warmup,
       iterations,
       p50_ms: percentile(latency, 0.5),
-      p95_ms: percentile(latency, 0.95),
-      min_ms: latency[0],
-      max_ms: latency.at(-1),
+      p95_ms: p95,
+      min_ms: Number(latency[0].toFixed(3)),
+      max_ms: Number((latency.at(-1) ?? 0).toFixed(3)),
       max_candidates: maxCandidates,
       candidate_query_count: 1,
       max_response_bytes: maxResponseBytes,
-      passed: percentile(latency, 0.95) <= 100 && maxCandidates <= 5
+      passed: p95 <= 100 && maxCandidates <= 5
     });
   }
   const explain = await explainWorstPartial(pg, fixture.partial);
@@ -166,6 +171,7 @@ async function readFixtureInputs(client: Client) {
       AND alias_type = 'romanized_title'
     LIMIT 1
   `);
+  const savedAliasTitle = requireRomanizedTitleAlias(savedAlias.rows);
   const prefixTitle = prefix.canonical_title.slice(
     0,
     Math.max(2, prefix.canonical_title.length - 3)
@@ -190,7 +196,7 @@ async function readFixtureInputs(client: Client) {
       canonical_artist: exact.canonical_artist
     },
     savedAlias: {
-      canonical_title: savedAlias.rows[0].alias,
+      canonical_title: savedAliasTitle,
       canonical_artist: saved.canonical_artist
     },
     both: {
@@ -270,7 +276,7 @@ async function explainWorstPartial(client: Client, input: DuplicateCheckInput) {
         )
           AND (
             alias.alias_type <> 'artist'
-            OR alias.normalized_alias = alias_song.normalized_canonical_artist
+            OR alias.normalized_alias <> alias_song.normalized_canonical_artist
           )
       ),
       scored_values AS (
@@ -282,8 +288,8 @@ async function explainWorstPartial(client: Client, input: DuplicateCheckInput) {
           candidate.matched_value,
           CASE
             WHEN candidate.normalized_value = input.value THEN 3
-            WHEN char_length(input.value) >= 2
-              AND candidate.normalized_value LIKE input.value || '%' THEN 2
+            WHEN char_length(input.value) >= ${DUPLICATE_MIN_PARTIAL_INPUT_LENGTH}
+              AND strpos(candidate.normalized_value, input.value) = 1 THEN 2
             ELSE 1
           END AS strength
         FROM candidate_values AS candidate
@@ -292,12 +298,12 @@ async function explainWorstPartial(client: Client, input: DuplicateCheckInput) {
          AND (
            candidate.normalized_value = input.value
            OR (
-             char_length(input.value) >= 2
-             AND candidate.normalized_value LIKE input.value || '%'
+             char_length(input.value) >= ${DUPLICATE_MIN_PARTIAL_INPUT_LENGTH}
+             AND strpos(candidate.normalized_value, input.value) = 1
            )
            OR (
-             char_length(input.value) >= 2
-             AND candidate.normalized_value LIKE '%' || input.value || '%'
+             char_length(input.value) >= ${DUPLICATE_MIN_PARTIAL_INPUT_LENGTH}
+             AND strpos(candidate.normalized_value, input.value) > 0
            )
          )
       ),

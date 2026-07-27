@@ -17,7 +17,8 @@ describe("administrator song detail service", () => {
       "POSSIBLE_DUPLICATE_CONFIRMATION_REQUIRED"
     ],
     ["PROVIDER_NOT_FOUND", 422, "PROVIDER_NOT_FOUND"],
-    ["TIMEOUT", 503, "DUPLICATE_CHECK_UNAVAILABLE"],
+    ["DUPLICATE_CHECK_TIMEOUT", 503, "DUPLICATE_CHECK_UNAVAILABLE"],
+    ["TIMEOUT", 503, "DATABASE_TIMEOUT"],
     ["SYSTEM_ALIAS_INVARIANT", 409, "CATALOG_INVARIANT_VIOLATION"],
     ["CONFLICT", 409, "SONG_CONFLICT"]
   ] as const)(
@@ -60,10 +61,21 @@ describe("administrator song detail service", () => {
       repository as AdminSongDetailRepository
     );
 
-    await expect(
-      service.update("admin-a", "song-a", {} as never)
-    ).rejects.toMatchObject({
+    const error = await service
+      .update("admin-a", "song-a", {} as never)
+      .catch((caught: unknown) => caught);
+    expect({
+      name: (error as Error).name,
+      message: (error as Error).message,
+      code: (error as { code: unknown }).code,
+      status: (error as { status: unknown }).status,
+      details: (error as { details: unknown }).details
+    }).toStrictEqual({
+      name: "PersonalizationApiError",
+      message:
+        "A song with the same canonical title and artist already exists.",
       code: "DUPLICATE_SONG",
+      status: 409,
       details: { candidates: [{ id: "song-b" }] }
     });
   });

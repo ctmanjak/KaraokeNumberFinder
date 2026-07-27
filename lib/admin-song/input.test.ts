@@ -101,6 +101,28 @@ describe("admin song input", () => {
     ).toThrowError(expect.objectContaining({ code: "VALIDATION_ERROR" }));
   });
 
+  it("reports an indexed path for an invalid alias type", () => {
+    expect(() =>
+      parseAdminSongInput({
+        ...validInput(),
+        aliases: [
+          validInput().aliases[0],
+          {
+            alias: "System alias",
+            language: "en",
+            alias_type: "canonical_title"
+          }
+        ]
+      })
+    ).toThrowError(
+      expect.objectContaining({
+        details: {
+          issues: [expect.objectContaining({ path: "aliases.1.alias_type" })]
+        }
+      })
+    );
+  });
+
   it("rejects a request with a missing key", () => {
     const missingKey: Partial<ReturnType<typeof validInput>> = validInput();
     delete missingKey.verification_note;
