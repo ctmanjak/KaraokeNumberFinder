@@ -69,7 +69,12 @@ function stubRepository(
     create: vi.fn(async () => ({
       song: { id: "song-a", display_title: "Song", canonical_artist: "Artist" },
       alias_count: 3,
-      karaoke_entry_count: 1
+      karaoke_entry_count: 1,
+      created_counts: {
+        songs: 1,
+        administrator_aliases: 0,
+        karaoke_entries: 1
+      }
     })),
     ...patch
   };

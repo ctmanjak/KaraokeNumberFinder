@@ -214,8 +214,10 @@ describe("admin song repository", () => {
     });
     const transaction = {
       user: { findUnique: vi.fn(async () => ({ role: "admin" })) },
-      song: { findFirst: vi.fn(async () => null), create },
-      karaokeProvider: { findMany: vi.fn(async () => [{ id: "tj" }]) }
+      song: { create },
+      karaokeProvider: { findMany: vi.fn(async () => [{ id: "tj" }]) },
+      $executeRawUnsafe: vi.fn(async () => 0),
+      $queryRaw: vi.fn(async () => [])
     };
     const db = {
       $transaction: vi.fn(async (callback, options) => {
@@ -252,11 +254,22 @@ describe("admin song repository", () => {
         })
       ])
     );
+    expect(
+      createArgs.data.aliases.create
+        .slice(0, 3)
+        .every((alias) => alias.sourceName === null && alias.sourceUrl === null)
+    ).toBe(true);
+    expect(createArgs.data.aliases.create[3]).toMatchObject({
+      sourceName: "Alias source",
+      sourceUrl: null
+    });
     expect(createArgs.data.karaokeEntries.create).toEqual([
       expect.objectContaining({
         providerId: "tj",
         karaokeNumber: "28822",
         availabilityStatus: "available",
+        sourceName: "TJ",
+        sourceUrl: null,
         verifiedBy: "admin:admin-user"
       })
     ]);
@@ -268,8 +281,10 @@ describe("admin song repository", () => {
     const role = { current: "user" };
     const transaction = {
       user: { findUnique: vi.fn(async () => ({ role: role.current })) },
-      song: { findFirst: vi.fn(async () => null), create },
-      karaokeProvider: { findMany: vi.fn(async () => []) }
+      song: { create },
+      karaokeProvider: { findMany: vi.fn(async () => []) },
+      $executeRawUnsafe: vi.fn(async () => 0),
+      $queryRaw: vi.fn(async () => [])
     };
     const db = {
       $transaction: vi.fn(async (callback) => callback(transaction))
@@ -286,6 +301,96 @@ describe("admin song repository", () => {
       new AdminSongRepositoryError("PROVIDER_NOT_FOUND")
     );
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it("requires the exact current possible-candidate ID set and never lets acknowledgement bypass exact", async () => {
+    const create = vi.fn(async (args: { data: Record<string, unknown> }) => ({
+      id: args.data.id,
+      displayTitle: args.data.displayTitle,
+      canonicalArtist: args.data.canonicalArtist
+    }));
+    const candidateRow = {
+      id: "song-candidate",
+      displayTitle: "Candidate",
+      canonicalTitle: "Candidate",
+      canonicalArtist: "Other Artist",
+      originalLanguage: "en",
+      releaseYear: null,
+      tieIn: null,
+      exactIdentity: false,
+      titleStrength: 2,
+      titleInputField: "canonical_title",
+      titleCandidateField: "song.canonical_title",
+      titleMatchedValue: "Candidate",
+      artistStrength: null as number | null,
+      artistCandidateField: null,
+      artistMatchedValue: null,
+      providerSummary: []
+    };
+    const transaction = {
+      user: { findUnique: vi.fn(async () => ({ role: "admin" })) },
+      song: { create },
+      karaokeProvider: { findMany: vi.fn(async () => [{ id: "tj" }]) },
+      $executeRawUnsafe: vi.fn(async () => 0),
+      $queryRaw: vi.fn(async () => [candidateRow])
+    };
+    const db = {
+      $transaction: vi.fn(async (callback) => callback(transaction))
+    } as unknown as PrismaClient;
+    const repository = createPrismaAdminSongRepository(db);
+
+    await expect(
+      repository.create("admin-user", validInput())
+    ).rejects.toMatchObject({
+      code: "POSSIBLE_DUPLICATE_CONFIRMATION_REQUIRED",
+      candidates: [expect.objectContaining({ id: "song-candidate" })]
+    });
+    expect(create).not.toHaveBeenCalled();
+
+    await expect(
+      repository.create("admin-user", {
+        ...validInput(),
+        possible_duplicate_acknowledged_song_ids: ["song-candidate"]
+      })
+    ).resolves.toMatchObject({
+      created_counts: {
+        songs: 1,
+        administrator_aliases: 1,
+        karaoke_entries: 1
+      }
+    });
+
+    transaction.$queryRaw.mockResolvedValueOnce([
+      { ...candidateRow, exactIdentity: true, artistStrength: 3 }
+    ]);
+    await expect(
+      repository.create("admin-user", {
+        ...validInput(),
+        possible_duplicate_acknowledged_song_ids: ["song-candidate"]
+      })
+    ).rejects.toMatchObject({ code: "DUPLICATE_SONG" });
+  });
+
+  it("maps candidate statement cancellation to an unavailable error before writes", async () => {
+    const create = vi.fn();
+    const transaction = {
+      user: { findUnique: vi.fn(async () => ({ role: "admin" })) },
+      song: { create },
+      karaokeProvider: { findMany: vi.fn(async () => [{ id: "tj" }]) },
+      $executeRawUnsafe: vi.fn(async () => 0),
+      $queryRaw: vi.fn(async () => {
+        throw { code: "57014" };
+      })
+    };
+    const db = {
+      $transaction: vi.fn(async (callback) => callback(transaction))
+    } as unknown as PrismaClient;
+
+    await expect(
+      createPrismaAdminSongRepository(db).create("admin-user", validInput())
+    ).rejects.toMatchObject({ code: "DUPLICATE_CHECK_TIMEOUT" });
+    expect(create).not.toHaveBeenCalled();
+    expect(transaction.karaokeProvider.findMany).not.toHaveBeenCalled();
   });
 });
 
@@ -370,15 +475,25 @@ function validInput(): AdminSongInput {
     tie_in: null,
     source_url: "https://example.com",
     source_name: "Official",
-    verification_note: null,
-    aliases: [{ alias: "Lemon", language: "en", alias_type: "english_title" }],
+    aliases: [
+      {
+        alias: "Lemon English",
+        language: "en",
+        alias_type: "english_title",
+        source_name: "Alias source",
+        source_url: null
+      }
+    ],
     karaoke_entries: [
       {
         provider_id: "tj",
         karaoke_number: "28822",
         version_info: "",
         availability_status: "available",
-        last_verified_at: "2026-07-22"
+        last_verified_at: "2026-07-22",
+        source_name: "TJ",
+        source_url: null,
+        verification_note: null
       }
     ]
   };

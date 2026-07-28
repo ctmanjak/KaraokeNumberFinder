@@ -1,6 +1,7 @@
 import {
-  parseJsonBody,
+  parseLimitedJsonBody,
   personalizationError,
+  requireJsonContentType,
   type PersonalizationRouteHandler
 } from "../personalization";
 import { parseAdminSongInput } from "./input";
@@ -10,6 +11,7 @@ import {
   parseAdminSongListResponse
 } from "./list-contract";
 import type { AdminSongService } from "./service";
+import { ADMIN_SONG_POST_BODY_LIMIT_BYTES } from "./types";
 
 export function createAdminSongOptionsHandler(
   service: AdminSongService
@@ -48,7 +50,10 @@ export function createAdminSongPostHandler(
     if (new URL(request.url).search !== "") {
       throw personalizationError("INVALID_REQUEST");
     }
-    const input = parseAdminSongInput(await parseJsonBody(request));
+    requireJsonContentType(request);
+    const input = parseAdminSongInput(
+      await parseLimitedJsonBody(request, ADMIN_SONG_POST_BODY_LIMIT_BYTES)
+    );
     return Response.json(await service.create(auth.user.id, input), {
       status: 201
     });

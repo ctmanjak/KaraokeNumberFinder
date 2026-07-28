@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AdminSongClientError } from "@/lib/admin-song/client";
 import { checkAdminSongDuplicate } from "@/lib/admin-song-duplicate/client";
@@ -7,7 +7,11 @@ import { normalizeSearchText } from "@/lib/search/normalize";
 
 export type DuplicateState =
   | { status: "idle" }
-  | { status: "invalid"; message: string }
+  | {
+      status: "invalid";
+      message: string;
+      fieldMessages: DuplicateFieldMessages;
+    }
   | { status: "checking" | "retrying" }
   | ({ status: "none" | "possible" | "exact" } & DuplicateCheckResult)
   | {
@@ -30,7 +34,7 @@ export function useDuplicateCheck({
   identity,
   onCatalogDisabled
 }: Readonly<{
-  songId: string;
+  songId?: string;
   identityChanged: boolean;
   catalogDisabled: boolean;
   identity: DuplicateIdentityInput;
@@ -44,12 +48,22 @@ export function useDuplicateCheck({
   const [nonce, setNonce] = useState(0);
   const [state, setState] = useState<DuplicateState>({ status: "idle" });
   const [acknowledged, setAcknowledged] = useState(false);
-  const canonicalNormalized = normalizeSearchText(identity.canonicalTitle);
-  const displayNormalized = normalizeSearchText(identity.displayTitle);
-  const artistNormalized = normalizeSearchText(identity.canonicalArtist);
-  const invalidMessage = duplicateInputError(identity);
+  const { canonicalTitle, displayTitle, canonicalArtist } = identity;
+  const canonicalNormalized = normalizeSearchText(canonicalTitle);
+  const displayNormalized = normalizeSearchText(displayTitle);
+  const artistNormalized = normalizeSearchText(canonicalArtist);
+  const fieldMessages = useMemo(
+    () =>
+      duplicateInputErrors({
+        originalLanguage: "",
+        canonicalTitle,
+        displayTitle,
+        canonicalArtist
+      }),
+    [canonicalArtist, canonicalTitle, displayTitle]
+  );
+  const invalidMessage = Object.values(fieldMessages)[0] ?? null;
   const fingerprint = [
-    identity.originalLanguage,
     canonicalNormalized,
     displayNormalized,
     artistNormalized
@@ -63,7 +77,11 @@ export function useDuplicateCheck({
       queueMicrotask(() => {
         setState(
           identityChanged && !catalogDisabled && invalidMessage !== null
-            ? { status: "invalid", message: invalidMessage }
+            ? {
+                status: "invalid",
+                message: invalidMessage,
+                fieldMessages
+              }
             : { status: "idle" }
         );
         setAcknowledged(false);
@@ -82,7 +100,8 @@ export function useDuplicateCheck({
     const controller = new AbortController();
     controllerRef.current = controller;
     const sequence = ++sequenceRef.current;
-    const allowAutoRetry = !manualNoAutoRetryRef.current;
+    const manualRequest = manualNoAutoRetryRef.current;
+    const allowAutoRetry = !manualRequest;
     manualNoAutoRetryRef.current = false;
     queueMicrotask(() => setState({ status: "checking" }));
 
@@ -93,7 +112,7 @@ export function useDuplicateCheck({
             canonical_title: identity.canonicalTitle,
             display_title: identity.displayTitle,
             canonical_artist: identity.canonicalArtist,
-            exclude_song_id: songId
+            ...(songId === undefined ? {} : { exclude_song_id: songId })
           },
           fetch,
           controller.signal
@@ -139,7 +158,7 @@ export function useDuplicateCheck({
         });
       }
     };
-    const debounce = setTimeout(() => void run(0), 500);
+    const debounce = setTimeout(() => void run(0), manualRequest ? 0 : 500);
     return () => {
       clearTimeout(debounce);
       if (retryTimerRef.current !== null) clearTimeout(retryTimerRef.current);
@@ -153,6 +172,7 @@ export function useDuplicateCheck({
     identity.displayTitle,
     identityChanged,
     invalidMessage,
+    fieldMessages,
     nonce,
     onCatalogDisabled,
     songId
@@ -178,33 +198,54 @@ export function useDuplicateCheck({
     state,
     acknowledged,
     setAcknowledged,
+    fieldMessages,
     reset,
     retry
   };
 }
 
+export type DuplicateFieldMessages = Partial<
+  Record<"canonical_title" | "display_title" | "canonical_artist", string>
+>;
+
+export function duplicateInputErrors(
+  identity: DuplicateIdentityInput
+): DuplicateFieldMessages {
+  const messages: DuplicateFieldMessages = {};
+  for (const [field, subject, value] of [
+    ["canonical_title", "원제는", identity.canonicalTitle],
+    ["display_title", "표시 제목은", identity.displayTitle],
+    ["canonical_artist", "가수는", identity.canonicalArtist]
+  ] as const) {
+    if (Array.from(value.trim()).length > 512) {
+      messages[field] = `${subject} 512자 이하로 입력해 주세요.`;
+    }
+  }
+  if (
+    messages.canonical_title === undefined &&
+    normalizeSearchText(identity.canonicalTitle) === ""
+  ) {
+    messages.canonical_title = "원제에 검색 가능한 문자를 입력해 주세요.";
+  }
+  if (
+    messages.display_title === undefined &&
+    identity.displayTitle.trim() === ""
+  ) {
+    messages.display_title = "표시 제목을 입력해 주세요.";
+  }
+  if (
+    messages.canonical_artist === undefined &&
+    normalizeSearchText(identity.canonicalArtist) === ""
+  ) {
+    messages.canonical_artist = "가수에 검색 가능한 문자를 입력해 주세요.";
+  }
+  return messages;
+}
+
 export function duplicateInputError(
   identity: DuplicateIdentityInput
 ): string | null {
-  for (const [subject, value] of [
-    ["원제는", identity.canonicalTitle],
-    ["표시 제목은", identity.displayTitle],
-    ["가수는", identity.canonicalArtist]
-  ] as const) {
-    if (Array.from(value.trim()).length > 512) {
-      return `${subject} 512자 이하로 입력해 주세요.`;
-    }
-  }
-  if (normalizeSearchText(identity.canonicalTitle) === "") {
-    return "원제에 검색 가능한 문자를 입력해 주세요.";
-  }
-  if (identity.displayTitle.trim() === "") {
-    return "표시 제목을 입력해 주세요.";
-  }
-  if (normalizeSearchText(identity.canonicalArtist) === "") {
-    return "가수에 검색 가능한 문자를 입력해 주세요.";
-  }
-  return null;
+  return Object.values(duplicateInputErrors(identity))[0] ?? null;
 }
 
 function duplicateErrorMessage(error: unknown): string {

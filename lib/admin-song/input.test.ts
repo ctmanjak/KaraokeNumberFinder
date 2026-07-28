@@ -13,12 +13,13 @@ describe("admin song input", () => {
       tie_in: null,
       source_url: "https://example.com/catalog",
       source_name: "Official catalog",
-      verification_note: null,
       aliases: [
         {
           alias: "Yonezu Kenshi Lemon",
           language: "en",
-          alias_type: "romanized_title"
+          alias_type: "romanized_title",
+          source_name: "Alias catalog",
+          source_url: null
         }
       ],
       karaoke_entries: [
@@ -27,7 +28,10 @@ describe("admin song input", () => {
           karaoke_number: "28822",
           version_info: "",
           availability_status: "available",
-          last_verified_at: "2026-07-22"
+          last_verified_at: "2026-07-22",
+          source_name: "TJ catalog",
+          source_url: null,
+          verification_note: null
         }
       ]
     });
@@ -110,7 +114,9 @@ describe("admin song input", () => {
           {
             alias: "System alias",
             language: "en",
-            alias_type: "canonical_title"
+            alias_type: "canonical_title",
+            source_name: null,
+            source_url: null
           }
         ]
       })
@@ -125,7 +131,7 @@ describe("admin song input", () => {
 
   it("rejects a request with a missing key", () => {
     const missingKey: Partial<ReturnType<typeof validInput>> = validInput();
-    delete missingKey.verification_note;
+    delete missingKey.source_name;
 
     expect(() => parseAdminSongInput(missingKey)).toThrowError(
       expect.objectContaining({ code: "VALIDATION_ERROR" })
@@ -147,6 +153,110 @@ describe("admin song input", () => {
       })
     );
   });
+
+  it("applies the shared entry status, future-date, and indexed path rules", () => {
+    expect(() =>
+      parseAdminSongInput(
+        {
+          ...validInput(),
+          karaoke_entries: [
+            {
+              ...validEntry(),
+              availability_status: "not_available",
+              karaoke_number: "",
+              verification_note: null
+            }
+          ]
+        },
+        new Date("2026-07-28T00:00:00.000Z")
+      )
+    ).toThrowError(
+      expect.objectContaining({
+        details: {
+          issues: [
+            expect.objectContaining({
+              path: "karaoke_entries.0.verification_note"
+            })
+          ]
+        }
+      })
+    );
+    expect(() =>
+      parseAdminSongInput(
+        {
+          ...validInput(),
+          karaoke_entries: [{ ...validEntry(), last_verified_at: "2026-07-29" }]
+        },
+        new Date("2026-07-28T00:00:00.000Z")
+      )
+    ).toThrowError(
+      expect.objectContaining({
+        details: {
+          issues: [
+            expect.objectContaining({
+              path: "karaoke_entries.0.last_verified_at"
+            })
+          ]
+        }
+      })
+    );
+    expect(() =>
+      parseAdminSongInput({
+        ...validInput(),
+        karaoke_entries: [{ ...validEntry(), last_verified_at: null }]
+      })
+    ).toThrowError(
+      expect.objectContaining({
+        details: {
+          issues: [
+            expect.objectContaining({
+              path: "karaoke_entries.0.last_verified_at"
+            })
+          ]
+        }
+      })
+    );
+  });
+
+  it("accepts 30 aliases and 20 entries but rejects 31 and 21", () => {
+    const aliases = Array.from({ length: 30 }, (_, index) => ({
+      alias: `Unique alias ${index}`,
+      language: "en",
+      alias_type: "alternate_spelling",
+      source_name: null,
+      source_url: null
+    }));
+    const entries = Array.from({ length: 20 }, (_, index) => ({
+      ...validEntry(),
+      version_info: `version-${index}`
+    }));
+
+    expect(() =>
+      parseAdminSongInput({
+        ...validInput(),
+        aliases,
+        karaoke_entries: entries
+      })
+    ).not.toThrow();
+    for (const [field, value, max] of [
+      ["aliases", [...aliases, { ...aliases[0], alias: "Alias 31" }], 30],
+      [
+        "karaoke_entries",
+        [...entries, { ...validEntry(), version_info: "version-21" }],
+        20
+      ]
+    ] as const) {
+      expect(() =>
+        parseAdminSongInput({ ...validInput(), [field]: value })
+      ).toThrowError(
+        expect.objectContaining({
+          details: {
+            issues: [expect.objectContaining({ path: field, max })]
+          }
+        })
+      );
+    }
+  });
 });
 
 function validInput() {
@@ -159,12 +269,13 @@ function validInput() {
     tie_in: null,
     source_url: "https://example.com/catalog",
     source_name: "Official catalog",
-    verification_note: null,
     aliases: [
       {
         alias: "Yonezu Kenshi Lemon",
         language: "en",
-        alias_type: "romanized_title"
+        alias_type: "romanized_title",
+        source_name: "Alias catalog",
+        source_url: null
       }
     ],
     karaoke_entries: [validEntry()]
@@ -177,6 +288,9 @@ function validEntry() {
     karaoke_number: "28822",
     version_info: "",
     availability_status: "available",
-    last_verified_at: "2026-07-22"
+    last_verified_at: "2026-07-22",
+    source_name: "TJ catalog",
+    source_url: null,
+    verification_note: null
   };
 }

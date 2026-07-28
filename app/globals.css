@@ -620,6 +620,12 @@ h1 {
   gap: 8px;
 }
 
+.field-error {
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .recent-searches {
   display: grid;
   gap: 8px;

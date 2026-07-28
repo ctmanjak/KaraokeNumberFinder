@@ -299,7 +299,6 @@ describeDatabase(
           tie_in: null,
           source_url: null,
           source_name: "Race source",
-          verification_note: null,
           aliases: [],
           karaoke_entries: [
             {
@@ -307,7 +306,10 @@ describeDatabase(
               karaoke_number: "77777",
               version_info: "",
               availability_status: "available",
-              last_verified_at: "2026-07-26"
+              last_verified_at: "2026-07-26",
+              source_name: "Race provider source",
+              source_url: null,
+              verification_note: null
             }
           ]
         })

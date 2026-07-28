@@ -9,7 +9,8 @@ import {
 import type { AdminSongService } from "./service";
 import {
   ADMIN_AVAILABILITY_STATUSES,
-  ADMIN_EDITABLE_ALIAS_TYPES
+  ADMIN_EDITABLE_ALIAS_TYPES,
+  ADMIN_SONG_POST_BODY_LIMIT_BYTES
 } from "./types";
 
 const ORIGIN = "https://knf.example";
@@ -96,6 +97,26 @@ describe("admin song route handlers", () => {
       expect(service.create).not.toHaveBeenCalled();
     }
   });
+
+  it("enforces the 524288/524289 actual UTF-8 byte boundary before validation", async () => {
+    const service = stubService();
+    const exactBody = JSON.stringify(
+      "a".repeat(ADMIN_SONG_POST_BODY_LIMIT_BYTES - 2)
+    );
+    const overBody = `${exactBody} `;
+
+    const exact = await protectedHandler(createAdminSongPostHandler(service))(
+      rawMutationRequest(exactBody)
+    );
+    expect(exact.status).toBe(422);
+
+    const over = await protectedHandler(createAdminSongPostHandler(service))(
+      rawMutationRequest(overBody)
+    );
+    expect(over.status).toBe(413);
+    expect((await over.json()).error.code).toBe("PAYLOAD_TOO_LARGE");
+    expect(service.create).not.toHaveBeenCalled();
+  });
 });
 
 function protectedHandler(
@@ -124,7 +145,12 @@ function stubService(): AdminSongService {
         canonical_artist: "米津玄師"
       },
       alias_count: 4,
-      karaoke_entry_count: 1
+      karaoke_entry_count: 1,
+      created_counts: {
+        songs: 1,
+        administrator_aliases: 1,
+        karaoke_entries: 1
+      }
     }))
   };
 }
@@ -146,6 +172,19 @@ function mutationRequest(
   });
 }
 
+function rawMutationRequest(body: string) {
+  return new Request(`${ORIGIN}/api/admin/songs`, {
+    method: "POST",
+    headers: {
+      origin: ORIGIN,
+      "sec-fetch-site": "same-origin",
+      "content-type": "application/json",
+      "x-knf-request": "1"
+    },
+    body
+  });
+}
+
 function validInput() {
   return {
     original_language: "ja",
@@ -156,7 +195,6 @@ function validInput() {
     tie_in: null,
     source_url: "https://example.com",
     source_name: "Official",
-    verification_note: null,
     aliases: [],
     karaoke_entries: [
       {
@@ -164,7 +202,10 @@ function validInput() {
         karaoke_number: "28822",
         version_info: "",
         availability_status: "available",
-        last_verified_at: null
+        last_verified_at: "2026-07-22",
+        source_name: "TJ",
+        source_url: null,
+        verification_note: null
       }
     ]
   };

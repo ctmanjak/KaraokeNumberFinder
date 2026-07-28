@@ -325,6 +325,21 @@ export function isStatementTimeout(error: unknown): boolean {
     ) {
       return true;
     }
+    if (
+      typeof current === "object" &&
+      current !== null &&
+      "code" in current &&
+      current.code === "P2010" &&
+      "meta" in current
+    ) {
+      const metadata = JSON.stringify(current.meta);
+      if (
+        metadata.includes("57014") &&
+        /statement timeout|canceling statement/iu.test(metadata)
+      ) {
+        return true;
+      }
+    }
     current =
       typeof current === "object" && current !== null && "cause" in current
         ? current.cause
