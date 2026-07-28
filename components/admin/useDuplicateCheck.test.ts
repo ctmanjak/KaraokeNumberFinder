@@ -16,6 +16,12 @@ describe("administrator duplicate-check input state", () => {
       "검색 가능한 문자"
     );
     expect(
+      duplicateInputError({ ...valid, canonicalTitle: "a".repeat(513) })
+    ).toBe("원제는 512자 이하로 입력해 주세요.");
+    expect(
+      duplicateInputError({ ...valid, displayTitle: "a".repeat(513) })
+    ).toBe("표시 제목은 512자 이하로 입력해 주세요.");
+    expect(
       duplicateInputError({ ...valid, canonicalArtist: "a".repeat(513) })
     ).toBe("가수는 512자 이하로 입력해 주세요.");
   });

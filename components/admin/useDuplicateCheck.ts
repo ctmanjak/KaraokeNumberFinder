@@ -186,13 +186,13 @@ export function useDuplicateCheck({
 export function duplicateInputError(
   identity: DuplicateIdentityInput
 ): string | null {
-  for (const [label, value] of [
-    ["원제", identity.canonicalTitle],
-    ["표시 제목", identity.displayTitle],
-    ["가수", identity.canonicalArtist]
+  for (const [subject, value] of [
+    ["원제는", identity.canonicalTitle],
+    ["표시 제목은", identity.displayTitle],
+    ["가수는", identity.canonicalArtist]
   ] as const) {
     if (Array.from(value.trim()).length > 512) {
-      return `${label}는 512자 이하로 입력해 주세요.`;
+      return `${subject} 512자 이하로 입력해 주세요.`;
     }
   }
   if (normalizeSearchText(identity.canonicalTitle) === "") {
