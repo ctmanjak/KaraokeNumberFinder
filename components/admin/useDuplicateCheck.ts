@@ -198,7 +198,7 @@ export function useDuplicateCheck({
     state,
     acknowledged,
     setAcknowledged,
-    fieldMessages,
+    fieldMessages: identityChanged ? fieldMessages : {},
     reset,
     retry
   };
@@ -245,7 +245,13 @@ export function duplicateInputErrors(
 export function duplicateInputError(
   identity: DuplicateIdentityInput
 ): string | null {
-  return Object.values(duplicateInputErrors(identity))[0] ?? null;
+  const messages = duplicateInputErrors(identity);
+  return (
+    messages.canonical_title ??
+    messages.display_title ??
+    messages.canonical_artist ??
+    null
+  );
 }
 
 function duplicateErrorMessage(error: unknown): string {

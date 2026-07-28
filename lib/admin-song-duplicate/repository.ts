@@ -332,10 +332,11 @@ export function isStatementTimeout(error: unknown): boolean {
       current.code === "P2010" &&
       "meta" in current
     ) {
-      const metadata = JSON.stringify(current.meta);
       if (
-        metadata.includes("57014") &&
-        /statement timeout|canceling statement/iu.test(metadata)
+        typeof current.meta === "object" &&
+        current.meta !== null &&
+        "code" in current.meta &&
+        current.meta.code === "57014"
       ) {
         return true;
       }

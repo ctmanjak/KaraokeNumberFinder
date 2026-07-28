@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
   type FormEvent
@@ -96,6 +97,10 @@ export function AdminSongPage({
   const [aliases, setAliases] = useState<AliasDraft[]>([]);
   const [entries, setEntries] = useState<EntryDraft[]>([]);
   const [recovery, setRecovery] = useState<RecoveryState | null>(null);
+  const identityTouched =
+    identity.canonicalTitle !== "" ||
+    identity.displayTitle !== "" ||
+    identity.canonicalArtist !== "";
   const disableCatalog = useCallback(() => {
     setCatalogNotEnabled("submit");
   }, []);
@@ -106,7 +111,7 @@ export function AdminSongPage({
     fieldMessages,
     retry: retryDuplicate
   } = useDuplicateCheck({
-    identityChanged: true,
+    identityChanged: identityTouched,
     catalogDisabled: catalogNotEnabled !== null,
     identity: {
       originalLanguage: "",
@@ -357,12 +362,14 @@ export function AdminSongPage({
             <TextField name="tie_in" label="작품/타이인" />
           </fieldset>
 
-          <DuplicatePanel
-            state={duplicate}
-            acknowledged={acknowledged}
-            onAcknowledged={setAcknowledged}
-            onRetry={retryDuplicate}
-          />
+          {recovery === null ? (
+            <DuplicatePanel
+              state={duplicate}
+              acknowledged={acknowledged}
+              onAcknowledged={setAcknowledged}
+              onRetry={retryDuplicate}
+            />
+          ) : null}
 
           <fieldset className="settings-section" disabled={interactionLocked}>
             <legend>곡 출처</legend>
@@ -373,7 +380,7 @@ export function AdminSongPage({
           <fieldset className="settings-section" disabled={interactionLocked}>
             <legend>추가 검색 별칭</legend>
             <p className="form-note">
-              원제, 표시 제목, 가수 별칭은 자동 생성됩니다. {aliases.length}/ 30
+              원제, 표시 제목, 가수 별칭은 자동 생성됩니다. {aliases.length}/30
             </p>
             {aliases.map((alias, index) => (
               <div className="admin-repeat-card" key={alias.key}>
@@ -973,6 +980,7 @@ function TextField({
   error?: string;
   onChange?: (value: string) => void;
 }>) {
+  const errorId = useId();
   return (
     <label className="settings-field">
       <span className="field-label">{label}</span>
@@ -988,6 +996,7 @@ function TextField({
         disabled={disabled}
         aria-label={label}
         aria-invalid={error === undefined ? undefined : true}
+        aria-describedby={error === undefined ? undefined : errorId}
         onChange={
           onChange === undefined
             ? undefined
@@ -995,7 +1004,7 @@ function TextField({
         }
       />
       {error === undefined ? null : (
-        <span className="field-error" role="alert">
+        <span className="field-error" id={errorId} role="alert">
           {error}
         </span>
       )}

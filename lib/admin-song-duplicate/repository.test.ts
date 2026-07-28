@@ -94,4 +94,26 @@ describe("duplicate candidate repository", () => {
       })
     ).rejects.toEqual(new DuplicateCheckRepositoryError("TIMEOUT"));
   });
+
+  it("maps a Prisma P2010 wrapped cancellation to a timeout", async () => {
+    const transaction = {
+      $executeRawUnsafe: vi.fn(async () => 0),
+      $queryRaw: vi.fn(async () => {
+        throw {
+          code: "P2010",
+          meta: { code: "57014", message: "canceling statement" }
+        };
+      })
+    };
+    const db = {
+      $transaction: vi.fn(async (run) => run(transaction))
+    } as unknown as PrismaClient;
+
+    await expect(
+      findDuplicateCandidates(db, {
+        canonical_title: "Lemon",
+        canonical_artist: "Artist"
+      })
+    ).rejects.toEqual(new DuplicateCheckRepositoryError("TIMEOUT"));
+  });
 });

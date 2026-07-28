@@ -36,6 +36,13 @@ describe("administrator duplicate-check input state", () => {
       display_title: "표시 제목을 입력해 주세요.",
       canonical_artist: "가수는 512자 이하로 입력해 주세요."
     });
+    expect(
+      duplicateInputError({
+        ...valid,
+        canonicalTitle: "---",
+        displayTitle: "a".repeat(513)
+      })
+    ).toBe("원제에 검색 가능한 문자를 입력해 주세요.");
   });
 
   it("waits for the 500ms trailing edge and applies only the current fingerprint", async () => {

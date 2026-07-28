@@ -163,7 +163,7 @@ export function validateAdminSongCreateAggregate(
   );
   rejectDuplicateEntries(input.karaoke_entries);
 
-  const today = currentDate.toISOString().slice(0, 10);
+  const today = serviceDate(currentDate);
   for (const [index, entry] of input.karaoke_entries.entries()) {
     const path = `karaoke_entries.${index}`;
     if (entry.source_name.trim() === "") {
@@ -213,13 +213,11 @@ export function validateAdminSongCreateAggregate(
 function parseAlias(value: unknown, index: number) {
   const path = `aliases.${index}`;
   const alias = record(value, path);
-  exactKeys(alias, [
-    "alias",
-    "language",
-    "alias_type",
-    "source_name",
-    "source_url"
-  ]);
+  exactKeys(
+    alias,
+    ["alias", "language", "alias_type", "source_name", "source_url"],
+    path
+  );
   const aliasType = requiredString(alias.alias_type, `${path}.alias_type`, 64);
   if (!(ADMIN_EDITABLE_ALIAS_TYPES as readonly string[]).includes(aliasType)) {
     throw adminSongValidationError(`${path}.alias_type`);
@@ -242,16 +240,20 @@ function parseAlias(value: unknown, index: number) {
 function parseEntry(value: unknown, index: number) {
   const path = `karaoke_entries.${index}`;
   const entry = record(value, path);
-  exactKeys(entry, [
-    "provider_id",
-    "karaoke_number",
-    "version_info",
-    "availability_status",
-    "last_verified_at",
-    "source_name",
-    "source_url",
-    "verification_note"
-  ]);
+  exactKeys(
+    entry,
+    [
+      "provider_id",
+      "karaoke_number",
+      "version_info",
+      "availability_status",
+      "last_verified_at",
+      "source_name",
+      "source_url",
+      "verification_note"
+    ],
+    path
+  );
   const status = requiredString(
     entry.availability_status,
     `${path}.availability_status`,
@@ -376,24 +378,43 @@ function array(
 
 function exactKeys(
   input: Record<string, unknown>,
-  keys: readonly string[]
+  keys: readonly string[],
+  path = ""
 ): void {
-  allowedKeys(input, keys);
+  allowedKeys(input, keys, path);
   const missing = keys.find((key) => !Object.hasOwn(input, key));
   if (missing !== undefined) {
-    throw adminSongValidationError(missing, "Required field.");
+    throw adminSongValidationError(
+      path === "" ? missing : `${path}.${missing}`,
+      "Required field."
+    );
   }
 }
 
 function allowedKeys(
   input: Record<string, unknown>,
-  keys: readonly string[]
+  keys: readonly string[],
+  path = ""
 ): void {
   const allowed = new Set(keys);
   const unknown = Object.keys(input).find((key) => !allowed.has(key));
   if (unknown !== undefined) {
-    throw adminSongValidationError(unknown, "Unknown field.");
+    throw adminSongValidationError(
+      path === "" ? unknown : `${path}.${unknown}`,
+      "Unknown field."
+    );
   }
+}
+
+function serviceDate(value: Date): string {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(value);
+  const byType = new Map(parts.map((part) => [part.type, part.value]));
+  return `${byType.get("year")}-${byType.get("month")}-${byType.get("day")}`;
 }
 
 function requiredString(

@@ -218,6 +218,66 @@ describe("admin song input", () => {
     );
   });
 
+  it("uses the KST service date for future-date validation", () => {
+    const duringKstCrossover = new Date("2026-07-27T15:30:00.000Z");
+    expect(() =>
+      parseAdminSongInput(
+        {
+          ...validInput(),
+          karaoke_entries: [{ ...validEntry(), last_verified_at: "2026-07-28" }]
+        },
+        duringKstCrossover
+      )
+    ).not.toThrow();
+    expect(() =>
+      parseAdminSongInput(
+        {
+          ...validInput(),
+          karaoke_entries: [{ ...validEntry(), last_verified_at: "2026-07-29" }]
+        },
+        duringKstCrossover
+      )
+    ).toThrowError(
+      expect.objectContaining({
+        details: {
+          issues: [
+            expect.objectContaining({
+              path: "karaoke_entries.0.last_verified_at"
+            })
+          ]
+        }
+      })
+    );
+  });
+
+  it.each([
+    [
+      "missing alias field",
+      () => {
+        const alias = { ...validInput().aliases[0] };
+        delete (alias as Partial<typeof alias>).source_name;
+        return { ...validInput(), aliases: [alias] };
+      },
+      "aliases.0.source_name"
+    ],
+    [
+      "unknown entry field",
+      () => ({
+        ...validInput(),
+        karaoke_entries: [{ ...validEntry(), unexpected: true }]
+      }),
+      "karaoke_entries.0.unexpected"
+    ]
+  ])("reports the indexed path for a %s", (_name, input, path) => {
+    expect(() => parseAdminSongInput(input())).toThrowError(
+      expect.objectContaining({
+        details: {
+          issues: [expect.objectContaining({ path })]
+        }
+      })
+    );
+  });
+
   it("accepts 30 aliases and 20 entries but rejects 31 and 21", () => {
     const aliases = Array.from({ length: 30 }, (_, index) => ({
       alias: `Unique alias ${index}`,

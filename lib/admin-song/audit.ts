@@ -31,6 +31,12 @@ export function createAdminSongCreateAuditCompletion(
     const payload = await safeJson(completion.response);
     const songId = completion.response.ok ? readSongId(payload) : undefined;
     const errorCode = readErrorCode(payload);
+    const createCounts = completion.response.ok
+      ? readCreateCounts(payload)
+      : ZERO_COUNTS;
+    if (completion.response.ok && createCounts === null) {
+      console.error("[admin-song] Successful create audit had invalid counts.");
+    }
     const event: AdminSongCreateAuditEvent = {
       event: "admin_song.create",
       occurred_at: now().toISOString(),
@@ -46,9 +52,7 @@ export function createAdminSongCreateAuditCompletion(
           : "rejected",
       http_status: completion.response.status,
       ...(errorCode === undefined ? {} : { error_code: errorCode }),
-      created_counts: completion.response.ok
-        ? readCreateCounts(payload)
-        : ZERO_COUNTS
+      created_counts: createCounts ?? ZERO_COUNTS
     };
     try {
       writer(event);
@@ -85,7 +89,7 @@ function readSongId(value: unknown): string | undefined {
     : undefined;
 }
 
-function readCreateCounts(value: unknown): AdminSongCreateCounts {
+function readCreateCounts(value: unknown): AdminSongCreateCounts | null {
   if (
     isRecord(value) &&
     isRecord(value.created_counts) &&
@@ -99,7 +103,7 @@ function readCreateCounts(value: unknown): AdminSongCreateCounts {
       karaoke_entries: value.created_counts.karaoke_entries
     };
   }
-  return ZERO_COUNTS;
+  return null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

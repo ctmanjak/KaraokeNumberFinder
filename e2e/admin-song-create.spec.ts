@@ -95,8 +95,11 @@ test("administrator creates once, then branches to exact and possible existing-s
       page.getByLabel("표시된 후보를 모두 확인했으며 새 곡 추가")
     ).not.toBeChecked();
   } finally {
-    await deleteSongsByIdentity(database, identity);
-    await database.end();
+    try {
+      await deleteSongsByIdentity(database, identity);
+    } finally {
+      await database.end();
+    }
   }
 });
 
@@ -118,6 +121,8 @@ test("ambiguous create response performs a duplicate recheck without replaying P
   try {
     await users.loginAdmin(page.request, admin);
     await page.goto("/admin/songs/new");
+    // The form must observe "none" before the simulated server commit; changing
+    // identity after that commit would recheck as exact and disable submission.
     await fillCreateForm(page, identity);
     const providerId = await page
       .locator(".admin-repeat-card select.provider-select")
@@ -188,8 +193,11 @@ test("ambiguous create response performs a duplicate recheck without replaying P
     if (!page.isClosed()) {
       await page.unrouteAll({ behavior: "wait" });
     }
-    await deleteSongsByIdentity(database, identity);
-    await database.end();
+    try {
+      await deleteSongsByIdentity(database, identity);
+    } finally {
+      await database.end();
+    }
   }
 });
 

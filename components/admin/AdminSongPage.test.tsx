@@ -26,6 +26,37 @@ describe("admin song page", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps a pristine form idle without field errors", async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      if (input.toString() === "/api/auth/get-session") {
+        return jsonResponse({
+          user: { id: "admin-a", name: "Admin", is_admin: true }
+        });
+      }
+      if (input.toString() === "/api/admin/songs/options") {
+        return optionsResponse();
+      }
+      return jsonResponse({ error: { code: "NOT_FOUND" } }, 404);
+    });
+    vi.stubGlobal("fetch", fetcher);
+
+    renderPage();
+
+    expect(
+      await screen.findByText("원제와 가수를 입력하면 중복을 확인합니다.")
+    ).toBeTruthy();
+    expect(screen.queryByText("곡 식별 입력을 확인해 주세요.")).toBeNull();
+    expect(
+      screen.getByLabelText("원제").getAttribute("aria-invalid")
+    ).toBeNull();
+    expect(
+      screen.getByLabelText("표시 제목").getAttribute("aria-invalid")
+    ).toBeNull();
+    expect(
+      screen.getByLabelText("가수").getAttribute("aria-invalid")
+    ).toBeNull();
+  });
+
   it("loads dynamic options and submits one atomic song request", async () => {
     const navigate = vi.fn();
     const fetcher = vi.fn(

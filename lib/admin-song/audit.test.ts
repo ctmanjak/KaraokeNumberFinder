@@ -113,4 +113,37 @@ describe("administrator song create audit", () => {
       })
     ).resolves.toBeUndefined();
   });
+
+  it("warns instead of silently trusting malformed success counts", async () => {
+    const writer = vi.fn();
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const completion = createAdminSongCreateAuditCompletion(writer);
+
+    await completion({
+      requestId: "request-malformed-counts",
+      response: Response.json({
+        song: { id: "song-created" },
+        created_counts: {
+          songs: 0,
+          administrator_aliases: "invalid",
+          karaoke_entries: 1
+        }
+      })
+    });
+
+    expect(consoleError).toHaveBeenCalledWith(
+      "[admin-song] Successful create audit had invalid counts."
+    );
+    expect(writer).toHaveBeenCalledWith(
+      expect.objectContaining({ created_counts: ZERO_EXPECTED_COUNTS })
+    );
+  });
 });
+
+const ZERO_EXPECTED_COUNTS = {
+  songs: 0,
+  administrator_aliases: 0,
+  karaoke_entries: 0
+};
