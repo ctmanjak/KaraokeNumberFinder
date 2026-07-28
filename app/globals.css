@@ -570,6 +570,34 @@ h1 {
   line-height: 1.45;
 }
 
+.admin-detail-frame {
+  max-width: 760px;
+}
+
+.admin-candidate-list {
+  display: grid;
+  gap: 0.75rem;
+  list-style: none;
+  margin: 0.75rem 0;
+  padding: 0;
+}
+
+.admin-candidate-list .admin-repeat-card {
+  align-items: flex-start;
+}
+
+.admin-acknowledgement {
+  align-items: flex-start;
+  cursor: pointer;
+  display: flex;
+  gap: 0.6rem;
+  line-height: 1.5;
+}
+
+.admin-acknowledgement input {
+  margin-top: 0.25rem;
+}
+
 .admin-song-updated {
   border-top: 1px solid var(--line);
   padding-top: 10px;

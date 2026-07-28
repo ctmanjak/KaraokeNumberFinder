@@ -5,6 +5,8 @@ import {
   buildAliasSearchFields,
   normalizeSearchText
 } from "../search/normalize";
+import { normalizeSongIdentity } from "../song-identity/normalize";
+import { isNormalizedIdentityUniqueViolation } from "../song-identity/prisma-error";
 import { isAdminSongCursorTimestamp, type AdminSongCursorKey } from "./cursor";
 import type { AdminSongListItem, AdminSongListQuery } from "./list-contract";
 import type {
@@ -161,6 +163,7 @@ export function createPrismaAdminSongRepository(
     },
 
     async create(userId, input) {
+      const identity = normalizeSongIdentity(input);
       try {
         return await db.$transaction(
           async (transaction) => {
@@ -168,8 +171,8 @@ export function createPrismaAdminSongRepository(
 
             const duplicate = await transaction.song.findFirst({
               where: {
-                canonicalTitle: input.canonical_title,
-                canonicalArtist: input.canonical_artist
+                normalizedCanonicalTitle: identity.normalizedCanonicalTitle,
+                normalizedCanonicalArtist: identity.normalizedCanonicalArtist
               },
               select: { id: true }
             });
@@ -229,6 +232,8 @@ export function createPrismaAdminSongRepository(
                 canonicalTitle: input.canonical_title,
                 displayTitle: input.display_title,
                 canonicalArtist: input.canonical_artist,
+                normalizedCanonicalTitle: identity.normalizedCanonicalTitle,
+                normalizedCanonicalArtist: identity.normalizedCanonicalArtist,
                 releaseYear: input.release_year,
                 tieIn: input.tie_in,
                 sourceUrl: input.source_url,
@@ -260,6 +265,9 @@ export function createPrismaAdminSongRepository(
       } catch (error) {
         if (error instanceof AdminSongRepositoryError) {
           throw error;
+        }
+        if (isNormalizedIdentityUniqueViolation(error)) {
+          throw new AdminSongRepositoryError("DUPLICATE_SONG");
         }
         if (hasPrismaConflictCode(error)) {
           throw new AdminSongRepositoryError("CONFLICT");

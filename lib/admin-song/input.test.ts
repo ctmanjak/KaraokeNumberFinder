@@ -67,7 +67,7 @@ describe("admin song input", () => {
           {
             alias: " Lemon ",
             language: "en",
-            alias_type: "canonical_title"
+            alias_type: "english_title"
           }
         ]
       })
@@ -81,12 +81,70 @@ describe("admin song input", () => {
     ).toThrowError(expect.objectContaining({ code: "VALIDATION_ERROR" }));
   });
 
+  it("rejects normalized administrator duplicates across editable alias types", () => {
+    expect(() =>
+      parseAdminSongInput({
+        ...validInput(),
+        aliases: [
+          {
+            alias: "Alternate",
+            language: "en",
+            alias_type: "english_title"
+          },
+          {
+            alias: "Ａｌｔｅｒｎａｔｅ！",
+            language: "ko",
+            alias_type: "common_name"
+          }
+        ]
+      })
+    ).toThrowError(expect.objectContaining({ code: "VALIDATION_ERROR" }));
+  });
+
+  it("reports an indexed path for an invalid alias type", () => {
+    expect(() =>
+      parseAdminSongInput({
+        ...validInput(),
+        aliases: [
+          validInput().aliases[0],
+          {
+            alias: "System alias",
+            language: "en",
+            alias_type: "canonical_title"
+          }
+        ]
+      })
+    ).toThrowError(
+      expect.objectContaining({
+        details: {
+          issues: [expect.objectContaining({ path: "aliases.1.alias_type" })]
+        }
+      })
+    );
+  });
+
   it("rejects a request with a missing key", () => {
     const missingKey: Partial<ReturnType<typeof validInput>> = validInput();
     delete missingKey.verification_note;
 
     expect(() => parseAdminSongInput(missingKey)).toThrowError(
       expect.objectContaining({ code: "VALIDATION_ERROR" })
+    );
+  });
+
+  it.each([
+    ["canonical_title", { canonical_title: "---" }],
+    ["normalized_canonical_title", { normalized_canonical_title: "forged" }]
+  ])("includes the raw field path for identity error %s", (path, patch) => {
+    expect(() =>
+      parseAdminSongInput({ ...validInput(), ...patch })
+    ).toThrowError(
+      expect.objectContaining({
+        code: "VALIDATION_ERROR",
+        details: {
+          issues: [expect.objectContaining({ path })]
+        }
+      })
     );
   });
 });

@@ -93,6 +93,34 @@ describe("personalization error contract", () => {
     expect(second).not.toBe(first);
   });
 
+  it("serializes only allowlisted error detail fields", async () => {
+    const response = createPersonalizationErrorResponse(
+      personalizationDomainError({
+        code: "DUPLICATE_SONG",
+        status: 409,
+        publicMessage: "Duplicate.",
+        details: {
+          candidates: [
+            {
+              id: "song-a",
+              display_title: "must-not-leak"
+            } as { id: string }
+          ]
+        }
+      }),
+      { requestId: "safe-details", writeSafeLog: () => undefined }
+    );
+
+    expect(await response.json()).toStrictEqual({
+      error: {
+        code: "DUPLICATE_SONG",
+        message: "Duplicate.",
+        request_id: "safe-details",
+        details: { candidates: [{ id: "song-a" }] }
+      }
+    });
+  });
+
   it("redacts unexpected errors from both response and safe logs", async () => {
     const secrets = [
       "session-token-must-not-leak",

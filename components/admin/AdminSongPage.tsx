@@ -9,8 +9,8 @@ import {
   fetchAdminSongOptions
 } from "@/lib/admin-song/client";
 import type {
-  AdminAliasType,
   AdminAvailabilityStatus,
+  AdminEditableAliasType,
   AdminSongOptions
 } from "@/lib/admin-song/types";
 
@@ -18,7 +18,7 @@ type AliasDraft = {
   key: number;
   alias: string;
   language: string;
-  alias_type: AdminAliasType;
+  alias_type: AdminEditableAliasType;
 };
 
 type EntryDraft = {
@@ -261,7 +261,7 @@ export function AdminSongPage() {
                     value={alias.alias_type}
                     onChange={(event) =>
                       updateAlias(index, {
-                        alias_type: event.target.value as AdminAliasType
+                        alias_type: event.target.value as AdminEditableAliasType
                       })
                     }
                   >

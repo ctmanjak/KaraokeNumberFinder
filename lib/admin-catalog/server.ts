@@ -28,7 +28,11 @@ const serverGuardDependencies = {
 
 export function createServerAdminCatalogHandler(
   routeCategory: AdminCatalogRouteCategory,
-  handler: Parameters<typeof createAdminCatalogHandler>[1]
+  handler: Parameters<typeof createAdminCatalogHandler>[1],
+  options: Readonly<{
+    requireJsonInCsrf?: boolean;
+    onComplete?: Parameters<typeof createAdminCatalogHandler>[2]["onComplete"];
+  }> = {}
 ) {
   return createAdminCatalogHandler(routeCategory, handler, {
     ...serverGuardDependencies,
@@ -38,7 +42,8 @@ export function createServerAdminCatalogHandler(
       } catch {
         throw personalizationError("PERSONALIZATION_UNAVAILABLE");
       }
-    }
+    },
+    ...options
   });
 }
 

@@ -7,7 +7,10 @@ import {
   createAdminSongPostHandler
 } from "./route-handler";
 import type { AdminSongService } from "./service";
-import { ADMIN_ALIAS_TYPES, ADMIN_AVAILABILITY_STATUSES } from "./types";
+import {
+  ADMIN_AVAILABILITY_STATUSES,
+  ADMIN_EDITABLE_ALIAS_TYPES
+} from "./types";
 
 const ORIGIN = "https://knf.example";
 
@@ -109,7 +112,7 @@ function protectedHandler(
 function stubService(): AdminSongService {
   return {
     getOptions: vi.fn(async () => ({
-      alias_types: ADMIN_ALIAS_TYPES,
+      alias_types: ADMIN_EDITABLE_ALIAS_TYPES,
       availability_statuses: ADMIN_AVAILABILITY_STATUSES,
       providers: [{ id: "tj", name: "TJ", country: "KR" }]
     })),

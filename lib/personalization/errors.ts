@@ -16,7 +16,18 @@ export type PersonalizationErrorCode =
   (typeof PERSONALIZATION_ERROR_CODES)[number];
 
 export type PersonalizationHttpStatus =
-  400 | 401 | 403 | 404 | 409 | 422 | 429 | 500;
+  400 | 401 | 403 | 404 | 409 | 413 | 415 | 422 | 429 | 500 | 503;
+
+export type PersonalizationValidationIssue = Readonly<{
+  path: string;
+  message: string;
+  max?: number;
+}>;
+
+export type PersonalizationErrorDetails = Readonly<{
+  issues?: readonly PersonalizationValidationIssue[];
+  candidates?: ReadonlyArray<Readonly<{ id: string }>>;
+}>;
 
 type ErrorDefinition = {
   status: PersonalizationHttpStatus;
@@ -71,7 +82,8 @@ export class PersonalizationApiError<
   constructor(
     code: TCode,
     status: PersonalizationHttpStatus,
-    publicMessage: string
+    publicMessage: string,
+    readonly details?: PersonalizationErrorDetails
   ) {
     super(publicMessage);
     this.name = "PersonalizationApiError";
@@ -96,6 +108,7 @@ export type PersonalizationErrorEnvelope = {
     code: string;
     message: string;
     request_id: string;
+    details?: PersonalizationErrorDetails;
   };
 };
 
@@ -114,6 +127,7 @@ export function personalizationDomainError<TCode extends string>(definition: {
   code: TCode;
   status: PersonalizationHttpStatus;
   publicMessage: string;
+  details?: PersonalizationErrorDetails;
 }): PersonalizationApiError<TCode> {
   if (
     !/^[A-Z][A-Z0-9_]*$/u.test(definition.code) ||
@@ -126,7 +140,8 @@ export function personalizationDomainError<TCode extends string>(definition: {
   return new PersonalizationApiError(
     definition.code,
     definition.status,
-    definition.publicMessage
+    definition.publicMessage,
+    definition.details
   );
 }
 
@@ -155,11 +170,16 @@ export function createPersonalizationErrorResponse(
 
   writeFailureEvent(event, options.writeSafeLog);
 
+  const details =
+    apiError.details === undefined
+      ? undefined
+      : sanitizeErrorDetails(apiError.details);
   const body: PersonalizationErrorEnvelope = {
     error: {
       code: apiError.code,
       message: apiError.message,
-      request_id: requestId
+      request_id: requestId,
+      ...(details === undefined ? {} : { details })
     }
   };
   const headers = new Headers({
@@ -176,6 +196,54 @@ export function createPersonalizationErrorResponse(
     status: apiError.status,
     headers
   });
+}
+
+function sanitizeErrorDetails(
+  value: PersonalizationErrorDetails
+): PersonalizationErrorDetails | undefined {
+  const record = value as Record<string, unknown>;
+  const issues = Array.isArray(record.issues)
+    ? record.issues.filter(isValidationIssue).map((issue) => ({
+        path: issue.path,
+        message: issue.message,
+        ...(typeof issue.max === "number" ? { max: issue.max } : {})
+      }))
+    : undefined;
+  const candidates = Array.isArray(record.candidates)
+    ? record.candidates
+        .filter(isCandidateReference)
+        .map((candidate) => ({ id: candidate.id }))
+    : undefined;
+  if (issues === undefined && candidates === undefined) return undefined;
+  return {
+    ...(issues === undefined ? {} : { issues }),
+    ...(candidates === undefined ? {} : { candidates })
+  };
+}
+
+function isValidationIssue(
+  value: unknown
+): value is PersonalizationValidationIssue {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "path" in value &&
+    typeof value.path === "string" &&
+    "message" in value &&
+    typeof value.message === "string" &&
+    (!("max" in value) || typeof value.max === "number")
+  );
+}
+
+function isCandidateReference(
+  value: unknown
+): value is Readonly<{ id: string }> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    typeof value.id === "string"
+  );
 }
 
 function writeFailureEvent(

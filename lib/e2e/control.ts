@@ -7,6 +7,7 @@ import { getServerAuth } from "../auth/server";
 import { authCookiePolicy, SESSION_IDLE_TTL_SECONDS } from "../auth/policy";
 import { getPrismaClient } from "../db/prisma";
 import { readAuthEnvironment } from "../auth/env";
+import { E2E_FIXTURE_MARKER } from "./constants";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -16,7 +17,11 @@ export async function readBrowserE2EFixtures(): Promise<Response> {
   const prisma = getPrismaClient();
   const [songs, providers] = await Promise.all([
     prisma.song.findMany({
-      where: { aliases: { some: {} } },
+      where: {
+        verifiedBy: { not: E2E_FIXTURE_MARKER },
+        sourceName: { not: E2E_FIXTURE_MARKER },
+        aliases: { some: {} }
+      },
       orderBy: { id: "asc" },
       take: 3,
       select: {
@@ -65,7 +70,7 @@ export async function createBrowserE2ESession(
     !hasExactKeys(
       body,
       ["action", "display_name", "user_id"],
-      ["oauth_state"]
+      ["oauth_state", "is_admin"]
     ) ||
     body.action !== "login" ||
     typeof body.user_id !== "string" ||
@@ -74,6 +79,7 @@ export async function createBrowserE2ESession(
     body.display_name.trim() !== body.display_name ||
     body.display_name.length === 0 ||
     body.display_name.length > MAX_DISPLAY_NAME_LENGTH ||
+    (body.is_admin !== undefined && typeof body.is_admin !== "boolean") ||
     (body.oauth_state !== undefined &&
       (typeof body.oauth_state !== "string" ||
         body.oauth_state.length < 32 ||
@@ -100,17 +106,21 @@ export async function createBrowserE2ESession(
       });
     }
 
+    // Test-only logins intentionally replace the stored role, so a non-admin
+    // re-login may downgrade an existing E2E administrator.
     await transaction.user.upsert({
       where: { id: body.user_id as string },
       create: {
         id: body.user_id as string,
         name: body.display_name as string,
         email: `${body.user_id as string}@e2e.invalid`,
-        emailVerified: true
+        emailVerified: true,
+        role: body.is_admin === true ? "admin" : "user"
       },
       update: {
         name: body.display_name as string,
-        emailVerified: true
+        emailVerified: true,
+        role: body.is_admin === true ? "admin" : "user"
       }
     });
     await transaction.session.create({
@@ -153,7 +163,11 @@ export async function createBrowserE2ESession(
   return new Response(
     JSON.stringify({
       authenticated: true,
-      user: { id: body.user_id, name: body.display_name }
+      user: {
+        id: body.user_id,
+        name: body.display_name,
+        is_admin: body.is_admin === true
+      }
     }),
     { status: 200, headers }
   );

@@ -55,7 +55,16 @@ export type AdminCatalogHandlerDependencies = AdminCatalogGuardDependencies &
     trustedOrigin: string | (() => string);
     generateRequestId?: () => string;
     writeSafeLog?: WritePersonalizationSafeLog;
+    requireJsonInCsrf?: boolean;
+    onComplete?: (event: AdminCatalogHandlerCompletion) => void | Promise<void>;
   }>;
+
+export type AdminCatalogHandlerCompletion = Readonly<{
+  requestId: string;
+  actorUserId?: string;
+  response: Response;
+  error?: unknown;
+}>;
 
 export type AdminCatalogPageAccess =
   | Readonly<{ status: "allowed"; auth: AuthContext; requestId: string }>
@@ -68,9 +77,11 @@ export async function authorizeAdminCatalogRequest(
   request: Request,
   requestId: string,
   routeCategory: AdminCatalogRouteCategory,
-  dependencies: AdminCatalogGuardDependencies
+  dependencies: AdminCatalogGuardDependencies,
+  onActor?: (userId: string) => void
 ): Promise<AuthContext> {
   const auth = await dependencies.requireSession(request);
+  onActor?.(auth.user.id);
   const role = await dependencies.readActorRole(auth.user.id);
   if (role !== "admin") {
     throw personalizationError("FORBIDDEN");
@@ -105,13 +116,19 @@ export function createAdminCatalogHandler(
   ): Promise<Response> {
     const requestId =
       dependencies.generateRequestId?.() ?? createPersonalizationRequestId();
+    let actorUserId: string | undefined;
+    let response: Response;
+    let caughtError: unknown;
 
     try {
       const auth = await authorizeAdminCatalogRequest(
         request,
         requestId,
         routeCategory,
-        dependencies
+        dependencies,
+        (userId) => {
+          actorUserId = userId;
+        }
       );
 
       if (isMutationMethod(request.method)) {
@@ -119,21 +136,35 @@ export function createAdminCatalogHandler(
           typeof dependencies.trustedOrigin === "function"
             ? dependencies.trustedOrigin()
             : dependencies.trustedOrigin;
-        validateMutationRequest(request, trustedOrigin);
+        validateMutationRequest(request, trustedOrigin, {
+          requireJson: dependencies.requireJsonInCsrf
+        });
       } else {
         validateMutationRequest(request);
       }
 
-      return withProtectedCachePolicy(
+      response = withProtectedCachePolicy(
         await handler({ request, auth, requestId }),
         requestId
       );
     } catch (error) {
-      return createPersonalizationErrorResponse(error, {
+      caughtError = error;
+      response = createPersonalizationErrorResponse(error, {
         requestId,
         writeSafeLog: dependencies.writeSafeLog
       });
     }
+    try {
+      await dependencies.onComplete?.({
+        requestId,
+        ...(actorUserId === undefined ? {} : { actorUserId }),
+        response: response.clone(),
+        ...(caughtError === undefined ? {} : { error: caughtError })
+      });
+    } catch {
+      console.error("[admin-catalog] Completion sink failed.");
+    }
+    return response;
   };
 }
 
