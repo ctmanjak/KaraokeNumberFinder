@@ -6,7 +6,11 @@ import {
   createAdminSongOptionsHandler,
   createAdminSongPostHandler
 } from "./route-handler";
-import type { AdminSongService } from "./service";
+import {
+  AdminSongRepositoryError,
+  type AdminSongRepository
+} from "./repository";
+import { createAdminSongService, type AdminSongService } from "./service";
 import {
   ADMIN_AVAILABILITY_STATUSES,
   ADMIN_EDITABLE_ALIAS_TYPES,
@@ -76,6 +80,57 @@ describe("admin song route handlers", () => {
       "authenticated-user",
       expect.objectContaining({ canonical_title: "Lemon" })
     );
+  });
+
+  it("preserves the safe candidate DTO in a final create conflict response", async () => {
+    const candidate = {
+      id: "song-candidate",
+      display_title: "레몬",
+      canonical_title: "Lemon",
+      canonical_artist: "米津玄師",
+      original_language: "ja",
+      release_year: 2018,
+      tie_in: null,
+      provider_summary: [
+        {
+          provider_id: "tj",
+          provider_name: "TJ",
+          karaoke_number: "28822",
+          version_info: ""
+        }
+      ],
+      match_evidence: [
+        {
+          role: "title",
+          strength: "exact",
+          input_field: "canonical_title",
+          candidate_field: "song.canonical_title",
+          matched_value: "Lemon"
+        }
+      ],
+      admin_path: "/admin/songs/song-candidate"
+    } as const;
+    const repository: AdminSongRepository = {
+      getOptions: vi.fn(async () => []),
+      list: vi.fn(async () => ({ items: [], nextCursorKey: null })),
+      create: vi.fn(async () => {
+        throw new AdminSongRepositoryError(
+          "POSSIBLE_DUPLICATE_CONFIRMATION_REQUIRED",
+          [candidate]
+        );
+      })
+    };
+    const response = await protectedHandler(
+      createAdminSongPostHandler(createAdminSongService(repository))
+    )(mutationRequest(validInput()));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "POSSIBLE_DUPLICATE_CONFIRMATION_REQUIRED",
+        details: { candidates: [candidate] }
+      }
+    });
   });
 
   it("rejects forged identity, invalid input, query parameters, and cross-origin writes", async () => {

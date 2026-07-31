@@ -50,6 +50,7 @@ type EntryDraft = {
 };
 
 type IdentityDraft = {
+  originalLanguage: string;
   canonicalTitle: string;
   displayTitle: string;
   canonicalArtist: string;
@@ -90,6 +91,7 @@ export function AdminSongPage({
     "load" | "submit" | null
   >(null);
   const [identity, setIdentity] = useState<IdentityDraft>({
+    originalLanguage: "ja",
     canonicalTitle: "",
     displayTitle: "",
     canonicalArtist: ""
@@ -113,10 +115,7 @@ export function AdminSongPage({
   } = useDuplicateCheck({
     identityChanged: identityTouched,
     catalogDisabled: catalogNotEnabled !== null,
-    identity: {
-      originalLanguage: "",
-      ...identity
-    },
+    identity,
     onCatalogDisabled: disableCatalog
   });
   const optionsLoadIdentity =
@@ -319,7 +318,10 @@ export function AdminSongPage({
             <TextField
               name="original_language"
               label="원어 코드"
-              defaultValue="ja"
+              value={identity.originalLanguage}
+              onChange={(originalLanguage) =>
+                setIdentity((current) => ({ ...current, originalLanguage }))
+              }
               required
             />
             <TextField
@@ -1058,7 +1060,7 @@ function buildSnapshot(
   acknowledgedIds: readonly string[] | undefined
 ): AdminSongInput {
   return {
-    original_language: field(data, "original_language"),
+    original_language: identity.originalLanguage,
     canonical_title: identity.canonicalTitle,
     display_title: identity.displayTitle,
     canonical_artist: identity.canonicalArtist,

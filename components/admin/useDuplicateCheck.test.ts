@@ -33,7 +33,7 @@ describe("administrator duplicate-check input state", () => {
       })
     ).toEqual({
       canonical_title: "원제에 검색 가능한 문자를 입력해 주세요.",
-      display_title: "표시 제목을 입력해 주세요.",
+      display_title: "표시 제목에 검색 가능한 문자를 입력해 주세요.",
       canonical_artist: "가수는 512자 이하로 입력해 주세요."
     });
     expect(
@@ -148,6 +148,41 @@ describe("administrator duplicate-check input state", () => {
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(result.current.state.status).toBe("error");
     await advance(2_000);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("resets acknowledgement and rechecks when the original language changes", async () => {
+    vi.useFakeTimers();
+    const fetcher = vi.fn(async () =>
+      jsonResponse({
+        classification: "possible",
+        candidates: [candidate("song-language")]
+      })
+    );
+    vi.stubGlobal("fetch", fetcher);
+    const onCatalogDisabled = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ originalLanguage }) =>
+        useDuplicateCheck({
+          identityChanged: true,
+          catalogDisabled: false,
+          identity: { ...valid, originalLanguage },
+          onCatalogDisabled
+        }),
+      { initialProps: { originalLanguage: "ja" } }
+    );
+
+    await advance(500);
+    await flush();
+    expect(result.current.state.status).toBe("possible");
+    act(() => result.current.setAcknowledged(true));
+    expect(result.current.acknowledged).toBe(true);
+
+    rerender({ originalLanguage: "ko" });
+    await flush();
+    expect(result.current.acknowledged).toBe(false);
+    await advance(500);
+    await flush();
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
 });

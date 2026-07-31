@@ -24,9 +24,39 @@ export type PersonalizationValidationIssue = Readonly<{
   max?: number;
 }>;
 
+export type PersonalizationSafeCandidateSummary = Readonly<{
+  id: string;
+  display_title: string;
+  canonical_title: string;
+  canonical_artist: string;
+  original_language: string;
+  release_year: number | null;
+  tie_in: string | null;
+  provider_summary: ReadonlyArray<
+    Readonly<{
+      provider_id: string;
+      provider_name: string;
+      karaoke_number: string;
+      version_info: string;
+    }>
+  >;
+  match_evidence: ReadonlyArray<
+    Readonly<{
+      role: "title" | "artist";
+      strength: "exact" | "prefix" | "partial";
+      input_field: "canonical_title" | "display_title" | "canonical_artist";
+      candidate_field: string;
+      matched_value: string;
+    }>
+  >;
+  admin_path: string;
+}>;
+
 export type PersonalizationErrorDetails = Readonly<{
   issues?: readonly PersonalizationValidationIssue[];
-  candidates?: ReadonlyArray<Readonly<{ id: string }>>;
+  candidates?: ReadonlyArray<
+    Readonly<{ id: string }> | PersonalizationSafeCandidateSummary
+  >;
 }>;
 
 type ErrorDefinition = {
@@ -211,8 +241,14 @@ function sanitizeErrorDetails(
     : undefined;
   const candidates = Array.isArray(record.candidates)
     ? record.candidates
-        .filter(isCandidateReference)
-        .map((candidate) => ({ id: candidate.id }))
+        .map(sanitizeCandidate)
+        .filter(
+          (
+            candidate
+          ): candidate is
+            Readonly<{ id: string }> | PersonalizationSafeCandidateSummary =>
+            candidate !== null
+        )
     : undefined;
   if (issues === undefined && candidates === undefined) return undefined;
   return {
@@ -235,14 +271,117 @@ function isValidationIssue(
   );
 }
 
-function isCandidateReference(
+function sanitizeCandidate(
   value: unknown
-): value is Readonly<{ id: string }> {
+): Readonly<{ id: string }> | PersonalizationSafeCandidateSummary | null {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("id" in value) ||
+    typeof value.id !== "string"
+  ) {
+    return null;
+  }
+  if (!isSafeCandidateSummary(value)) {
+    return { id: value.id };
+  }
+  return {
+    id: value.id,
+    display_title: value.display_title,
+    canonical_title: value.canonical_title,
+    canonical_artist: value.canonical_artist,
+    original_language: value.original_language,
+    release_year: value.release_year,
+    tie_in: value.tie_in,
+    provider_summary: value.provider_summary.map((entry) => ({
+      provider_id: entry.provider_id,
+      provider_name: entry.provider_name,
+      karaoke_number: entry.karaoke_number,
+      version_info: entry.version_info
+    })),
+    match_evidence: value.match_evidence.map((evidence) => ({
+      role: evidence.role,
+      strength: evidence.strength,
+      input_field: evidence.input_field,
+      candidate_field: evidence.candidate_field,
+      matched_value: evidence.matched_value
+    })),
+    admin_path: value.admin_path
+  };
+}
+
+function isSafeCandidateSummary(
+  value: object & Record<"id", unknown>
+): value is PersonalizationSafeCandidateSummary {
+  return (
+    typeof value.id === "string" &&
+    "display_title" in value &&
+    typeof value.display_title === "string" &&
+    "canonical_title" in value &&
+    typeof value.canonical_title === "string" &&
+    "canonical_artist" in value &&
+    typeof value.canonical_artist === "string" &&
+    "original_language" in value &&
+    typeof value.original_language === "string" &&
+    "release_year" in value &&
+    (value.release_year === null || typeof value.release_year === "number") &&
+    "tie_in" in value &&
+    (value.tie_in === null || typeof value.tie_in === "string") &&
+    "provider_summary" in value &&
+    Array.isArray(value.provider_summary) &&
+    value.provider_summary.every(isSafeProviderSummary) &&
+    "match_evidence" in value &&
+    Array.isArray(value.match_evidence) &&
+    value.match_evidence.every(isSafeMatchEvidence) &&
+    "admin_path" in value &&
+    value.admin_path === `/admin/songs/${encodeURIComponent(value.id)}`
+  );
+}
+
+function isSafeProviderSummary(value: unknown): value is {
+  provider_id: string;
+  provider_name: string;
+  karaoke_number: string;
+  version_info: string;
+} {
   return (
     typeof value === "object" &&
     value !== null &&
-    "id" in value &&
-    typeof value.id === "string"
+    "provider_id" in value &&
+    typeof value.provider_id === "string" &&
+    "provider_name" in value &&
+    typeof value.provider_name === "string" &&
+    "karaoke_number" in value &&
+    typeof value.karaoke_number === "string" &&
+    "version_info" in value &&
+    typeof value.version_info === "string"
+  );
+}
+
+function isSafeMatchEvidence(value: unknown): value is {
+  role: "title" | "artist";
+  strength: "exact" | "prefix" | "partial";
+  input_field: "canonical_title" | "display_title" | "canonical_artist";
+  candidate_field: string;
+  matched_value: string;
+} {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "role" in value &&
+    (value.role === "title" || value.role === "artist") &&
+    "strength" in value &&
+    (value.strength === "exact" ||
+      value.strength === "prefix" ||
+      value.strength === "partial") &&
+    "input_field" in value &&
+    (value.input_field === "canonical_title" ||
+      value.input_field === "display_title" ||
+      value.input_field === "canonical_artist") &&
+    "candidate_field" in value &&
+    typeof value.candidate_field === "string" &&
+    "matched_value" in value &&
+    typeof value.matched_value === "string"
   );
 }
 

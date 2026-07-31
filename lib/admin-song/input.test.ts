@@ -140,6 +140,7 @@ describe("admin song input", () => {
 
   it.each([
     ["canonical_title", { canonical_title: "---" }],
+    ["display_title", { display_title: "---" }],
     ["normalized_canonical_title", { normalized_canonical_title: "forged" }]
   ])("includes the raw field path for identity error %s", (path, patch) => {
     expect(() =>

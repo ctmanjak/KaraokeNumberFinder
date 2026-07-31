@@ -47,3 +47,14 @@ jobs:
       - run: npx prisma migrate deploy
       - run: npm run seed:import
       - run: npm run seed:search-smoke
+      - name: Run administrator song PostgreSQL integration tests
+        env:
+          ADMIN_T03_TEST_DATABASE_URL: ${{ env.DATABASE_URL }}
+          ADMIN_T04_TEST_DATABASE_URL: ${{ env.DATABASE_URL }}
+        run: >-
+          npx vitest run
+          lib/admin-song/repository.integration.test.ts
+          lib/admin-song-duplicate/repository.integration.test.ts
+          lib/admin-song-detail/repository.integration.test.ts
+          --fileParallelism=false
+          --maxWorkers=1

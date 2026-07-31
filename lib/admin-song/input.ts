@@ -14,6 +14,7 @@ import {
   type AdminAvailabilityStatus,
   type AdminSongInput
 } from "./types";
+import { validateAdminKaraokeEntryPolicy } from "./entry-policy";
 import { adminSongValidationError } from "./validation";
 
 const LANGUAGE_PATTERN = /^[a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-[A-Z]{2})?$/u;
@@ -69,6 +70,7 @@ export function parseAdminSongInput(
   );
   const sourceName = requiredString(input.source_name, "source_name", 256);
   assertIdentity(canonicalTitle, canonicalArtist);
+  assertSearchable(displayTitle, "display_title");
 
   const aliases = array(input.aliases, "aliases", ADMIN_SONG_MAX_ALIASES).map(
     (alias, index) => parseAlias(alias, index)
@@ -163,7 +165,6 @@ export function validateAdminSongCreateAggregate(
   );
   rejectDuplicateEntries(input.karaoke_entries);
 
-  const today = serviceDate(currentDate);
   for (const [index, entry] of input.karaoke_entries.entries()) {
     const path = `karaoke_entries.${index}`;
     if (entry.source_name.trim() === "") {
@@ -172,41 +173,14 @@ export function validateAdminSongCreateAggregate(
         "Source name is required."
       );
     }
-    if (entry.last_verified_at !== null && entry.last_verified_at > today) {
-      throw adminSongValidationError(`${path}.last_verified_at`);
-    }
-    if (
-      entry.availability_status !== "unknown" &&
-      entry.last_verified_at === null
-    ) {
-      throw adminSongValidationError(
-        `${path}.last_verified_at`,
-        "A confirmed status requires a verified date."
-      );
-    }
-    if (
-      entry.availability_status === "available" &&
-      entry.karaoke_number === ""
-    ) {
-      throw adminSongValidationError(`${path}.karaoke_number`);
-    }
-    if (
-      entry.availability_status !== "available" &&
-      entry.karaoke_number !== ""
-    ) {
-      throw adminSongValidationError(`${path}.karaoke_number`);
-    }
-    if (
-      (entry.availability_status === "not_available" ||
-        entry.availability_status === "temporarily_unavailable") &&
-      (entry.verification_note === null ||
-        entry.verification_note.trim() === "")
-    ) {
-      throw adminSongValidationError(
-        `${path}.verification_note`,
-        "This status requires a verification note."
-      );
-    }
+    validateAdminKaraokeEntryPolicy({
+      availabilityStatus: entry.availability_status,
+      karaokeNumber: entry.karaoke_number,
+      lastVerifiedAt: entry.last_verified_at,
+      verificationNote: entry.verification_note,
+      currentDate,
+      path
+    });
   }
 }
 
@@ -308,6 +282,12 @@ function assertIdentity(canonicalTitle: string, canonicalArtist: string): void {
   }
 }
 
+function assertSearchable(value: string, path: string): void {
+  if (buildAliasSearchFields(value).normalizedAlias === "") {
+    throw adminSongValidationError(path);
+  }
+}
+
 function rejectDuplicateAliases(
   systemAliases: readonly string[],
   aliases: ReadonlyArray<{
@@ -404,17 +384,6 @@ function allowedKeys(
       "Unknown field."
     );
   }
-}
-
-function serviceDate(value: Date): string {
-  const parts = new Intl.DateTimeFormat("en", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(value);
-  const byType = new Map(parts.map((part) => [part.type, part.value]));
-  return `${byType.get("year")}-${byType.get("month")}-${byType.get("day")}`;
 }
 
 function requiredString(

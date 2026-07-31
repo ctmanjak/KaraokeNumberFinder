@@ -409,6 +409,94 @@ describe("admin song page", () => {
     ).toBe(true);
   });
 
+  it("shows final possible candidates and resubmits their exact acknowledgement set", async () => {
+    const navigate = vi.fn();
+    let createCall = 0;
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = input.toString();
+        if (url === "/api/auth/get-session") {
+          return jsonResponse({
+            user: { id: "admin-a", name: "Admin", is_admin: true }
+          });
+        }
+        if (url === "/api/admin/songs/options") return optionsResponse();
+        if (url === "/api/admin/songs/duplicate-check") {
+          return jsonResponse({ classification: "none", candidates: [] });
+        }
+        if (url === "/api/admin/songs" && init?.method === "POST") {
+          createCall += 1;
+          if (createCall === 1) {
+            return jsonResponse(
+              {
+                error: {
+                  code: "POSSIBLE_DUPLICATE_CONFIRMATION_REQUIRED",
+                  message: "Confirm the latest candidates.",
+                  details: { candidates: [candidate("song-final-possible")] }
+                }
+              },
+              409
+            );
+          }
+          return jsonResponse(
+            {
+              song: {
+                id: "song-created",
+                display_title: "레몬",
+                canonical_artist: "米津玄師"
+              },
+              alias_count: 3,
+              karaoke_entry_count: 1,
+              created_counts: {
+                songs: 1,
+                administrator_aliases: 0,
+                karaoke_entries: 1
+              }
+            },
+            201
+          );
+        }
+        return jsonResponse({ error: { code: "NOT_FOUND" } }, 404);
+      }
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    renderPage(navigate);
+    await fillIdentity();
+    await fillCreateFields();
+    expect(await screen.findByText("중복 후보가 없습니다.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "노래 추가" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "중복 가능 후보" })
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("link", {
+        name: "레몬 기존 곡 열기 (새 탭)"
+      })
+    ).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "표시된 후보를 모두 확인했으며 새 곡 추가"
+      })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "다시 생성" }));
+
+    await vi.waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith("/admin/songs/song-created");
+    });
+    const createBodies = fetcher.mock.calls
+      .filter(
+        ([input, init]) =>
+          input.toString() === "/api/admin/songs" && init?.method === "POST"
+      )
+      .map(([, init]) => JSON.parse(String(init?.body)));
+    expect(createBodies).toHaveLength(2);
+    expect(createBodies[1]).toMatchObject({
+      possible_duplicate_acknowledged_song_ids: ["song-final-possible"]
+    });
+  });
+
   it("does not replay an ambiguous POST and checks the original snapshot before showing an exact result", async () => {
     let duplicateCall = 0;
     const fetcher = vi.fn(

@@ -48,7 +48,8 @@ export function useDuplicateCheck({
   const [nonce, setNonce] = useState(0);
   const [state, setState] = useState<DuplicateState>({ status: "idle" });
   const [acknowledged, setAcknowledged] = useState(false);
-  const { canonicalTitle, displayTitle, canonicalArtist } = identity;
+  const { originalLanguage, canonicalTitle, displayTitle, canonicalArtist } =
+    identity;
   const canonicalNormalized = normalizeSearchText(canonicalTitle);
   const displayNormalized = normalizeSearchText(displayTitle);
   const artistNormalized = normalizeSearchText(canonicalArtist);
@@ -64,6 +65,7 @@ export function useDuplicateCheck({
   );
   const invalidMessage = Object.values(fieldMessages)[0] ?? null;
   const fingerprint = [
+    originalLanguage,
     canonicalNormalized,
     displayNormalized,
     artistNormalized
@@ -229,9 +231,9 @@ export function duplicateInputErrors(
   }
   if (
     messages.display_title === undefined &&
-    identity.displayTitle.trim() === ""
+    normalizeSearchText(identity.displayTitle) === ""
   ) {
-    messages.display_title = "표시 제목을 입력해 주세요.";
+    messages.display_title = "표시 제목에 검색 가능한 문자를 입력해 주세요.";
   }
   if (
     messages.canonical_artist === undefined &&
