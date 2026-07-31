@@ -1,4 +1,5 @@
 import { Prisma, type PrismaClient } from "../generated/prisma/client";
+import { isPostgresStatementTimeout } from "../prisma-error";
 import { normalizeDuplicateInput } from "./match";
 import {
   DUPLICATE_CANDIDATE_LIMIT,
@@ -315,36 +316,5 @@ function isProviderSummary(
 }
 
 export function isStatementTimeout(error: unknown): boolean {
-  let current: unknown = error;
-  for (let depth = 0; depth < 5; depth += 1) {
-    if (
-      typeof current === "object" &&
-      current !== null &&
-      "code" in current &&
-      current.code === "57014"
-    ) {
-      return true;
-    }
-    if (
-      typeof current === "object" &&
-      current !== null &&
-      "code" in current &&
-      current.code === "P2010" &&
-      "meta" in current
-    ) {
-      if (
-        typeof current.meta === "object" &&
-        current.meta !== null &&
-        "code" in current.meta &&
-        current.meta.code === "57014"
-      ) {
-        return true;
-      }
-    }
-    current =
-      typeof current === "object" && current !== null && "cause" in current
-        ? current.cause
-        : undefined;
-  }
-  return false;
+  return isPostgresStatementTimeout(error);
 }

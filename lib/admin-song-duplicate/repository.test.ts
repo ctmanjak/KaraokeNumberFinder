@@ -116,4 +116,36 @@ describe("duplicate candidate repository", () => {
       })
     ).rejects.toEqual(new DuplicateCheckRepositoryError("TIMEOUT"));
   });
+
+  it("maps a Prisma 7 driver-adapter wrapped cancellation to a timeout", async () => {
+    const transaction = {
+      $executeRawUnsafe: vi.fn(async () => 0),
+      $queryRaw: vi.fn(async () => {
+        throw {
+          code: "P2010",
+          meta: {
+            driverAdapterError: {
+              name: "DriverAdapterError",
+              cause: {
+                kind: "postgres",
+                code: "57014",
+                originalCode: "57014",
+                originalMessage: "canceling statement due to statement timeout"
+              }
+            }
+          }
+        };
+      })
+    };
+    const db = {
+      $transaction: vi.fn(async (run) => run(transaction))
+    } as unknown as PrismaClient;
+
+    await expect(
+      findDuplicateCandidates(db, {
+        canonical_title: "Lemon",
+        canonical_artist: "Artist"
+      })
+    ).rejects.toEqual(new DuplicateCheckRepositoryError("TIMEOUT"));
+  });
 });

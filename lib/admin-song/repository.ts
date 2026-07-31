@@ -12,6 +12,10 @@ import {
   buildAliasSearchFields,
   normalizeSearchText
 } from "../search/normalize";
+import {
+  hasPrismaErrorCode,
+  isPrismaTransactionWriteConflict
+} from "../prisma-error";
 import { normalizeSongIdentity } from "../song-identity/normalize";
 import { isNormalizedIdentityUniqueViolation } from "../song-identity/prisma-error";
 import { parseAdminSongInput } from "./input";
@@ -312,7 +316,7 @@ export function createPrismaAdminSongRepository(
         }
         const normalizedIdentityConflict =
           isNormalizedIdentityUniqueViolation(error);
-        const serializationConflict = hasPrismaCode(error, "P2034");
+        const serializationConflict = isPrismaTransactionWriteConflict(error);
         if (normalizedIdentityConflict || serializationConflict) {
           try {
             const duplicate = await findDuplicateCandidates(db, duplicateInput);
@@ -520,19 +524,5 @@ function sameIdSet(left: readonly string[], right: readonly string[]): boolean {
 }
 
 function hasPrismaConflictCode(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error.code === "P2002" || error.code === "P2034")
-  );
-}
-
-function hasPrismaCode(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === code
-  );
+  return hasPrismaErrorCode(error, ["P2002", "P2034"]);
 }

@@ -392,6 +392,55 @@ describe("admin song repository", () => {
     expect(create).not.toHaveBeenCalled();
     expect(transaction.karaokeProvider.findMany).not.toHaveBeenCalled();
   });
+
+  it("rechecks candidates after a Prisma 7 adapter transaction conflict", async () => {
+    const candidateRow = {
+      id: "song-winner",
+      displayTitle: "레몬",
+      canonicalTitle: "Lemon",
+      canonicalArtist: "米津玄師",
+      originalLanguage: "ja",
+      releaseYear: 2018,
+      tieIn: null,
+      exactIdentity: true,
+      titleStrength: 3,
+      titleInputField: "canonical_title",
+      titleCandidateField: "song.canonical_title",
+      titleMatchedValue: "Lemon",
+      artistStrength: 3,
+      artistCandidateField: "song.canonical_artist",
+      artistMatchedValue: "米津玄師",
+      providerSummary: []
+    };
+    const duplicateTransaction = {
+      $executeRawUnsafe: vi.fn(async () => 0),
+      $queryRaw: vi.fn(async () => [candidateRow])
+    };
+    const conflict = {
+      name: "DriverAdapterError",
+      cause: {
+        kind: "TransactionWriteConflict",
+        originalCode: "40001",
+        originalMessage:
+          "could not serialize access due to read/write dependencies"
+      }
+    };
+    const db = {
+      $transaction: vi
+        .fn()
+        .mockRejectedValueOnce(conflict)
+        .mockImplementationOnce(async (callback) =>
+          callback(duplicateTransaction)
+        )
+    } as unknown as PrismaClient;
+
+    await expect(
+      createPrismaAdminSongRepository(db).create("admin-user", validInput())
+    ).rejects.toMatchObject({
+      code: "DUPLICATE_SONG",
+      candidates: [expect.objectContaining({ id: "song-winner" })]
+    });
+  });
 });
 
 function listSong(
