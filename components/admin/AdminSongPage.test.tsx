@@ -492,6 +492,20 @@ describe("admin song page", () => {
       )
       .map(([, init]) => JSON.parse(String(init?.body)));
     expect(createBodies).toHaveLength(2);
+    expect(createBodies[0]).not.toHaveProperty(
+      "possible_duplicate_acknowledged_song_ids"
+    );
+    expect({
+      original_language: createBodies[1].original_language,
+      canonical_title: createBodies[1].canonical_title,
+      display_title: createBodies[1].display_title,
+      canonical_artist: createBodies[1].canonical_artist
+    }).toEqual({
+      original_language: createBodies[0].original_language,
+      canonical_title: createBodies[0].canonical_title,
+      display_title: createBodies[0].display_title,
+      canonical_artist: createBodies[0].canonical_artist
+    });
     expect(createBodies[1]).toMatchObject({
       possible_duplicate_acknowledged_song_ids: ["song-final-possible"]
     });

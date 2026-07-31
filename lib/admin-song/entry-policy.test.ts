@@ -42,33 +42,62 @@ describe("shared administrator karaoke entry policy", () => {
     );
   });
 
+  it("requires an explicit verified date when a confirmed status changes", () => {
+    expect(() =>
+      validateAdminKaraokeEntryPolicy({
+        availabilityStatus: "available",
+        karaokeNumber: "28822",
+        lastVerifiedAt: "2026-07-28",
+        verificationNote: null,
+        currentDate: new Date("2026-07-28T12:00:00.000Z"),
+        path: "karaoke_entries.0",
+        requireExplicitVerifiedDate: true,
+        hasExplicitVerifiedDate: false
+      })
+    ).toThrowError(
+      expect.objectContaining({
+        details: {
+          issues: [
+            expect.objectContaining({
+              path: "karaoke_entries.0.last_verified_at"
+            })
+          ]
+        }
+      })
+    );
+  });
+
   it("enforces the shared status, number, date, and note rules", () => {
     const currentDate = new Date("2026-07-28T12:00:00.000Z");
 
-    for (const input of [
+    for (const { expectedPath, ...input } of [
       {
         availabilityStatus: "available" as const,
         karaokeNumber: "",
         lastVerifiedAt: "2026-07-28",
-        verificationNote: null
+        verificationNote: null,
+        expectedPath: "karaoke_entries.0.karaoke_number"
       },
       {
         availabilityStatus: "not_available" as const,
         karaokeNumber: "28822",
         lastVerifiedAt: "2026-07-28",
-        verificationNote: "Not listed"
+        verificationNote: "Not listed",
+        expectedPath: "karaoke_entries.0.karaoke_number"
       },
       {
         availabilityStatus: "temporarily_unavailable" as const,
         karaokeNumber: "",
         lastVerifiedAt: "2026-07-28",
-        verificationNote: null
+        verificationNote: null,
+        expectedPath: "karaoke_entries.0.verification_note"
       },
       {
         availabilityStatus: "available" as const,
         karaokeNumber: "28822",
         lastVerifiedAt: null,
-        verificationNote: null
+        verificationNote: null,
+        expectedPath: "karaoke_entries.0.last_verified_at"
       }
     ]) {
       expect(() =>
@@ -77,7 +106,13 @@ describe("shared administrator karaoke entry policy", () => {
           currentDate,
           path: "karaoke_entries.0"
         })
-      ).toThrow();
+      ).toThrowError(
+        expect.objectContaining({
+          details: {
+            issues: [expect.objectContaining({ path: expectedPath })]
+          }
+        })
+      );
     }
   });
 });

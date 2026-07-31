@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseAdminSongInput } from "./input";
+import { parseAdminSongInput, validateAdminSongCreateAggregate } from "./input";
 
 describe("admin song input", () => {
   it("normalizes a valid song request", () => {
@@ -244,6 +244,66 @@ describe("admin song input", () => {
           issues: [
             expect.objectContaining({
               path: "karaoke_entries.0.last_verified_at"
+            })
+          ]
+        }
+      })
+    );
+  });
+
+  it("reports candidate acknowledgement limits separately from duplicate IDs", () => {
+    const currentDate = new Date("2026-07-28T12:00:00.000Z");
+    const tooManyIds = Array.from({ length: 6 }, (_, index) => `song-${index}`);
+    const limitIssue = expect.objectContaining({
+      path: "possible_duplicate_acknowledged_song_ids",
+      message: "At most 5 candidate IDs may be acknowledged.",
+      max: 5
+    });
+
+    expect(() =>
+      parseAdminSongInput(
+        {
+          ...validInput(),
+          possible_duplicate_acknowledged_song_ids: tooManyIds
+        },
+        currentDate
+      )
+    ).toThrowError(
+      expect.objectContaining({
+        details: { issues: [limitIssue] }
+      })
+    );
+
+    const parsed = parseAdminSongInput(validInput(), currentDate);
+    expect(() =>
+      validateAdminSongCreateAggregate(
+        {
+          ...parsed,
+          possible_duplicate_acknowledged_song_ids: tooManyIds
+        },
+        currentDate
+      )
+    ).toThrowError(
+      expect.objectContaining({
+        details: { issues: [limitIssue] }
+      })
+    );
+    expect(() =>
+      validateAdminSongCreateAggregate(
+        {
+          ...parsed,
+          possible_duplicate_acknowledged_song_ids: ["song-a", "song-a"]
+        },
+        currentDate
+      )
+    ).toThrowError(
+      expect.objectContaining({
+        details: {
+          issues: [
+            expect.objectContaining({
+              path: "possible_duplicate_acknowledged_song_ids",
+              message: "Candidate IDs must be unique.",
+              max: 5
             })
           ]
         }

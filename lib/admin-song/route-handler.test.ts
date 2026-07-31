@@ -125,12 +125,13 @@ describe("admin song route handlers", () => {
     )(mutationRequest(validInput()));
 
     expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({
+    const body = await response.json();
+    expect(body).toMatchObject({
       error: {
-        code: "POSSIBLE_DUPLICATE_CONFIRMATION_REQUIRED",
-        details: { candidates: [candidate] }
+        code: "POSSIBLE_DUPLICATE_CONFIRMATION_REQUIRED"
       }
     });
+    expect(body.error.details.candidates).toEqual([candidate]);
   });
 
   it("rejects forged identity, invalid input, query parameters, and cross-origin writes", async () => {

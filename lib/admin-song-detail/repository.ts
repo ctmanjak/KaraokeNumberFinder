@@ -496,10 +496,7 @@ function validateEntryAggregate(
       existing.availabilityStatus !== entry.availability_status;
     const finalVerifiedAt = Object.hasOwn(entry, "last_verified_at")
       ? (entry.last_verified_at ?? null)
-      : existing?.lastVerifiedAt === null ||
-          existing?.lastVerifiedAt === undefined
-        ? null
-        : new Date(existing.lastVerifiedAt).toISOString().slice(0, 10);
+      : storedVerifiedDate(existing?.lastVerifiedAt);
     const finalNote = Object.hasOwn(entry, "verification_note")
       ? (entry.verification_note ?? null)
       : (existing?.verificationNote ?? null);
@@ -537,6 +534,14 @@ function validateEntryAggregate(
     }
     tuples.add(tuple);
   }
+}
+
+function storedVerifiedDate(
+  value: DetailRecord["karaokeEntries"][number]["lastVerifiedAt"] | undefined
+): string | null {
+  return value === null || value === undefined
+    ? null
+    : new Date(value).toISOString().slice(0, 10);
 }
 
 async function applyAliases(

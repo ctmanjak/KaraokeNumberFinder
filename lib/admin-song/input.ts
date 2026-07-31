@@ -19,6 +19,7 @@ import { adminSongValidationError } from "./validation";
 
 const LANGUAGE_PATTERN = /^[a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-[A-Z]{2})?$/u;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
+const ADMIN_SONG_MAX_ACKNOWLEDGED_CANDIDATES = 5;
 
 export function parseAdminSongInput(
   value: unknown,
@@ -87,7 +88,9 @@ export function parseAdminSongInput(
       : array(
           input.possible_duplicate_acknowledged_song_ids,
           "possible_duplicate_acknowledged_song_ids",
-          5
+          ADMIN_SONG_MAX_ACKNOWLEDGED_CANDIDATES,
+          false,
+          `At most ${ADMIN_SONG_MAX_ACKNOWLEDGED_CANDIDATES} candidate IDs may be acknowledged.`
         ).map((id, index) =>
           parseAdminSongId(
             id,
@@ -101,7 +104,7 @@ export function parseAdminSongInput(
     throw adminSongValidationError(
       "possible_duplicate_acknowledged_song_ids",
       "Candidate IDs must be unique.",
-      { max: 5 }
+      { max: ADMIN_SONG_MAX_ACKNOWLEDGED_CANDIDATES }
     );
   }
 
@@ -146,16 +149,25 @@ export function validateAdminSongCreateAggregate(
       { max: ADMIN_SONG_MAX_ENTRIES }
     );
   }
+  const acknowledged = input.possible_duplicate_acknowledged_song_ids;
   if (
-    input.possible_duplicate_acknowledged_song_ids !== undefined &&
-    (input.possible_duplicate_acknowledged_song_ids.length > 5 ||
-      new Set(input.possible_duplicate_acknowledged_song_ids).size !==
-        input.possible_duplicate_acknowledged_song_ids.length)
+    acknowledged !== undefined &&
+    acknowledged.length > ADMIN_SONG_MAX_ACKNOWLEDGED_CANDIDATES
+  ) {
+    throw adminSongValidationError(
+      "possible_duplicate_acknowledged_song_ids",
+      `At most ${ADMIN_SONG_MAX_ACKNOWLEDGED_CANDIDATES} candidate IDs may be acknowledged.`,
+      { max: ADMIN_SONG_MAX_ACKNOWLEDGED_CANDIDATES }
+    );
+  }
+  if (
+    acknowledged !== undefined &&
+    new Set(acknowledged).size !== acknowledged.length
   ) {
     throw adminSongValidationError(
       "possible_duplicate_acknowledged_song_ids",
       "Candidate IDs must be unique.",
-      { max: 5 }
+      { max: ADMIN_SONG_MAX_ACKNOWLEDGED_CANDIDATES }
     );
   }
 
@@ -344,11 +356,12 @@ function array(
   value: unknown,
   path: string,
   max: number,
-  requireItem = false
+  requireItem = false,
+  tooManyMessage = "Too many items."
 ): unknown[] {
   if (!Array.isArray(value)) throw adminSongValidationError(path);
   if (value.length > max) {
-    throw adminSongValidationError(path, "Too many items.", { max });
+    throw adminSongValidationError(path, tooManyMessage, { max });
   }
   if (requireItem && value.length === 0) {
     throw adminSongValidationError(path, "At least one item is required.");

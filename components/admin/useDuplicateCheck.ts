@@ -45,6 +45,7 @@ export function useDuplicateCheck({
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const manualNoAutoRetryRef = useRef(false);
   const previousFingerprintRef = useRef("");
+  const previousOriginalLanguageRef = useRef(identity.originalLanguage);
   const [nonce, setNonce] = useState(0);
   const [state, setState] = useState<DuplicateState>({ status: "idle" });
   const [acknowledged, setAcknowledged] = useState(false);
@@ -65,11 +66,18 @@ export function useDuplicateCheck({
   );
   const invalidMessage = Object.values(fieldMessages)[0] ?? null;
   const fingerprint = [
-    originalLanguage,
     canonicalNormalized,
     displayNormalized,
     artistNormalized
   ].join("\u0000");
+
+  useEffect(() => {
+    if (previousOriginalLanguageRef.current === originalLanguage) {
+      return;
+    }
+    previousOriginalLanguageRef.current = originalLanguage;
+    queueMicrotask(() => setAcknowledged(false));
+  }, [originalLanguage]);
 
   useEffect(() => {
     if (!identityChanged || catalogDisabled || invalidMessage !== null) {

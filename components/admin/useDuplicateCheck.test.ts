@@ -151,7 +151,7 @@ describe("administrator duplicate-check input state", () => {
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
-  it("resets acknowledgement and rechecks when the original language changes", async () => {
+  it("resets acknowledgement without rechecking when the original language changes", async () => {
     vi.useFakeTimers();
     const fetcher = vi.fn(async () =>
       jsonResponse({
@@ -183,7 +183,7 @@ describe("administrator duplicate-check input state", () => {
     expect(result.current.acknowledged).toBe(false);
     await advance(500);
     await flush();
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });
 
