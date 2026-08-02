@@ -121,6 +121,89 @@ describe("personalization error contract", () => {
     });
   });
 
+  it("preserves an explicit safe duplicate candidate DTO and strips extra fields", async () => {
+    const candidateWithSecret = {
+      id: "song-a",
+      display_title: "레몬",
+      canonical_title: "Lemon",
+      canonical_artist: "米津玄師",
+      original_language: "ja",
+      release_year: 2018,
+      tie_in: null,
+      provider_summary: [
+        {
+          provider_id: "tj",
+          provider_name: "TJ",
+          karaoke_number: "28822",
+          version_info: ""
+        }
+      ],
+      match_evidence: [
+        {
+          role: "title",
+          strength: "exact",
+          input_field: "canonical_title",
+          candidate_field: "song.canonical_title",
+          matched_value: "Lemon"
+        }
+      ],
+      admin_path: "/admin/songs/song-a",
+      source_url: "must-not-leak"
+    } as const;
+    const response = createPersonalizationErrorResponse(
+      personalizationDomainError({
+        code: "POSSIBLE_DUPLICATE_CONFIRMATION_REQUIRED",
+        status: 409,
+        publicMessage: "Confirm candidates.",
+        details: {
+          candidates: [candidateWithSecret]
+        }
+      }),
+      { requestId: "candidate-details", writeSafeLog: () => undefined }
+    );
+
+    const payload = await response.json();
+    expect(payload).toEqual({
+      error: {
+        code: "POSSIBLE_DUPLICATE_CONFIRMATION_REQUIRED",
+        message: "Confirm candidates.",
+        request_id: "candidate-details",
+        details: {
+          candidates: [
+            {
+              id: "song-a",
+              display_title: "레몬",
+              canonical_title: "Lemon",
+              canonical_artist: "米津玄師",
+              original_language: "ja",
+              release_year: 2018,
+              tie_in: null,
+              provider_summary: [
+                {
+                  provider_id: "tj",
+                  provider_name: "TJ",
+                  karaoke_number: "28822",
+                  version_info: ""
+                }
+              ],
+              match_evidence: [
+                {
+                  role: "title",
+                  strength: "exact",
+                  input_field: "canonical_title",
+                  candidate_field: "song.canonical_title",
+                  matched_value: "Lemon"
+                }
+              ],
+              admin_path: "/admin/songs/song-a"
+            }
+          ]
+        }
+      }
+    });
+    expect(JSON.stringify(payload)).not.toContain("must-not-leak");
+  });
+
   it("redacts unexpected errors from both response and safe logs", async () => {
     const secrets = [
       "session-token-must-not-leak",

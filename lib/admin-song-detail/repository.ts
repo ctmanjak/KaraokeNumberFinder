@@ -1,10 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma, type PrismaClient } from "../generated/prisma/client";
-import {
-  ADMIN_SYSTEM_ALIAS_TYPES,
-  type AdminAvailabilityStatus
-} from "../admin-song/types";
+import { validateAdminKaraokeEntryPolicy } from "../admin-song/entry-policy";
+import { ADMIN_SYSTEM_ALIAS_TYPES } from "../admin-song/types";
 import { adminSongValidationError } from "../admin-song/validation";
 import {
   DuplicateCheckRepositoryError,
@@ -488,7 +486,6 @@ function validateEntryAggregate(
       "Existing karaoke entries cannot be deleted or replaced."
     );
   }
-  const today = currentDate.toISOString().slice(0, 10);
   const tuples = new Set<string>();
   for (const [index, entry] of input.karaoke_entries.entries()) {
     const path = `karaoke_entries.${index}`;
@@ -498,28 +495,21 @@ function validateEntryAggregate(
       existing !== undefined &&
       existing.availabilityStatus !== entry.availability_status;
     const finalVerifiedAt = Object.hasOwn(entry, "last_verified_at")
-      ? entry.last_verified_at
-      : existing?.lastVerifiedAt === null ||
-          existing?.lastVerifiedAt === undefined
-        ? null
-        : new Date(existing.lastVerifiedAt).toISOString().slice(0, 10);
-    if (
-      entry.last_verified_at !== undefined &&
-      entry.last_verified_at !== null &&
-      entry.last_verified_at > today
-    ) {
-      throw adminSongValidationError(`${path}.last_verified_at`);
-    }
-    if (
-      isConfirmed(entry.availability_status) &&
-      (finalVerifiedAt === null ||
-        (statusChanged && !Object.hasOwn(entry, "last_verified_at")))
-    ) {
-      throw adminSongValidationError(
-        `${path}.last_verified_at`,
-        "A confirmed status requires an explicitly verified date."
-      );
-    }
+      ? (entry.last_verified_at ?? null)
+      : storedVerifiedDate(existing?.lastVerifiedAt);
+    const finalNote = Object.hasOwn(entry, "verification_note")
+      ? (entry.verification_note ?? null)
+      : (existing?.verificationNote ?? null);
+    validateAdminKaraokeEntryPolicy({
+      availabilityStatus: entry.availability_status,
+      karaokeNumber: entry.karaoke_number,
+      lastVerifiedAt: finalVerifiedAt,
+      verificationNote: finalNote,
+      currentDate,
+      path,
+      requireExplicitVerifiedDate: statusChanged,
+      hasExplicitVerifiedDate: Object.hasOwn(entry, "last_verified_at")
+    });
     if (
       (existing === undefined || statusChanged) &&
       (!Object.hasOwn(entry, "source_name") ||
@@ -529,18 +519,6 @@ function validateEntryAggregate(
       throw adminSongValidationError(
         `${path}.source_name`,
         "Source name must be supplied for a new or changed status."
-      );
-    }
-    const finalNote = Object.hasOwn(entry, "verification_note")
-      ? entry.verification_note
-      : (existing?.verificationNote ?? null);
-    if (
-      requiresNote(entry.availability_status) &&
-      (finalNote === null || finalNote === undefined || finalNote.trim() === "")
-    ) {
-      throw adminSongValidationError(
-        `${path}.verification_note`,
-        "This status requires a verification note."
       );
     }
     const tuple = [
@@ -556,6 +534,14 @@ function validateEntryAggregate(
     }
     tuples.add(tuple);
   }
+}
+
+function storedVerifiedDate(
+  value: DetailRecord["karaokeEntries"][number]["lastVerifiedAt"] | undefined
+): string | null {
+  return value === null || value === undefined
+    ? null
+    : new Date(value).toISOString().slice(0, 10);
 }
 
 async function applyAliases(
@@ -817,14 +803,6 @@ function sameIdSet(left: readonly string[], right: readonly string[]): boolean {
   if (left.length !== right.length) return false;
   const rightSet = new Set(right);
   return left.every((id) => rightSet.has(id));
-}
-
-function isConfirmed(status: AdminAvailabilityStatus): boolean {
-  return status !== "unknown";
-}
-
-function requiresNote(status: AdminAvailabilityStatus): boolean {
-  return status === "not_available" || status === "temporarily_unavailable";
 }
 
 type AdminLookupDb = Pick<PrismaClient, "user">;

@@ -48,6 +48,8 @@ export type AdminSongAliasInput = Readonly<{
   alias: string;
   language: string;
   alias_type: AdminEditableAliasType;
+  source_name: string | null;
+  source_url: string | null;
 }>;
 
 export type AdminKaraokeEntryInput = Readonly<{
@@ -56,6 +58,9 @@ export type AdminKaraokeEntryInput = Readonly<{
   version_info: string;
   availability_status: AdminAvailabilityStatus;
   last_verified_at: string | null;
+  source_name: string;
+  source_url: string | null;
+  verification_note: string | null;
 }>;
 
 export type AdminSongInput = Readonly<{
@@ -67,9 +72,9 @@ export type AdminSongInput = Readonly<{
   tie_in: string | null;
   source_url: string | null;
   source_name: string;
-  verification_note: string | null;
   aliases: readonly AdminSongAliasInput[];
   karaoke_entries: readonly AdminKaraokeEntryInput[];
+  possible_duplicate_acknowledged_song_ids?: readonly string[];
 }>;
 
 export type AdminSongOptions = Readonly<{
@@ -90,7 +95,18 @@ export type AdminSongCreateResult = Readonly<{
   };
   alias_count: number;
   karaoke_entry_count: number;
+  created_counts: AdminSongCreateCounts;
 }>;
+
+export type AdminSongCreateCounts = Readonly<{
+  songs: number;
+  administrator_aliases: number;
+  karaoke_entries: number;
+}>;
+
+export const ADMIN_SONG_MAX_ALIASES = 30;
+export const ADMIN_SONG_MAX_ENTRIES = 20;
+export const ADMIN_SONG_POST_BODY_LIMIT_BYTES = 524_288;
 
 export type {
   AdminSongListItem,

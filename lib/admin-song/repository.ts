@@ -2,11 +2,23 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma, type PrismaClient } from "../generated/prisma/client";
 import {
+  DuplicateCheckRepositoryError,
+  findDuplicateCandidates,
+  findDuplicateCandidatesInTransaction,
+  isStatementTimeout
+} from "../admin-song-duplicate/repository";
+import type { CandidateSummary } from "../admin-song-duplicate/types";
+import {
   buildAliasSearchFields,
   normalizeSearchText
 } from "../search/normalize";
+import {
+  hasPrismaErrorCode,
+  isPrismaTransactionWriteConflict
+} from "../prisma-error";
 import { normalizeSongIdentity } from "../song-identity/normalize";
 import { isNormalizedIdentityUniqueViolation } from "../song-identity/prisma-error";
+import { parseAdminSongInput } from "./input";
 import { isAdminSongCursorTimestamp, type AdminSongCursorKey } from "./cursor";
 import type { AdminSongListItem, AdminSongListQuery } from "./list-contract";
 import type {
@@ -19,10 +31,18 @@ const ADMIN_SONG_SEARCH_BATCH_SIZE = 100;
 export const MAX_ADMIN_SONG_SEARCH_SCAN_BATCHES = 5;
 
 export type AdminSongRepositoryErrorCode =
-  "FORBIDDEN" | "DUPLICATE_SONG" | "PROVIDER_NOT_FOUND" | "CONFLICT";
+  | "FORBIDDEN"
+  | "DUPLICATE_SONG"
+  | "POSSIBLE_DUPLICATE_CONFIRMATION_REQUIRED"
+  | "DUPLICATE_CHECK_TIMEOUT"
+  | "PROVIDER_NOT_FOUND"
+  | "CONFLICT";
 
 export class AdminSongRepositoryError extends Error {
-  constructor(readonly code: AdminSongRepositoryErrorCode) {
+  constructor(
+    readonly code: AdminSongRepositoryErrorCode,
+    readonly candidates: readonly CandidateSummary[] = []
+  ) {
     super(code);
     this.name = "AdminSongRepositoryError";
   }
@@ -44,7 +64,8 @@ export type AdminSongRepositoryListResult = Readonly<{
 
 export function createPrismaAdminSongRepository(
   db: PrismaClient,
-  generateId: () => string = randomUUID
+  generateId: () => string = randomUUID,
+  now: () => Date = () => new Date()
 ): AdminSongRepository {
   return {
     async getOptions(userId) {
@@ -163,26 +184,51 @@ export function createPrismaAdminSongRepository(
     },
 
     async create(userId, input) {
-      const identity = normalizeSongIdentity(input);
+      const duplicateInput = {
+        canonical_title: input.canonical_title,
+        display_title: input.display_title,
+        canonical_artist: input.canonical_artist
+      };
       try {
         return await db.$transaction(
           async (transaction) => {
             await requireAdmin(transaction, userId);
+            const finalInput = parseAdminSongInput(input, now());
 
-            const duplicate = await transaction.song.findFirst({
-              where: {
-                normalizedCanonicalTitle: identity.normalizedCanonicalTitle,
-                normalizedCanonicalArtist: identity.normalizedCanonicalArtist
-              },
-              select: { id: true }
-            });
-            if (duplicate !== null) {
-              throw new AdminSongRepositoryError("DUPLICATE_SONG");
+            let duplicate;
+            try {
+              duplicate = await findDuplicateCandidatesInTransaction(
+                transaction,
+                duplicateInput
+              );
+            } catch (error) {
+              if (isStatementTimeout(error)) {
+                throw new AdminSongRepositoryError("DUPLICATE_CHECK_TIMEOUT");
+              }
+              throw error;
+            }
+            if (duplicate.classification === "exact") {
+              throw new AdminSongRepositoryError(
+                "DUPLICATE_SONG",
+                duplicate.candidates
+              );
+            }
+            if (
+              duplicate.classification === "possible" &&
+              !sameIdSet(
+                duplicate.candidates.map((candidate) => candidate.id),
+                finalInput.possible_duplicate_acknowledged_song_ids ?? []
+              )
+            ) {
+              throw new AdminSongRepositoryError(
+                "POSSIBLE_DUPLICATE_CONFIRMATION_REQUIRED",
+                duplicate.candidates
+              );
             }
 
             const providerIds = [
               ...new Set(
-                input.karaoke_entries.map((entry) => entry.provider_id)
+                finalInput.karaoke_entries.map((entry) => entry.provider_id)
               )
             ];
             const providers = await transaction.karaokeProvider.findMany({
@@ -194,22 +240,15 @@ export function createPrismaAdminSongRepository(
             }
 
             const verifiedBy = `admin:${userId}`;
-            const aliases = standardAliases(input).map((alias) => {
-              const search = buildAliasSearchFields(alias.alias);
-              return {
-                id: `alias_${generateId()}`,
-                alias: alias.alias,
-                language: alias.language,
-                aliasType: alias.alias_type,
-                normalizedAlias: search.normalizedAlias,
-                chosungAlias: search.chosungAlias || null,
-                sourceUrl: input.source_url,
-                sourceName: input.source_name,
-                verifiedBy,
-                verificationNote: input.verification_note
-              };
-            });
-            const karaokeEntries = input.karaoke_entries.map((entry) => ({
+            const aliases = [
+              ...systemAliases(finalInput).map((alias) =>
+                toAliasCreate(alias, verifiedBy, generateId)
+              ),
+              ...finalInput.aliases.map((alias) =>
+                toAliasCreate(alias, verifiedBy, generateId)
+              )
+            ];
+            const karaokeEntries = finalInput.karaoke_entries.map((entry) => ({
               id: `entry_${generateId()}`,
               providerId: entry.provider_id,
               karaokeNumber: entry.karaoke_number,
@@ -219,27 +258,28 @@ export function createPrismaAdminSongRepository(
                 entry.last_verified_at === null
                   ? null
                   : new Date(`${entry.last_verified_at}T00:00:00.000Z`),
-              sourceUrl: input.source_url,
-              sourceName: input.source_name,
+              sourceUrl: entry.source_url,
+              sourceName: entry.source_name,
               verifiedBy,
-              verificationNote: input.verification_note
+              verificationNote: entry.verification_note
             }));
+            const identity = normalizeSongIdentity(finalInput);
 
             const song = await transaction.song.create({
               data: {
                 id: `song_${generateId()}`,
-                originalLanguage: input.original_language,
-                canonicalTitle: input.canonical_title,
-                displayTitle: input.display_title,
-                canonicalArtist: input.canonical_artist,
+                originalLanguage: finalInput.original_language,
+                canonicalTitle: finalInput.canonical_title,
+                displayTitle: finalInput.display_title,
+                canonicalArtist: finalInput.canonical_artist,
                 normalizedCanonicalTitle: identity.normalizedCanonicalTitle,
                 normalizedCanonicalArtist: identity.normalizedCanonicalArtist,
-                releaseYear: input.release_year,
-                tieIn: input.tie_in,
-                sourceUrl: input.source_url,
-                sourceName: input.source_name,
+                releaseYear: finalInput.release_year,
+                tieIn: finalInput.tie_in,
+                sourceUrl: finalInput.source_url,
+                sourceName: finalInput.source_name,
                 verifiedBy,
-                verificationNote: input.verification_note,
+                verificationNote: null,
                 aliases: { create: aliases },
                 karaokeEntries: { create: karaokeEntries }
               },
@@ -257,7 +297,12 @@ export function createPrismaAdminSongRepository(
                 canonical_artist: song.canonicalArtist
               },
               alias_count: aliases.length,
-              karaoke_entry_count: karaokeEntries.length
+              karaoke_entry_count: karaokeEntries.length,
+              created_counts: {
+                songs: 1,
+                administrator_aliases: finalInput.aliases.length,
+                karaoke_entries: karaokeEntries.length
+              }
             };
           },
           { isolationLevel: "Serializable" }
@@ -266,8 +311,31 @@ export function createPrismaAdminSongRepository(
         if (error instanceof AdminSongRepositoryError) {
           throw error;
         }
-        if (isNormalizedIdentityUniqueViolation(error)) {
-          throw new AdminSongRepositoryError("DUPLICATE_SONG");
+        if (isStatementTimeout(error)) {
+          throw new AdminSongRepositoryError("DUPLICATE_CHECK_TIMEOUT");
+        }
+        const normalizedIdentityConflict =
+          isNormalizedIdentityUniqueViolation(error);
+        const serializationConflict = isPrismaTransactionWriteConflict(error);
+        if (normalizedIdentityConflict || serializationConflict) {
+          try {
+            const duplicate = await findDuplicateCandidates(db, duplicateInput);
+            if (duplicate.classification === "exact") {
+              throw new AdminSongRepositoryError(
+                "DUPLICATE_SONG",
+                duplicate.candidates
+              );
+            }
+            throw new AdminSongRepositoryError("CONFLICT");
+          } catch (candidateError) {
+            if (candidateError instanceof AdminSongRepositoryError) {
+              throw candidateError;
+            }
+            if (candidateError instanceof DuplicateCheckRepositoryError) {
+              throw new AdminSongRepositoryError("DUPLICATE_CHECK_TIMEOUT");
+            }
+            throw candidateError;
+          }
         }
         if (hasPrismaConflictCode(error)) {
           throw new AdminSongRepositoryError("CONFLICT");
@@ -401,32 +469,60 @@ async function requireAdmin(db: AdminLookupDb, userId: string): Promise<void> {
   }
 }
 
-function standardAliases(input: AdminSongInput) {
+function systemAliases(input: AdminSongInput) {
   return [
     {
       alias: input.canonical_title,
       language: input.original_language,
-      alias_type: "canonical_title" as const
+      alias_type: "canonical_title" as const,
+      source_name: null,
+      source_url: null
     },
     {
       alias: input.display_title,
       language: input.original_language,
-      alias_type: "display_title" as const
+      alias_type: "display_title" as const,
+      source_name: null,
+      source_url: null
     },
     {
       alias: input.canonical_artist,
       language: input.original_language,
-      alias_type: "artist" as const
-    },
-    ...input.aliases
+      alias_type: "artist" as const,
+      source_name: null,
+      source_url: null
+    }
   ];
 }
 
+function toAliasCreate(
+  alias:
+    | AdminSongInput["aliases"][number]
+    | ReturnType<typeof systemAliases>[number],
+  verifiedBy: string,
+  generateId: () => string
+) {
+  const search = buildAliasSearchFields(alias.alias);
+  return {
+    id: `alias_${generateId()}`,
+    alias: alias.alias,
+    language: alias.language,
+    aliasType: alias.alias_type,
+    normalizedAlias: search.normalizedAlias,
+    chosungAlias: search.chosungAlias || null,
+    sourceUrl: alias.source_url,
+    sourceName: alias.source_name,
+    verifiedBy,
+    verificationNote: null
+  };
+}
+
+function sameIdSet(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) return false;
+  const rightSet = new Set(right);
+  return left.every((id) => rightSet.has(id));
+}
+
 function hasPrismaConflictCode(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error.code === "P2002" || error.code === "P2034")
-  );
+  return hasPrismaErrorCode(error, ["P2002", "P2034"]);
 }

@@ -72,12 +72,34 @@ function mapRepositoryError(error: unknown): never {
       publicMessage: "A selected karaoke provider is unavailable."
     });
   }
+  if (error.code === "DUPLICATE_SONG") {
+    throw personalizationDomainError({
+      code: "DUPLICATE_SONG",
+      status: 409,
+      publicMessage:
+        "A song with the same canonical title and artist already exists.",
+      details: { candidates: error.candidates }
+    });
+  }
+  if (error.code === "POSSIBLE_DUPLICATE_CONFIRMATION_REQUIRED") {
+    throw personalizationDomainError({
+      code: "POSSIBLE_DUPLICATE_CONFIRMATION_REQUIRED",
+      status: 409,
+      publicMessage:
+        "The current possible duplicate candidates must be confirmed.",
+      details: { candidates: error.candidates }
+    });
+  }
+  if (error.code === "DUPLICATE_CHECK_TIMEOUT") {
+    throw personalizationDomainError({
+      code: "DUPLICATE_CHECK_UNAVAILABLE",
+      status: 503,
+      publicMessage: "Duplicate checking is temporarily unavailable."
+    });
+  }
   throw personalizationDomainError({
-    code: error.code === "DUPLICATE_SONG" ? "DUPLICATE_SONG" : "SONG_CONFLICT",
+    code: "SONG_CONFLICT",
     status: 409,
-    publicMessage:
-      error.code === "DUPLICATE_SONG"
-        ? "A song with the same canonical title and artist already exists."
-        : "The song could not be created because the catalog changed."
+    publicMessage: "The song could not be created because the catalog changed."
   });
 }
