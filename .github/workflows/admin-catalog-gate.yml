@@ -40,6 +40,7 @@ jobs:
           node-version: 20.19.0
           cache: npm
       - run: npm ci
+      - run: npm run db:generate
       - run: npx prisma migrate deploy
       - run: npm run seed:import
       - run: npm run test:admin-song-migration
