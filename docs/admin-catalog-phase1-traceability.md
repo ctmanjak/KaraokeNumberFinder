@@ -119,20 +119,21 @@ canary mode, or broad refactor was introduced.
 
 ### Required commands and test counts
 
-| Gate                              | Result                                                                                                                                                                   |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `npm run format`                  | Pass; all files match Prettier.                                                                                                                                          |
-| `npm run lint`                    | Pass.                                                                                                                                                                    |
-| `npm run typecheck`               | Pass.                                                                                                                                                                    |
-| `npm test`                        | Pass: 104 files passed, 6 integration files skipped by the unit command; 748 tests passed, 31 skipped.                                                                   |
-| `npm run build`                   | Pass: optimized Next.js 16.2.9 production build.                                                                                                                         |
-| `npm run db:validate`             | Pass: Prisma schema valid.                                                                                                                                               |
-| `npm run seed:validate`           | Pass: 0 warnings.                                                                                                                                                        |
-| Disposable PostgreSQL integration | Pass: 3 files, 13 tests, including same-row PATCH, different-row converging PATCH, POST/PATCH race, 1 s timeout/57014 mapping, rollback, and pooled-setting non-leakage. |
-| Migration verifier                | Pass: expand preflight, dry-run/apply/idempotent backfill, contract, duplicate insert/update, NOT NULL, rollback, and raw-row preservation.                              |
-| Chromium on mode                  | Pass: 21 tests; the single off-only spec was expectedly skipped.                                                                                                         |
-| Chromium off mode                 | Pass: 1 dedicated test.                                                                                                                                                  |
-| `git diff --check`                | Pass.                                                                                                                                                                    |
+| Gate                               | Result                                                                                                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run format`                   | Pass; all files match Prettier.                                                                                                                                          |
+| `npm run lint`                     | Pass.                                                                                                                                                                    |
+| `npm run typecheck`                | Pass.                                                                                                                                                                    |
+| `npm test`                         | Pass: 104 files passed, 6 integration files skipped by the unit command; 748 tests passed, 31 skipped.                                                                   |
+| `npm run build`                    | Pass: optimized Next.js 16.2.9 production build.                                                                                                                         |
+| `npm run db:validate`              | Pass: Prisma schema valid.                                                                                                                                               |
+| `npm run seed:validate`            | Pass: 0 warnings.                                                                                                                                                        |
+| Disposable PostgreSQL integration  | Pass: 3 files, 13 tests, including same-row PATCH, different-row converging PATCH, POST/PATCH race, 1 s timeout/57014 mapping, rollback, and pooled-setting non-leakage. |
+| Migration verifier                 | Pass: expand preflight, dry-run/apply/idempotent backfill, contract, duplicate insert/update, NOT NULL, rollback, and raw-row preservation.                              |
+| Chromium on mode                   | Pass: 21 tests; the single off-only spec was expectedly skipped.                                                                                                         |
+| Chromium off mode                  | Pass: 1 dedicated test.                                                                                                                                                  |
+| Chromium repeat after CI hardening | Pass: 42 tests across two repetitions; 2 expected off-only skips.                                                                                                        |
+| `git diff --check`                 | Pass.                                                                                                                                                                    |
 
 The final Chromium suite covers the integrated administrator list search ->
 detail -> edit/add alias/add provider entry -> public-search reflection flow,
@@ -189,6 +190,18 @@ retains the worst-partial `EXPLAIN (ANALYZE, BUFFERS)` plan:
 
 ## Publication evidence
 
-The commit, draft PR, and final GitHub Actions links are added after the branch
-is published. ADMIN-T05 may move only to a reviewable state; it must not be set
-to Final without user approval.
+- Implementation evidence commit:
+  [`9840bae34073b47a3c533fa100562a4d4d5baa65`](https://github.com/ctmanjak/KaraokeNumberFinder/commit/9840bae34073b47a3c533fa100562a4d4d5baa65).
+- CI hardening commit:
+  [`bd9246cbc1fe02cad59f0a3fc5718a93c6e49deb`](https://github.com/ctmanjak/KaraokeNumberFinder/commit/bd9246cbc1fe02cad59f0a3fc5718a93c6e49deb).
+- Review target: draft [PR #52](https://github.com/ctmanjak/KaraokeNumberFinder/pull/52)
+  into `develop` (not merged).
+- Successful head workflows for `bd9246c`:
+  [Quality](https://github.com/ctmanjak/KaraokeNumberFinder/actions/runs/30757302589),
+  [M3 schema](https://github.com/ctmanjak/KaraokeNumberFinder/actions/runs/30757302579),
+  [Browser E2E](https://github.com/ctmanjak/KaraokeNumberFinder/actions/runs/30757302605),
+  and
+  [Admin catalog gate](https://github.com/ctmanjak/KaraokeNumberFinder/actions/runs/30757302613).
+
+ADMIN-T05 may move only to a reviewable state; it must not be set to Final
+without user approval.
