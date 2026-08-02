@@ -571,6 +571,148 @@ describe("admin song page", () => {
     ).toHaveLength(1);
     expect(duplicateCall).toBe(2);
   });
+
+  it("preserves the submitted snapshot and requires an explicit retry after ambiguous none recovery", async () => {
+    const navigate = vi.fn();
+    let createCalls = 0;
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = input.toString();
+        if (url === "/api/auth/get-session") {
+          return jsonResponse({
+            user: { id: "admin-a", name: "Admin", is_admin: true }
+          });
+        }
+        if (url === "/api/admin/songs/options") return optionsResponse();
+        if (url === "/api/admin/songs/duplicate-check") {
+          return jsonResponse({ classification: "none", candidates: [] });
+        }
+        if (url === "/api/admin/songs" && init?.method === "POST") {
+          createCalls += 1;
+          if (createCalls === 1) {
+            return jsonResponse(
+              {
+                error: {
+                  code: "DATABASE_TIMEOUT",
+                  message: "Unknown commit state."
+                }
+              },
+              503
+            );
+          }
+          return jsonResponse(
+            {
+              song: {
+                id: "song-explicit-retry",
+                display_title: "레몬",
+                canonical_artist: "米津玄師"
+              },
+              alias_count: 3,
+              karaoke_entry_count: 1,
+              created_counts: {
+                songs: 1,
+                administrator_aliases: 0,
+                karaoke_entries: 1
+              }
+            },
+            201
+          );
+        }
+        return jsonResponse({ error: { code: "NOT_FOUND" } }, 404);
+      }
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    renderPage(navigate);
+    await fillIdentity();
+    await fillCreateFields();
+    expect(await screen.findByText("중복 후보가 없습니다.")).toBeTruthy();
+    const canonicalTitle = screen.getByLabelText("원제");
+    fireEvent.click(screen.getByRole("button", { name: "노래 추가" }));
+
+    expect(
+      await screen.findByText(/현재 동일 곡은 확인되지 않았습니다/)
+    ).toBeTruthy();
+    expect((canonicalTitle as HTMLInputElement).value).toBe("Lemon");
+    expect(
+      (canonicalTitle.closest("fieldset") as HTMLFieldSetElement).disabled
+    ).toBe(true);
+    expect(createCalls).toBe(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "다시 생성" }));
+    await vi.waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith("/admin/songs/song-explicit-retry")
+    );
+    expect(createCalls).toBe(2);
+  });
+
+  it("keeps creation locked when the ambiguous-state duplicate recheck fails", async () => {
+    let duplicateCalls = 0;
+    let createCalls = 0;
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = input.toString();
+        if (url === "/api/auth/get-session") {
+          return jsonResponse({
+            user: { id: "admin-a", name: "Admin", is_admin: true }
+          });
+        }
+        if (url === "/api/admin/songs/options") return optionsResponse();
+        if (url === "/api/admin/songs/duplicate-check") {
+          duplicateCalls += 1;
+          if (duplicateCalls === 2) {
+            return jsonResponse(
+              {
+                error: {
+                  code: "DUPLICATE_CHECK_UNAVAILABLE",
+                  message: "Try again later."
+                }
+              },
+              503
+            );
+          }
+          return jsonResponse({ classification: "none", candidates: [] });
+        }
+        if (url === "/api/admin/songs" && init?.method === "POST") {
+          createCalls += 1;
+          return jsonResponse(
+            {
+              error: {
+                code: "DATABASE_TIMEOUT",
+                message: "Unknown commit state."
+              }
+            },
+            503
+          );
+        }
+        return jsonResponse({ error: { code: "NOT_FOUND" } }, 404);
+      }
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    renderPage();
+    await fillIdentity();
+    await fillCreateFields();
+    expect(await screen.findByText("중복 후보가 없습니다.")).toBeTruthy();
+    const canonicalTitle = screen.getByLabelText("원제");
+    fireEvent.click(screen.getByRole("button", { name: "노래 추가" }));
+
+    expect(
+      await screen.findByText(/저장 여부를 확인하지 못했습니다/)
+    ).toBeTruthy();
+    expect((canonicalTitle as HTMLInputElement).value).toBe("Lemon");
+    expect(
+      (canonicalTitle.closest("fieldset") as HTMLFieldSetElement).disabled
+    ).toBe(true);
+    expect(createCalls).toBe(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "상태 다시 확인" }));
+    expect(
+      await screen.findByText(/현재 동일 곡은 확인되지 않았습니다/)
+    ).toBeTruthy();
+    expect(duplicateCalls).toBe(3);
+    expect(createCalls).toBe(1);
+  });
 });
 
 function renderPage(navigateToDetail?: (url: string) => void) {

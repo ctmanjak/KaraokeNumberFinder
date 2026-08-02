@@ -134,6 +134,48 @@ describe("admin catalog guard", () => {
     expect(writeFeatureDeniedEvent).not.toHaveBeenCalled();
   });
 
+  it("correlates the response envelope, header, and completion with one server request ID", async () => {
+    const onComplete = vi.fn();
+    const protectedHandler = createAdminCatalogHandler(
+      "song_create_api",
+      async () => {
+        throw personalizationError("FORBIDDEN");
+      },
+      {
+        requireSession: async () => ({ user: { id: "admin-a" } }),
+        readActorRole: async () => "admin",
+        isCatalogEnabled: () => true,
+        trustedOrigin: ORIGIN,
+        requireJsonInCsrf: false,
+        generateRequestId: () => REQUEST_ID,
+        onComplete,
+        writeSafeLog: () => undefined
+      }
+    );
+
+    const response = await protectedHandler(
+      new Request(`${ORIGIN}/api/admin/songs`, {
+        method: "POST",
+        headers: {
+          origin: ORIGIN,
+          "sec-fetch-site": "same-origin",
+          "x-knf-request": "1",
+          "content-type": "application/json"
+        },
+        body: "{}"
+      })
+    );
+    const body = await response.json();
+
+    expect(response.headers.get("x-request-id")).toBe(REQUEST_ID);
+    expect(body.error.request_id).toBe(REQUEST_ID);
+    expect(onComplete).toHaveBeenCalledOnce();
+    expect(onComplete.mock.calls[0][0]).toMatchObject({
+      requestId: REQUEST_ID,
+      actorUserId: "admin-a"
+    });
+  });
+
   it.each(["catalog_menu_api", "songs_list_api", "songs_options_api"] as const)(
     "stops %s before the catalog handler and emits a safe GET denial",
     async (routeCategory) => {
@@ -208,5 +250,34 @@ describe("admin catalog guard", () => {
     ]) {
       expect(serialized).not.toContain(forbidden);
     }
+  });
+
+  it("redacts the actor identifier from the default console event", async () => {
+    const consoleWarn = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+
+    await resolveAdminCatalogPageAccess(
+      new Request(`${ORIGIN}/admin/songs`),
+      "songs_list_page",
+      {
+        requireSession: async () => ({ user: { id: "sensitive-actor-id" } }),
+        readActorRole: async () => "admin",
+        isCatalogEnabled: () => false
+      },
+      () => REQUEST_ID
+    );
+
+    expect(consoleWarn).toHaveBeenCalledWith(
+      "[admin-catalog] Catalog feature access denied.",
+      expect.objectContaining({
+        request_id: REQUEST_ID,
+        actor_user_id: "[redacted]"
+      })
+    );
+    expect(JSON.stringify(consoleWarn.mock.calls)).not.toContain(
+      "sensitive-actor-id"
+    );
+    consoleWarn.mockRestore();
   });
 });

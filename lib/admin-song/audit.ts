@@ -11,9 +11,9 @@ export type AdminSongCreateAuditEvent = Readonly<{
   event: "admin_song.create";
   occurred_at: string;
   request_id: string;
-  actor_user_id?: string;
-  target_song_id?: string;
-  outcome: "accepted" | "rejected" | "failed";
+  actor_user_id: string | null;
+  target_song_id: string | null;
+  outcome: "success" | "rejected" | "failed";
   http_status: number;
   error_code?: string;
   created_counts: AdminSongCreateCounts;
@@ -41,12 +41,10 @@ export function createAdminSongCreateAuditCompletion(
       event: "admin_song.create",
       occurred_at: now().toISOString(),
       request_id: completion.requestId,
-      ...(completion.actorUserId === undefined
-        ? {}
-        : { actor_user_id: completion.actorUserId }),
-      ...(songId === undefined ? {} : { target_song_id: songId }),
+      actor_user_id: completion.actorUserId ?? null,
+      target_song_id: songId ?? null,
       outcome: completion.response.ok
-        ? "accepted"
+        ? "success"
         : completion.response.status >= 500
           ? "failed"
           : "rejected",
@@ -111,5 +109,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function defaultAuditWriter(event: AdminSongCreateAuditEvent): void {
-  console.info("[admin-song] Song create audit.", event);
+  console.info("[admin-song] Song create audit.", {
+    ...event,
+    actor_user_id: event.actor_user_id === null ? null : "[redacted]"
+  });
 }

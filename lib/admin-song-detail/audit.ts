@@ -14,9 +14,9 @@ export type AdminSongUpdateAuditEvent = Readonly<{
   event: "admin_song.update";
   occurred_at: string;
   request_id: string;
-  actor_user_id?: string;
-  target_song_id?: string;
-  outcome: "accepted" | "rejected" | "failed";
+  actor_user_id: string | null;
+  target_song_id: string | null;
+  outcome: "success" | "rejected" | "failed";
   http_status: number;
   error_code?: string;
   change_counts: AdminSongUpdateCounts;
@@ -41,12 +41,10 @@ export function createAdminSongUpdateAuditCompletion(
       event: "admin_song.update",
       occurred_at: now().toISOString(),
       request_id: completion.requestId,
-      ...(completion.actorUserId === undefined
-        ? {}
-        : { actor_user_id: completion.actorUserId }),
-      ...(targetSongId === undefined ? {} : { target_song_id: targetSongId }),
+      actor_user_id: completion.actorUserId ?? null,
+      target_song_id: targetSongId ?? null,
       outcome: completion.response.ok
-        ? "accepted"
+        ? "success"
         : completion.response.status >= 500
           ? "failed"
           : "rejected",
@@ -117,5 +115,8 @@ function isChangeCounts(value: unknown): value is AdminSongUpdateCounts {
 }
 
 function defaultAuditWriter(event: AdminSongUpdateAuditEvent): void {
-  console.info("[admin-song] Song update audit.", event);
+  console.info("[admin-song] Song update audit.", {
+    ...event,
+    actor_user_id: event.actor_user_id === null ? null : "[redacted]"
+  });
 }

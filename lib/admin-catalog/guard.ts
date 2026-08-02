@@ -245,7 +245,10 @@ function writeFeatureDeniedEvent(
       writer(event);
       return;
     }
-    console.warn("[admin-catalog] Catalog feature access denied.", event);
+    console.warn("[admin-catalog] Catalog feature access denied.", {
+      ...event,
+      actor_user_id: "[redacted]"
+    });
   } catch {
     console.error(
       "[admin-catalog] Failed to write catalog feature denial event."

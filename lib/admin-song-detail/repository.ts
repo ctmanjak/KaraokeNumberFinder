@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma, type PrismaClient } from "../generated/prisma/client";
+import {
+  hasPrismaErrorCode,
+  isPrismaTransactionWriteConflict
+} from "../prisma-error";
 import { validateAdminKaraokeEntryPolicy } from "../admin-song/entry-policy";
 import { ADMIN_SYSTEM_ALIAS_TYPES } from "../admin-song/types";
 import { adminSongValidationError } from "../admin-song/validation";
@@ -278,10 +282,10 @@ export function createPrismaAdminSongDetailRepository(
             throw candidateError;
           }
         }
-        if (hasPrismaCode(error, "P2034")) {
+        if (isPrismaTransactionWriteConflict(error)) {
           throw new AdminSongDetailRepositoryError("STALE");
         }
-        if (hasPrismaCode(error, "P2002")) {
+        if (hasPrismaErrorCode(error, ["P2002"])) {
           throw new AdminSongDetailRepositoryError("CONFLICT");
         }
         throw error;
@@ -815,13 +819,4 @@ async function requireAdmin(db: AdminLookupDb, userId: string): Promise<void> {
   if (actor?.role !== "admin") {
     throw new AdminSongDetailRepositoryError("FORBIDDEN");
   }
-}
-
-function hasPrismaCode(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === code
-  );
 }

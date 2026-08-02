@@ -34,7 +34,7 @@ describe("administrator song update audit", () => {
       request_id: "request-1",
       actor_user_id: "actor-1",
       target_song_id: "song_1",
-      outcome: "accepted",
+      outcome: "success",
       http_status: 200,
       change_counts: {
         song_fields: 1,
@@ -76,6 +76,8 @@ describe("administrator song update audit", () => {
       expect(writer).toHaveBeenCalledOnce();
       expect(writer).toHaveBeenCalledWith(
         expect.objectContaining({
+          actor_user_id: "actor-1",
+          target_song_id: "song_1",
           outcome,
           http_status: status,
           error_code: errorCode
@@ -105,5 +107,65 @@ describe("administrator song update audit", () => {
     expect(writer).toHaveBeenCalledOnce();
     expect(consoleError).toHaveBeenCalledOnce();
     consoleError.mockRestore();
+  });
+
+  it("uses explicit null identifiers when neither value is validated", async () => {
+    const writer = vi.fn();
+    const completion = createAdminSongUpdateAuditCompletion(undefined, writer);
+
+    await completion({
+      requestId: "request-invalid-target",
+      response: Response.json(
+        {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Invalid target.",
+            request_id: "request-invalid-target"
+          }
+        },
+        { status: 422 }
+      )
+    });
+
+    expect(writer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request_id: "request-invalid-target",
+        actor_user_id: null,
+        target_song_id: null,
+        outcome: "rejected"
+      })
+    );
+  });
+
+  it("redacts the actor identifier from the default console audit", async () => {
+    const consoleInfo = vi
+      .spyOn(console, "info")
+      .mockImplementation(() => undefined);
+    const completion = createAdminSongUpdateAuditCompletion("song_1");
+
+    await completion({
+      requestId: "request-default-update",
+      actorUserId: "sensitive-actor-id",
+      response: Response.json({
+        detail: {},
+        change_counts: {
+          song_fields: 0,
+          aliases_added: 0,
+          aliases_updated: 0,
+          aliases_deleted: 0,
+          karaoke_entries_added: 0,
+          karaoke_entries_updated: 0
+        }
+      })
+    });
+
+    expect(consoleInfo).toHaveBeenCalledWith(
+      "[admin-song] Song update audit.",
+      expect.objectContaining({ actor_user_id: "[redacted]" })
+    );
+    expect(JSON.stringify(consoleInfo.mock.calls)).not.toContain(
+      "sensitive-actor-id"
+    );
+    consoleInfo.mockRestore();
   });
 });

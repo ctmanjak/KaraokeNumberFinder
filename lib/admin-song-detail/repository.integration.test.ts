@@ -267,6 +267,60 @@ describeDatabase(
       );
     });
 
+    it("allows only one of two different Songs to PATCH into the same normalized identity", async () => {
+      const firstId = `${SONG_PREFIX}converging_patch_a`;
+      const secondId = `${SONG_PREFIX}converging_patch_b`;
+      await createFixture(firstId, "Converging Patch A", "Patch Artist A");
+      await createFixture(secondId, "Converging Patch B", "Patch Artist B");
+      const [first, second] = await Promise.all([
+        repository.get(ADMIN_ID, firstId),
+        repository.get(ADMIN_ID, secondId)
+      ]);
+      const sharedSong = {
+        original_language: "en",
+        canonical_title: "Concurrent Shared Patch Identity",
+        display_title: "Concurrent Shared Patch Display",
+        canonical_artist: "Concurrent Shared Patch Artist",
+        release_year: 2026,
+        tie_in: null,
+        source_name: "Concurrent patch reconfirmation",
+        source_url: null,
+        verification_note: null
+      };
+
+      const outcomes = await Promise.allSettled([
+        repository.update(ADMIN_ID, firstId, {
+          ...patch(first),
+          song: sharedSong
+        }),
+        repository.update(ADMIN_ID, secondId, {
+          ...patch(second),
+          song: sharedSong
+        })
+      ]);
+
+      expect(
+        outcomes.filter((outcome) => outcome.status === "fulfilled")
+      ).toHaveLength(1);
+      const rejected = outcomes.find(
+        (outcome): outcome is PromiseRejectedResult =>
+          outcome.status === "rejected"
+      );
+      expect(rejected?.reason).toBeInstanceOf(AdminSongDetailRepositoryError);
+      expect(["DUPLICATE_SONG", "STALE", "CONFLICT"]).toContain(
+        (rejected?.reason as AdminSongDetailRepositoryError).code
+      );
+      const identity = normalizeSongIdentity(sharedSong);
+      expect(
+        await prisma.song.count({
+          where: {
+            normalizedCanonicalTitle: identity.normalizedCanonicalTitle,
+            normalizedCanonicalArtist: identity.normalizedCanonicalArtist
+          }
+        })
+      ).toBe(1);
+    });
+
     it("prevents a POST/PATCH race from committing two normalized identities", async () => {
       const targetId = `${SONG_PREFIX}post_patch_race`;
       await createFixture(targetId, "Race Target Before", "Race Artist Before");

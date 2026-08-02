@@ -49,6 +49,10 @@ jobs:
         run: npx playwright --version
       - name: Run the isolated suite twice
         run: npm run test:e2e:repeat
+      - name: Run the isolated feature-off administrator gate
+        env:
+          KNF_E2E_ADMIN_CATALOG_MODE: off
+        run: npm run test:e2e -- e2e/admin-catalog-off.spec.ts
       - name: Upload failure screenshots
         if: failure()
         uses: actions/upload-artifact@v4
