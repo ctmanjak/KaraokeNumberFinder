@@ -72,9 +72,9 @@ describe("ADMIN-T03 normalized song identity rollout", () => {
     );
   });
 
-  it("rolls back only the new constraint and columns", () => {
+  it("rolls back only the contract unique constraint", () => {
     expect(rollback).toMatch(/DROP CONSTRAINT IF EXISTS/u);
-    expect(rollback).toMatch(/DROP COLUMN IF EXISTS/u);
+    expect(rollback).not.toMatch(/DROP COLUMN IF EXISTS/u);
     expect(rollback).not.toMatch(
       /DELETE|TRUNCATE|UPDATE\s+"?songs"?|DROP TABLE/iu
     );

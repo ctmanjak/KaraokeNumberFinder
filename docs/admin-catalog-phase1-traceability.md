@@ -153,8 +153,8 @@ feature-denied logs.
   abbreviation 0, common name 0, alternate spelling 2; unmapped types 0.
 - Contract: both normalized columns NOT NULL; named composite unique constraint;
   duplicate insert/update and null insert blocked.
-- Rollback: normalized columns and constraint removed; all 14 pre-existing raw
-  Song rows byte-for-byte JSON-equivalent after rollback.
+- Rollback: normalized columns preserved and contract constraint removed; all
+  14 pre-existing raw Song rows byte-for-byte JSON-equivalent after rollback.
 
 ### 10K Song / 100K Alias performance evidence
 

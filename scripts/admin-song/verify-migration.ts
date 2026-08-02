@@ -114,7 +114,7 @@ try {
           null_insert_blocked: true
         },
         rollback: {
-          normalized_columns_removed: true,
+          normalized_columns_preserved: true,
           constraint_removed: true,
           existing_song_count: rawSongsAfter.length,
           raw_song_data_preserved: true
@@ -319,9 +319,9 @@ async function verifyRollbackShape(client: Client): Promise<void> {
     FROM pg_constraint
     WHERE conname = 'songs_normalized_canonical_title_artist_key'
   `);
-  if (columns.rows[0]?.count !== 0 || constraint.rows[0]?.count !== 0) {
+  if (columns.rows[0]?.count !== 2 || constraint.rows[0]?.count !== 0) {
     throw new Error(
-      "Contract rollback left normalized identity objects behind."
+      "Contract rollback did not preserve the normalized columns or remove the unique constraint."
     );
   }
 }

@@ -18,13 +18,19 @@ test("administrator edits one aggregate, preserves ids, and explicitly reloads a
   const database = new Client({ connectionString: databaseUrl });
   await database.connect();
   const songId = `e2e_admin_t03_${randomUUID()}`;
+  const fixtureSuffix = songId.slice(-12);
+  const fixtureDisplayTitle = `E2E 관리자 상세 ${fixtureSuffix}`;
+  const fixtureOriginalAlias = `E2E original alias ${fixtureSuffix}`;
   const providerId = catalog.providers[0].id;
   const admin = users.create("admin-song-detail");
   const integratedAlias = `E2E public alias ${songId.slice(-8)}`;
   const integratedNumber = `T05${songId.replaceAll("-", "").slice(-10)}`;
 
   try {
-    await createSongFixture(database, songId, providerId);
+    await createSongFixture(database, songId, providerId, {
+      displayTitle: fixtureDisplayTitle,
+      originalAlias: fixtureOriginalAlias
+    });
     const catalogResponse = await page.request.get("/api/e2e/control", {
       headers: controlHeaders()
     });
@@ -34,16 +40,27 @@ test("administrator edits one aggregate, preserves ids, and explicitly reloads a
 
     await users.loginAdmin(page.request, admin);
     await page.goto("/admin/songs");
-    await page.getByLabel("카탈로그 검색").fill("E2E original alias");
+    await page.getByLabel("카탈로그 검색").fill(fixtureOriginalAlias);
     const searchButton = page.getByRole("button", { name: "검색" });
     await expect(searchButton).toBeEnabled();
     await searchButton.click();
-    const detailLink = page.getByRole("link", { name: /E2E 관리자 상세/u });
+    const detailLink = page.getByRole("link", {
+      name: new RegExp(fixtureDisplayTitle, "u")
+    });
+    await expect(detailLink).toHaveCount(1);
+    await expect(detailLink).toHaveAttribute(
+      "href",
+      `/admin/songs/${encodeURIComponent(songId)}`
+    );
     await expect(detailLink).toBeVisible();
     await detailLink.click();
 
     await expect(
-      page.getByRole("heading", { level: 1, name: "E2E 관리자 상세" })
+      page.getByRole("heading", {
+        level: 1,
+        name: fixtureDisplayTitle,
+        exact: true
+      })
     ).toBeVisible();
     await expect(page.getByLabel("canonical_title")).toHaveAttribute(
       "readonly",
@@ -86,10 +103,7 @@ test("administrator edits one aggregate, preserves ids, and explicitly reloads a
     await expect(page.getByText("변경사항을 저장했습니다.")).toBeVisible();
     await expect(
       page.getByRole("link", { name: "공개 검색에서 확인" })
-    ).toHaveAttribute(
-      "href",
-      "/?q=E2E%20%EA%B4%80%EB%A6%AC%EC%9E%90%20%EC%83%81%EC%84%B8"
-    );
+    ).toHaveAttribute("href", `/?q=${encodeURIComponent(fixtureDisplayTitle)}`);
 
     const detailResponse = await page.request.get(
       `/api/admin/songs/${encodeURIComponent(songId)}`
@@ -166,7 +180,10 @@ test("administrator edits one aggregate, preserves ids, and explicitly reloads a
     await page.getByRole("searchbox", { name: "검색어" }).fill(integratedAlias);
     await page.getByRole("button", { name: "검색", exact: true }).click();
     await expect(
-      page.getByRole("heading", { name: "E2E 관리자 상세" }).first()
+      page.getByRole("heading", {
+        name: fixtureDisplayTitle,
+        exact: true
+      })
     ).toBeVisible();
   } finally {
     await database.query("DELETE FROM songs WHERE id = $1", [songId]);
@@ -205,10 +222,11 @@ test("detail API preserves guest, user, and administrator authorization boundari
 async function createSongFixture(
   database: Client,
   songId: string,
-  providerId: string
+  providerId: string,
+  fixture: { displayTitle: string; originalAlias: string }
 ) {
   const canonicalTitle = "E2E Admin Detail";
-  const displayTitle = "E2E 관리자 상세";
+  const displayTitle = fixture.displayTitle;
   const canonicalArtist = "E2E Artist";
   await database.query(
     `INSERT INTO songs (
@@ -232,7 +250,7 @@ async function createSongFixture(
     [`${songId}_canonical`, canonicalTitle, "canonical_title"],
     [`${songId}_display`, displayTitle, "display_title"],
     [`${songId}_artist`, canonicalArtist, "artist"],
-    [`${songId}_admin_alias`, "E2E original alias", "english_title"]
+    [`${songId}_admin_alias`, fixture.originalAlias, "english_title"]
   ] as const) {
     const search = buildAliasSearchFields(value);
     await database.query(
