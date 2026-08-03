@@ -73,10 +73,14 @@ describe("ADMIN-T03 normalized song identity rollout", () => {
   });
 
   it("rolls back only the contract unique constraint", () => {
-    expect(rollback).toMatch(/DROP CONSTRAINT IF EXISTS/u);
-    expect(rollback).not.toMatch(/DROP COLUMN IF EXISTS/u);
+    expect(rollback.trim()).toBe(
+      `ALTER TABLE "songs"
+  DROP CONSTRAINT IF EXISTS "songs_normalized_canonical_title_artist_key";`
+    );
+    expect(rollback.match(/\bDROP\s+CONSTRAINT\b/giu) ?? []).toHaveLength(1);
+    expect(rollback.match(/;/gu) ?? []).toHaveLength(1);
     expect(rollback).not.toMatch(
-      /DELETE|TRUNCATE|UPDATE\s+"?songs"?|DROP TABLE/iu
+      /\b(?:DROP\s+COLUMN|DROP\s+TABLE|TRUNCATE|DELETE|UPDATE)\b/iu
     );
   });
 });

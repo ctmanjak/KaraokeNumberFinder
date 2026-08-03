@@ -225,9 +225,9 @@ async function createSongFixture(
   providerId: string,
   fixture: { displayTitle: string; originalAlias: string }
 ) {
-  const canonicalTitle = "E2E Admin Detail";
+  const canonicalTitle = `E2E Admin Detail ${songId}`;
   const displayTitle = fixture.displayTitle;
-  const canonicalArtist = "E2E Artist";
+  const canonicalArtist = `E2E Artist ${songId}`;
   await database.query(
     `INSERT INTO songs (
        id, original_language, canonical_title, display_title, canonical_artist,
