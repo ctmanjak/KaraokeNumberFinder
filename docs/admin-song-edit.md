@@ -56,10 +56,11 @@ limited to the normalized key, song ID and display summary, timestamps, alias
 and entry IDs, and favorite counts; it contains no user IDs. A non-empty exact
 duplicate report requires a separate data-cleanup ticket.
 
-The contract migration's `rollback.sql` drops only the new constraint and the
-two normalized columns. It does not alter or delete existing Song rows. Roll
-back the contract/application before using that SQL; rolling back the expand
-shape while dual-write code is active is unsupported.
+The contract migration's `rollback.sql` drops only the new composite unique
+constraint. It preserves the two normalized columns owned by the earlier
+expand migration and does not alter or delete existing Song rows. Roll back the
+contract/application before using that SQL; rolling back the expand shape while
+dual-write code is active is unsupported.
 
 ## Runtime contracts
 

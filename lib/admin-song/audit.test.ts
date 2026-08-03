@@ -36,7 +36,7 @@ describe("administrator song create audit", () => {
       request_id: "request-create",
       actor_user_id: "actor-internal",
       target_song_id: "song-created",
-      outcome: "accepted",
+      outcome: "success",
       http_status: 201,
       created_counts: {
         songs: 1,
@@ -78,6 +78,8 @@ describe("administrator song create audit", () => {
       expect(writer).toHaveBeenCalledOnce();
       expect(writer.mock.calls[0][0]).toMatchObject({
         event: "admin_song.create",
+        actor_user_id: "actor-internal",
+        target_song_id: null,
         outcome,
         http_status: status,
         error_code: code,
@@ -87,7 +89,6 @@ describe("administrator song create audit", () => {
           karaoke_entries: 0
         }
       });
-      expect(writer.mock.calls[0][0]).not.toHaveProperty("target_song_id");
       expect(JSON.stringify(writer.mock.calls[0][0])).not.toContain(
         "must-not-log"
       );
@@ -112,6 +113,66 @@ describe("administrator song create audit", () => {
         })
       })
     ).resolves.toBeUndefined();
+  });
+
+  it("uses explicit null identifiers before authentication or target creation", async () => {
+    const writer = vi.fn();
+    const completion = createAdminSongCreateAuditCompletion(writer);
+
+    await completion({
+      requestId: "request-guest",
+      response: Response.json(
+        {
+          error: {
+            code: "UNAUTHENTICATED",
+            message: "Authentication required.",
+            request_id: "request-guest"
+          }
+        },
+        { status: 401 }
+      )
+    });
+
+    expect(writer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request_id: "request-guest",
+        actor_user_id: null,
+        target_song_id: null,
+        outcome: "rejected"
+      })
+    );
+  });
+
+  it("redacts the actor identifier from the default console audit", async () => {
+    const consoleInfo = vi
+      .spyOn(console, "info")
+      .mockImplementation(() => undefined);
+    const completion = createAdminSongCreateAuditCompletion();
+
+    await completion({
+      requestId: "request-default-create",
+      actorUserId: "sensitive-actor-id",
+      response: Response.json(
+        {
+          song: { id: "song-created" },
+          created_counts: {
+            songs: 1,
+            administrator_aliases: 0,
+            karaoke_entries: 1
+          }
+        },
+        { status: 201 }
+      )
+    });
+
+    expect(consoleInfo).toHaveBeenCalledWith(
+      "[admin-song] Song create audit.",
+      expect.objectContaining({ actor_user_id: "[redacted]" })
+    );
+    expect(JSON.stringify(consoleInfo.mock.calls)).not.toContain(
+      "sensitive-actor-id"
+    );
+    consoleInfo.mockRestore();
   });
 
   it("warns instead of silently trusting malformed success counts", async () => {

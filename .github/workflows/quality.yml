@@ -39,10 +39,12 @@ jobs:
           node-version: 20.19.0
           cache: npm
       - run: npm ci
+      - run: npm run format
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - run: npm run db:validate
       - run: npm run seed:validate
       - run: npx prisma migrate deploy
       - run: npm run seed:import

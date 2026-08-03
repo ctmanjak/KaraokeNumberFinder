@@ -321,8 +321,14 @@ test("a slow provider write cannot overwrite the latest browser selection", asyn
   expect(committedFirstWrite.status()).toBe(200);
   const firstWritePayload = await committedFirstWrite.json();
 
+  const latestWriteResponse = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname ===
+        "/api/user-preference/default-provider" && response.status() === 200
+  );
   await select.selectOption(initialProviderId);
   await expect(select).toHaveValue(initialProviderId);
+  await latestWriteResponse;
   firstWrite.release(200, firstWritePayload);
   await firstWrite.settled;
 
