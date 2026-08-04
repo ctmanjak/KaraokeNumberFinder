@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { buildAliasSearchFields } from "../search/normalize";
 import { readCsvRows } from "../seed/csv";
 import { validateSeedDirectory } from "../seed/validate";
 import {
@@ -45,6 +46,7 @@ describe("generateSyntheticDataset", () => {
     expect(first.metadata).toEqual(second.metadata);
     expect(first.sampleIds).toEqual(second.sampleIds);
     expect(first.metadata.generator_version).toBe(SYNTHETIC_GENERATOR_VERSION);
+    expect(first.metadata.generator_version).toBe("synthetic-search-v2");
     expect(first.metadata.random_seed).toBe(1009);
     expect(first.metadata.row_counts).toMatchObject({
       songs: 1_000,
@@ -86,6 +88,7 @@ describe("generateSyntheticDataset", () => {
     expect(result.metadata.row_counts.karaoke_entries).toBe(
       expectedSyntheticKaraokeEntryCount(config)
     );
+    expectSystemAliasCoverage(result.outputDir);
     expectRequiredFixtureCases(result.outputDir, result.metadata.dataset_label);
   });
 });
@@ -146,6 +149,41 @@ function expectRequiredFixtureCases(
     expect(caseIds.has(requiredCaseId)).toBe(true);
   }
   expect(records.every((row) => row.dataset_label === datasetLabel)).toBe(true);
+}
+
+function expectSystemAliasCoverage(outputDir: string): void {
+  const songs = recordsFromFile(path.join(outputDir, "songs.csv"));
+  const aliases = recordsFromFile(path.join(outputDir, "song_aliases.csv"));
+  const aliasKeys = new Set(
+    aliases.map((alias) =>
+      JSON.stringify([alias.song_id, alias.alias_type, alias.normalized_alias])
+    )
+  );
+
+  for (const song of songs) {
+    for (const [aliasType, alias] of [
+      ["canonical_title", song.canonical_title],
+      ["display_title", song.display_title],
+      ["artist", song.canonical_artist]
+    ] as const) {
+      const normalizedAlias = buildAliasSearchFields(alias).normalizedAlias;
+      expect(
+        aliasKeys.has(JSON.stringify([song.id, aliasType, normalizedAlias]))
+      ).toBe(true);
+    }
+  }
+}
+
+function recordsFromFile(filePath: string): Record<string, string>[] {
+  const rows = readCsvRows(filePath);
+  const header = rows[0] ?? [];
+  return rows
+    .slice(1)
+    .map((row) =>
+      Object.fromEntries(
+        header.map((column, index) => [column, row[index] ?? ""])
+      )
+    );
 }
 
 function readFileSyncText(filePath: string): string {

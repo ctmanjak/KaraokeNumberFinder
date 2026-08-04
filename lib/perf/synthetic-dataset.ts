@@ -20,7 +20,7 @@ export type SyntheticDatasetConfig = {
   // Contract seed recorded in metadata and embedded in generated karaoke numbers.
   // Generation is otherwise formula-driven and does not use a PRNG.
   randomSeed: number;
-  generatorVersion: "synthetic-search-v1";
+  generatorVersion: "synthetic-search-v2";
   deterministicGeneratedAt: string;
 };
 
@@ -78,7 +78,7 @@ type SearchFixtureRow = {
   notes: string;
 };
 
-export const SYNTHETIC_GENERATOR_VERSION = "synthetic-search-v1";
+export const SYNTHETIC_GENERATOR_VERSION = "synthetic-search-v2";
 export const SYNTHETIC_SEARCH_FIXTURE_FILE = "search-synthetic-scale.csv";
 export const SYNTHETIC_METADATA_FILE = "dataset-metadata.json";
 export const DEFAULT_SYNTHETIC_OUTPUT_ROOT = path.join(
@@ -285,15 +285,12 @@ function buildProviders(config: SyntheticDatasetConfig): ProviderRow[] {
 function buildSongs(config: SyntheticDatasetConfig): SongRow[] {
   return Array.from({ length: config.songCount }, (_, index) => {
     const ordinal = index + 1;
-    const fixtureTitle = fixtureDisplayTitle(ordinal);
 
     return {
       id: songId(config, ordinal),
       original_language: languageFor(ordinal),
       canonical_title: `Synthetic Canonical ${config.idPrefix} ${pad(ordinal, 6)}`,
-      display_title:
-        fixtureTitle ??
-        `Synthetic ${languageFor(ordinal).toUpperCase()} Title ${pad(ordinal, 6)}`,
+      display_title: syntheticDisplayTitle(config, ordinal),
       canonical_artist: artistFor(ordinal),
       release_year: releaseYearFor(ordinal),
       tie_in: tieInFor(ordinal),
@@ -637,6 +634,21 @@ function fixtureDisplayTitle(songOrdinal: number): string | null {
     return "Payload Fanout Anthem";
   }
   return null;
+}
+
+function syntheticDisplayTitle(
+  config: SyntheticDatasetConfig,
+  songOrdinal: number
+): string {
+  const fixtureTitle = fixtureDisplayTitle(songOrdinal);
+  if (fixtureTitle !== null) {
+    return fixtureTitle;
+  }
+
+  return (
+    fixtureAliasText(songOrdinal, "display_title") ??
+    `Synthetic Display ${pad(songOrdinal, 6)}`
+  );
 }
 
 function languageFor(songOrdinal: number): string {
