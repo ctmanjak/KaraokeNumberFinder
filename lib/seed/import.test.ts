@@ -26,6 +26,8 @@ const FIXTURES_DIR = path.join(
 );
 const VALID_DIR = path.join(FIXTURES_DIR, "valid");
 const INVALID_DIR = path.join(FIXTURES_DIR, "invalid");
+const SYSTEM_ALIAS_COLLISION_ID =
+  "alias_system_song_fixture_001_canonical_title";
 const tempSeedDirs: string[] = [];
 
 afterEach(() => {
@@ -160,6 +162,63 @@ describe("importSeedDirectory", () => {
     expect(db.store.songAlias.size).toBe(4);
     expect(db.store.karaokeEntry.size).toBe(2);
   });
+
+  it.each([
+    ["default", undefined],
+    ["batch", 1]
+  ] as const)(
+    "rejects a generated system alias ID used by a different input alias in %s mode",
+    async (_mode, writeBatchSize) => {
+      const seedDir = makeTempSeedDir({
+        "song_aliases.csv": readFixture(VALID_DIR, "song_aliases.csv").replace(
+          "alias_fixture_001_ro,",
+          `${SYSTEM_ALIAS_COLLISION_ID},`
+        )
+      });
+      const db = new FakeSeedImportDb();
+
+      await expect(
+        importSeedDirectory(db, { seedDir, writeBatchSize })
+      ).rejects.toThrow(
+        `System alias ID collision in seed input: ${SYSTEM_ALIAS_COLLISION_ID}`
+      );
+      expect(db.upsertLog).toEqual([]);
+      expect(db.store.songAlias.size).toBe(0);
+    }
+  );
+
+  it.each([
+    ["default", undefined],
+    ["batch", 1]
+  ] as const)(
+    "rejects a generated system alias ID assigned to a different database alias in %s mode",
+    async (_mode, writeBatchSize) => {
+      const storedAlias: AliasImportData = {
+        id: SYSTEM_ALIAS_COLLISION_ID,
+        songId: "song_fixture_001",
+        alias: "Fixture Song",
+        language: "ro",
+        aliasType: "romanized_title",
+        normalizedAlias: "fixturesong",
+        chosungAlias: null,
+        sourceUrl: "https://example.com/song",
+        sourceName: "Generic song source",
+        verifiedBy: "ops_fixture",
+        verificationNote: "Romanized alias"
+      };
+      const db = new FakeSeedImportDb({ songAlias: [storedAlias] });
+
+      await expect(
+        importSeedDirectory(db, { seedDir: VALID_DIR, writeBatchSize })
+      ).rejects.toThrow(
+        `System alias ID collision in database: ${SYSTEM_ALIAS_COLLISION_ID}`
+      );
+      expect(db.upsertLog).toEqual([]);
+      expect(db.store.songAlias.get(SYSTEM_ALIAS_COLLISION_ID)).toEqual(
+        storedAlias
+      );
+    }
+  );
 
   it("rejects non-plain integer values while reading import rows", () => {
     for (const displayOrder of ["", "1e2", "1.5"]) {

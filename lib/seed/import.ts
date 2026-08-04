@@ -181,6 +181,11 @@ export async function importSeedDirectory(
 
   const tables = readSeedImportTables(seedDir);
   const systemAliasCandidates = buildSystemAliasCandidates(tables);
+  await assertSystemAliasCandidateIdsAvailable(
+    db,
+    tables,
+    systemAliasCandidates
+  );
   const planningTables = includeSystemAliasCandidates(
     tables,
     systemAliasCandidates
@@ -661,6 +666,58 @@ function buildSystemAliasCandidates(
     }
   }
   return candidates;
+}
+
+async function assertSystemAliasCandidateIdsAvailable(
+  db: SeedImportDbClient,
+  tables: readonly SeedImportTable[],
+  candidates: readonly AliasImportData[]
+): Promise<void> {
+  const aliasTable = tables.find(
+    (table): table is SeedImportTable<"song_aliases.csv"> =>
+      table.file === "song_aliases.csv"
+  );
+  if (aliasTable === undefined) {
+    throw new Error("Alias seed table is required.");
+  }
+
+  const inputAliasesById = new Map(
+    aliasTable.data.map((alias) => [alias.id, alias])
+  );
+  for (const candidate of candidates) {
+    const inputAlias = inputAliasesById.get(candidate.id);
+    if (
+      inputAlias !== undefined &&
+      aliasIdentityKey(inputAlias) !== aliasIdentityKey(candidate)
+    ) {
+      throw new Error(
+        `System alias ID collision in seed input: ${candidate.id}`
+      );
+    }
+  }
+
+  const storedAliasesById = new Map<string, AliasImportData>();
+  for (const batch of batches(candidates, SEED_IMPORT_QUERY_BATCH_SIZE)) {
+    const storedAliases = await db.songAlias.findMany({
+      where: { id: { in: batch.map((candidate) => candidate.id) } }
+    });
+    for (const alias of storedAliases) {
+      storedAliasesById.set(alias.id, alias);
+    }
+  }
+  for (const candidate of candidates) {
+    const storedAlias = storedAliasesById.get(candidate.id);
+    if (
+      storedAlias !== undefined &&
+      aliasIdentityKey(storedAlias) !== aliasIdentityKey(candidate)
+    ) {
+      throw new Error(`System alias ID collision in database: ${candidate.id}`);
+    }
+  }
+}
+
+function aliasIdentityKey(alias: AliasImportData): string {
+  return systemAliasKey(alias.songId, alias.aliasType, alias.normalizedAlias);
 }
 
 function systemAliasKey(
