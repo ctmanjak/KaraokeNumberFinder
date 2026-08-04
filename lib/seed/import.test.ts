@@ -1,17 +1,23 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  formatSeedImportResult,
   importSeedDirectory,
   readSeedImportTables,
+  SEED_IMPORT_MAX_WRITE_BATCH_SIZE,
+  SEED_IMPORT_QUERY_BATCH_SIZE,
   type AliasImportData,
   type EntryImportData,
   type ProviderImportData,
   type SeedImportDbClient,
   type SongImportData
 } from "./import";
+import { generateSyntheticDataset } from "../perf/synthetic-dataset";
 import { cleanupSeedDirs, makeSeedDir, readFixture } from "./test-utils";
 
 const FIXTURES_DIR = path.join(
@@ -20,6 +26,8 @@ const FIXTURES_DIR = path.join(
 );
 const VALID_DIR = path.join(FIXTURES_DIR, "valid");
 const INVALID_DIR = path.join(FIXTURES_DIR, "invalid");
+const SYSTEM_ALIAS_COLLISION_ID =
+  "alias_system_song_fixture_001_canonical_title";
 const tempSeedDirs: string[] = [];
 
 afterEach(() => {
@@ -155,6 +163,63 @@ describe("importSeedDirectory", () => {
     expect(db.store.karaokeEntry.size).toBe(2);
   });
 
+  it.each([
+    ["default", undefined],
+    ["batch", 1]
+  ] as const)(
+    "rejects a generated system alias ID used by a different input alias in %s mode",
+    async (_mode, writeBatchSize) => {
+      const seedDir = makeTempSeedDir({
+        "song_aliases.csv": readFixture(VALID_DIR, "song_aliases.csv").replace(
+          "alias_fixture_001_ro,",
+          `${SYSTEM_ALIAS_COLLISION_ID},`
+        )
+      });
+      const db = new FakeSeedImportDb();
+
+      await expect(
+        importSeedDirectory(db, { seedDir, writeBatchSize })
+      ).rejects.toThrow(
+        `System alias ID collision in seed input: ${SYSTEM_ALIAS_COLLISION_ID}`
+      );
+      expect(db.upsertLog).toEqual([]);
+      expect(db.store.songAlias.size).toBe(0);
+    }
+  );
+
+  it.each([
+    ["default", undefined],
+    ["batch", 1]
+  ] as const)(
+    "rejects a generated system alias ID assigned to a different database alias in %s mode",
+    async (_mode, writeBatchSize) => {
+      const storedAlias: AliasImportData = {
+        id: SYSTEM_ALIAS_COLLISION_ID,
+        songId: "song_fixture_001",
+        alias: "Fixture Song",
+        language: "ro",
+        aliasType: "romanized_title",
+        normalizedAlias: "fixturesong",
+        chosungAlias: null,
+        sourceUrl: "https://example.com/song",
+        sourceName: "Generic song source",
+        verifiedBy: "ops_fixture",
+        verificationNote: "Romanized alias"
+      };
+      const db = new FakeSeedImportDb({ songAlias: [storedAlias] });
+
+      await expect(
+        importSeedDirectory(db, { seedDir: VALID_DIR, writeBatchSize })
+      ).rejects.toThrow(
+        `System alias ID collision in database: ${SYSTEM_ALIAS_COLLISION_ID}`
+      );
+      expect(db.upsertLog).toEqual([]);
+      expect(db.store.songAlias.get(SYSTEM_ALIAS_COLLISION_ID)).toEqual(
+        storedAlias
+      );
+    }
+  );
+
   it("rejects non-plain integer values while reading import rows", () => {
     for (const displayOrder of ["", "1e2", "1.5"]) {
       const seedDir = makeTempSeedDir({
@@ -208,6 +273,77 @@ describe("importSeedDirectory", () => {
     expect(db.store.songAlias.size).toBe(0);
     expect(db.store.karaokeEntry.size).toBe(0);
   });
+
+  it("plans and formats the 10k/100k synthetic dataset with bounded queries", async () => {
+    const outputRoot = mkdtempSync(path.join(tmpdir(), "seed-import-scale-"));
+    tempSeedDirs.push(outputRoot);
+    const generated = generateSyntheticDataset({
+      datasetLabel: "synthetic-10k-songs-100k-aliases",
+      outputRoot
+    });
+    const db = new FakeSeedImportDb();
+
+    const result = await importSeedDirectory(db, {
+      seedDir: generated.outputDir,
+      dryRun: true
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.rows).toHaveLength(132_532);
+    expect(result.files).toContainEqual(
+      expect.objectContaining({
+        file: "song_aliases.csv",
+        create: 100_000,
+        update: 0,
+        skip: 0
+      })
+    );
+    expect(db.maxFindBatchSize).toBeLessThanOrEqual(
+      SEED_IMPORT_QUERY_BATCH_SIZE
+    );
+    expect(() => formatSeedImportResult(result)).not.toThrow();
+    expect(formatSeedImportResult(result, { includeRows: false })).toContain(
+      "Row plan omitted (132532 rows)."
+    );
+  }, 20_000);
+
+  it("uses bounded create batches and converges after a partial failure", async () => {
+    const db = new FakeSeedImportDb({
+      failOnUpsertId: "alias_fixture_001_ro"
+    });
+
+    await expect(
+      importSeedDirectory(db, { seedDir: VALID_DIR, writeBatchSize: 1 })
+    ).rejects.toThrow("forced upsert failure for alias_fixture_001_ro");
+    expect(db.store.karaokeProvider.size).toBe(2);
+    expect(db.store.song.size).toBe(1);
+    expect(db.store.songAlias.size).toBe(1);
+    expect(db.store.karaokeEntry.size).toBe(0);
+
+    db.failOnUpsertId = undefined;
+    const result = await importSeedDirectory(db, {
+      seedDir: VALID_DIR,
+      writeBatchSize: 1
+    });
+
+    expect(result.applied).toBe(true);
+    expect(db.store.karaokeProvider.size).toBe(2);
+    expect(db.store.song.size).toBe(1);
+    expect(db.store.songAlias.size).toBe(4);
+    expect(db.store.karaokeEntry.size).toBe(2);
+    expect(db.createManyBatchSizes.every((size) => size <= 1)).toBe(true);
+  });
+
+  it("rejects an unbounded write batch size", async () => {
+    await expect(
+      importSeedDirectory(new FakeSeedImportDb(), {
+        seedDir: VALID_DIR,
+        writeBatchSize: SEED_IMPORT_MAX_WRITE_BATCH_SIZE + 1
+      })
+    ).rejects.toThrow(
+      `writeBatchSize must be an integer between 1 and ${SEED_IMPORT_MAX_WRITE_BATCH_SIZE}`
+    );
+  });
 });
 
 type Store = {
@@ -227,9 +363,11 @@ type InitialData = Partial<{
 
 class FakeSeedImportDb implements SeedImportDbClient {
   readonly store: Store;
-  readonly failOnUpsertId?: string;
+  failOnUpsertId?: string;
   upsertLog: string[] = [];
   findCount = 0;
+  maxFindBatchSize = 0;
+  createManyBatchSizes: number[] = [];
 
   constructor(initial: InitialData = {}) {
     this.store = {
@@ -273,9 +411,27 @@ class FakeSeedImportDb implements SeedImportDbClient {
     return {
       findMany: async (args: { where: { id: { in: string[] } } }) => {
         this.findCount += 1;
+        this.maxFindBatchSize = Math.max(
+          this.maxFindBatchSize,
+          args.where.id.in.length
+        );
         const ids = new Set(args.where.id.in);
         const table = this.store[model] as unknown as Map<string, TData>;
         return Array.from(table.values()).filter((row) => ids.has(row.id));
+      },
+      createMany: async (args: { data: TData[] }) => {
+        const failed = args.data.find((row) => row.id === this.failOnUpsertId);
+        if (failed !== undefined) {
+          throw new Error(`forced upsert failure for ${failed.id}`);
+        }
+        this.createManyBatchSizes.push(args.data.length);
+        const table = this.store[model] as unknown as Map<string, TData>;
+        for (const row of args.data) {
+          if (table.has(row.id)) {
+            throw new Error(`duplicate create for ${row.id}`);
+          }
+          table.set(row.id, row);
+        }
       },
       upsert: async (args: {
         where: { id: string };

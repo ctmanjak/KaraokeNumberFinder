@@ -41,10 +41,11 @@ try {
 
   const result = await importSeedDirectory(toSeedImportDbClient(prisma), {
     seedDir: args.seedDir,
-    dryRun: args.dryRun
+    dryRun: args.dryRun,
+    writeBatchSize: 500
   });
 
-  for (const line of formatSeedImportResult(result)) {
+  for (const line of formatSeedImportResult(result, { includeRows: false })) {
     if (line.startsWith("error:")) {
       console.error(line);
     } else if (line.startsWith("warning:")) {
@@ -180,14 +181,22 @@ function seedImportDelegates(
   return {
     karaokeProvider: {
       findMany: (args) => prisma.karaokeProvider.findMany(args),
+      createMany: (args) => prisma.karaokeProvider.createMany(args),
       upsert: (args) => prisma.karaokeProvider.upsert(args)
     },
     song: {
       findMany: (args) => prisma.song.findMany(args),
+      createMany: (args) => prisma.song.createMany(args),
       upsert: (args) => prisma.song.upsert(args)
     },
     songAlias: {
       findMany: (args) => prisma.songAlias.findMany(args),
+      createMany: (args) =>
+        prisma.songAlias.createMany({
+          data: args.data as NonNullable<
+            Parameters<typeof prisma.songAlias.createMany>[0]
+          >["data"]
+        }),
       upsert: (args) =>
         prisma.songAlias.upsert({
           ...args,
@@ -201,6 +210,12 @@ function seedImportDelegates(
     },
     karaokeEntry: {
       findMany: (args) => prisma.karaokeEntry.findMany(args),
+      createMany: (args) =>
+        prisma.karaokeEntry.createMany({
+          data: args.data as NonNullable<
+            Parameters<typeof prisma.karaokeEntry.createMany>[0]
+          >["data"]
+        }),
       upsert: (args) =>
         prisma.karaokeEntry.upsert({
           ...args,
