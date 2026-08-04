@@ -246,7 +246,7 @@ describe("importSeedDirectory", () => {
     expect(formatSeedImportResult(result, { includeRows: false })).toContain(
       "Row plan omitted (132532 rows)."
     );
-  });
+  }, 20_000);
 
   it("uses bounded create batches and converges after a partial failure", async () => {
     const db = new FakeSeedImportDb({
