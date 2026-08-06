@@ -42,13 +42,16 @@ test("administrator catalog access is prefetched and reused by the user menu", a
   expect(accessRequestCount).toBe(1);
 
   await menuButton.click();
+  await expect(menuButton).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("link", { name: "노래 관리" })).toHaveCount(0);
   await menuButton.click();
+  await expect(menuButton).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("link", { name: "노래 관리" })).toBeVisible();
   expect(accessRequestCount).toBe(1);
 
-  await menuButton.click();
   await page.getByRole("link", { name: "즐겨찾기", exact: true }).click();
   await expect(page.getByRole("heading", { name: "즐겨찾기" })).toBeVisible();
+  await expect(menuButton).toHaveAttribute("aria-expanded", "false");
   expect(accessRequestCount).toBe(1);
 
   await menuButton.click();

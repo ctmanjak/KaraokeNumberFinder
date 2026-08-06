@@ -133,6 +133,7 @@ export function AuthHeader({
           });
         }
       } catch {
+        // Actor changes and unmounts abort this controller; timeouts must record disabled access.
         if (
           active &&
           !controller.signal.aborted &&

@@ -187,7 +187,7 @@ describe("global auth header", () => {
     expect(screen.queryByRole("link", { name: "노래 관리" })).toBeNull();
 
     fireEvent.click(menuButton);
-    expect(screen.getByRole("link", { name: "노래 관리" })).toBeTruthy();
+    expect(await screen.findByRole("link", { name: "노래 관리" })).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "노래 관리" }).getAttribute("href")
     ).toBe("/admin/songs");
@@ -279,7 +279,7 @@ describe("global auth header", () => {
     });
     await waitFor(() => expect(catalogAccessCalls(fetcher)).toHaveLength(1));
     fireEvent.click(menuButton);
-    expect(screen.getByRole("link", { name: "노래 관리" })).toBeTruthy();
+    expect(await screen.findByRole("link", { name: "노래 관리" })).toBeTruthy();
 
     fireEvent.click(menuButton);
     fireEvent.click(menuButton);
@@ -469,7 +469,7 @@ describe("global auth header", () => {
     });
     await waitFor(() => expect(catalogAccessCalls(fetcher)).toHaveLength(1));
     fireEvent.click(menuButton);
-    expect(screen.getByRole("link", { name: "노래 관리" })).toBeTruthy();
+    expect(await screen.findByRole("link", { name: "노래 관리" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
     await screen.findByRole("button", { name: "Google 로그인" });
