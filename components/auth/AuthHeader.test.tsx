@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -25,6 +26,7 @@ describe("global auth header", () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -166,7 +168,7 @@ describe("global auth header", () => {
     expect(screen.queryByText("Alice")).toBeNull();
   });
 
-  it("shows song creation only to an admin session", async () => {
+  it("prefetches catalog access once before an admin opens the menu", async () => {
     const fetcher = vi
       .fn()
       .mockResolvedValueOnce(
@@ -178,10 +180,14 @@ describe("global auth header", () => {
     vi.stubGlobal("fetch", fetcher);
 
     renderHeader();
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Admin 사용자 메뉴" })
-    );
-    expect(await screen.findByRole("link", { name: "노래 관리" })).toBeTruthy();
+    const menuButton = await screen.findByRole("button", {
+      name: "Admin 사용자 메뉴"
+    });
+    await waitFor(() => expect(catalogAccessCalls(fetcher)).toHaveLength(1));
+    expect(screen.queryByRole("link", { name: "노래 관리" })).toBeNull();
+
+    fireEvent.click(menuButton);
+    expect(screen.getByRole("link", { name: "노래 관리" })).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "노래 관리" }).getAttribute("href")
     ).toBe("/admin/songs");
@@ -189,6 +195,39 @@ describe("global auth header", () => {
       "/api/admin/catalog-access",
       expect.objectContaining({ cache: "no-store" })
     );
+    expect(catalogAccessCalls(fetcher)).toHaveLength(1);
+  });
+
+  it("keeps one in-flight access request while the admin toggles the menu", async () => {
+    const accessResponse = deferred<Response>();
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          user: { id: "admin-a", name: "Admin", is_admin: true }
+        })
+      )
+      .mockImplementationOnce(() => accessResponse.promise);
+    vi.stubGlobal("fetch", fetcher);
+
+    renderHeader();
+    const menuButton = await screen.findByRole("button", {
+      name: "Admin 사용자 메뉴"
+    });
+    await waitFor(() => expect(catalogAccessCalls(fetcher)).toHaveLength(1));
+
+    fireEvent.click(menuButton);
+    fireEvent.click(menuButton);
+    fireEvent.click(menuButton);
+    expect(catalogAccessCalls(fetcher)).toHaveLength(1);
+    expect(screen.queryByRole("link", { name: "노래 관리" })).toBeNull();
+
+    await act(async () => {
+      accessResponse.resolve(jsonResponse({ enabled: true }));
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("link", { name: "노래 관리" })).toBeTruthy();
+    expect(catalogAccessCalls(fetcher)).toHaveLength(1);
   });
 
   it("does not render the catalog entry for an admin when the feature is off", async () => {
@@ -214,20 +253,205 @@ describe("global auth header", () => {
     vi.stubGlobal("fetch", fetcher);
 
     renderHeader();
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Admin 사용자 메뉴" })
-    );
-    await waitFor(() =>
-      expect(fetcher).toHaveBeenCalledWith(
-        "/api/admin/catalog-access",
-        expect.objectContaining({ cache: "no-store" })
-      )
-    );
+    const menuButton = await screen.findByRole("button", {
+      name: "Admin 사용자 메뉴"
+    });
+    await waitFor(() => expect(catalogAccessCalls(fetcher)).toHaveLength(1));
+    fireEvent.click(menuButton);
     expect(screen.queryByRole("link", { name: "노래 관리" })).toBeNull();
     expect(screen.queryByText(/준비 중/)).toBeNull();
   });
 
-  it("rechecks the runtime catalog mode whenever an admin reopens the menu", async () => {
+  it("reuses an actor result across menu reopen and client navigation", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          user: { id: "admin-a", name: "Admin", is_admin: true }
+        })
+      )
+      .mockResolvedValueOnce(jsonResponse({ enabled: true }));
+    vi.stubGlobal("fetch", fetcher);
+
+    const view = renderHeader();
+    const menuButton = await screen.findByRole("button", {
+      name: "Admin 사용자 메뉴"
+    });
+    await waitFor(() => expect(catalogAccessCalls(fetcher)).toHaveLength(1));
+    fireEvent.click(menuButton);
+    expect(screen.getByRole("link", { name: "노래 관리" })).toBeTruthy();
+
+    fireEvent.click(menuButton);
+    fireEvent.click(menuButton);
+    expect(screen.getByRole("link", { name: "노래 관리" })).toBeTruthy();
+    expect(catalogAccessCalls(fetcher)).toHaveLength(1);
+
+    navigation.pathname = "/favorites";
+    window.history.replaceState({}, "", "/favorites");
+    view.rerender(headerTree());
+    await act(async () => Promise.resolve());
+    expect(menuButton.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(menuButton);
+    expect(screen.getByRole("link", { name: "노래 관리" })).toBeTruthy();
+    expect(catalogAccessCalls(fetcher)).toHaveLength(1);
+  });
+
+  it.each([
+    ["guest", null],
+    ["regular user", { user: { id: "user-a", name: "Alice", is_admin: false } }]
+  ])("does not request catalog access for a %s", async (_label, session) => {
+    const fetcher = vi.fn().mockResolvedValueOnce(jsonResponse(session));
+    vi.stubGlobal("fetch", fetcher);
+
+    renderHeader();
+    if (session === null) {
+      await screen.findByRole("button", { name: "Google 로그인" });
+    } else {
+      const menuButton = await screen.findByRole("button", {
+        name: "Alice 사용자 메뉴"
+      });
+      fireEvent.click(menuButton);
+    }
+    await act(async () => Promise.resolve());
+
+    expect(catalogAccessCalls(fetcher)).toHaveLength(0);
+    expect(screen.queryByRole("link", { name: "노래 관리" })).toBeNull();
+  });
+
+  it.each([
+    [
+      "403",
+      () =>
+        Promise.resolve(
+          jsonResponse({ error: { code: "ADMIN_CATALOG_NOT_ENABLED" } }, 403)
+        )
+    ],
+    [
+      "5xx",
+      () =>
+        Promise.resolve(
+          jsonResponse({ error: { code: "PERSONALIZATION_UNAVAILABLE" } }, 503)
+        )
+    ],
+    ["network error", () => Promise.reject(new TypeError("offline"))],
+    ["malformed response", () => Promise.resolve(malformedJsonResponse())]
+  ])("fails closed for an access %s", async (_label, accessResponse) => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          user: { id: "admin-a", name: "Admin", is_admin: true }
+        })
+      )
+      .mockImplementationOnce(accessResponse);
+    vi.stubGlobal("fetch", fetcher);
+
+    renderHeader();
+    const menuButton = await screen.findByRole("button", {
+      name: "Admin 사용자 메뉴"
+    });
+    await waitFor(() => expect(catalogAccessCalls(fetcher)).toHaveLength(1));
+    await act(async () => Promise.resolve());
+
+    fireEvent.click(menuButton);
+    expect(screen.queryByRole("link", { name: "노래 관리" })).toBeNull();
+  });
+
+  it("aborts and fails closed when catalog access times out", async () => {
+    vi.useFakeTimers();
+    let accessSignal: AbortSignal | undefined;
+    const fetcher = vi.fn(
+      (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        if (input.toString() === "/api/auth/get-session") {
+          return Promise.resolve(
+            jsonResponse({
+              user: { id: "admin-a", name: "Admin", is_admin: true }
+            })
+          );
+        }
+        accessSignal = init?.signal ?? undefined;
+        return new Promise((_resolve, reject) => {
+          accessSignal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("Timed out", "AbortError")),
+            { once: true }
+          );
+        });
+      }
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    renderHeader();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(
+      screen.getByRole("button", { name: "Admin 사용자 메뉴" })
+    ).toBeTruthy();
+    expect(accessSignal?.aborted).toBe(false);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(8_000);
+    });
+    expect(accessSignal?.aborted).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Admin 사용자 메뉴" }));
+    expect(screen.queryByRole("link", { name: "노래 관리" })).toBeNull();
+  });
+
+  it("discards an old actor response and checks the replacement actor", async () => {
+    const actorAAccess = deferred<Response>();
+    const accessSignals: AbortSignal[] = [];
+    let sessionReads = 0;
+    let accessReads = 0;
+    const fetcher = vi.fn(
+      (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        if (input.toString() === "/api/auth/get-session") {
+          sessionReads += 1;
+          return Promise.resolve(
+            jsonResponse({
+              user:
+                sessionReads === 1
+                  ? { id: "admin-a", name: "Admin A", is_admin: true }
+                  : { id: "admin-b", name: "Admin B", is_admin: true }
+            })
+          );
+        }
+        if (input.toString() === "/api/admin/catalog-access") {
+          accessReads += 1;
+          if (init?.signal !== undefined && init.signal !== null) {
+            accessSignals.push(init.signal);
+          }
+          return accessReads === 1
+            ? actorAAccess.promise
+            : Promise.resolve(jsonResponse({ enabled: false }));
+        }
+        throw new Error(`Unexpected request: ${input.toString()}`);
+      }
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    renderHeader();
+    await screen.findByRole("button", { name: "Admin A 사용자 메뉴" });
+    await waitFor(() => expect(catalogAccessCalls(fetcher)).toHaveLength(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "세션 새로고침" }));
+    const actorBMenu = await screen.findByRole("button", {
+      name: "Admin B 사용자 메뉴"
+    });
+    await waitFor(() => expect(catalogAccessCalls(fetcher)).toHaveLength(2));
+    expect(accessSignals[0]?.aborted).toBe(true);
+
+    await act(async () => {
+      actorAAccess.resolve(jsonResponse({ enabled: true }));
+      await Promise.resolve();
+    });
+    fireEvent.click(actorBMenu);
+    expect(screen.queryByRole("link", { name: "노래 관리" })).toBeNull();
+  });
+
+  it("removes an enabled result after logout", async () => {
     const fetcher = vi
       .fn()
       .mockResolvedValueOnce(
@@ -236,30 +460,48 @@ describe("global auth header", () => {
         })
       )
       .mockResolvedValueOnce(jsonResponse({ enabled: true }))
-      .mockResolvedValueOnce(
-        jsonResponse(
-          {
-            error: {
-              code: "ADMIN_CATALOG_NOT_ENABLED",
-              message: "Catalog access is unavailable.",
-              request_id: "request-off"
-            }
-          },
-          403
-        )
-      );
+      .mockResolvedValueOnce(jsonResponse({ success: true }));
     vi.stubGlobal("fetch", fetcher);
 
     renderHeader();
     const menuButton = await screen.findByRole("button", {
       name: "Admin 사용자 메뉴"
     });
+    await waitFor(() => expect(catalogAccessCalls(fetcher)).toHaveLength(1));
     fireEvent.click(menuButton);
-    expect(await screen.findByRole("link", { name: "노래 관리" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "노래 관리" })).toBeTruthy();
 
-    fireEvent.click(menuButton);
-    fireEvent.click(menuButton);
-    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3));
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    await screen.findByRole("button", { name: "Google 로그인" });
+    expect(screen.queryByRole("link", { name: "노래 관리" })).toBeNull();
+  });
+
+  it("aborts an in-flight access request on unmount without applying it", async () => {
+    const accessResponse = deferred<Response>();
+    let accessSignal: AbortSignal | undefined;
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          user: { id: "admin-a", name: "Admin", is_admin: true }
+        })
+      )
+      .mockImplementationOnce((_input, init: RequestInit | undefined) => {
+        accessSignal = init?.signal ?? undefined;
+        return accessResponse.promise;
+      });
+    vi.stubGlobal("fetch", fetcher);
+
+    const view = renderHeader();
+    await screen.findByRole("button", { name: "Admin 사용자 메뉴" });
+    await waitFor(() => expect(accessSignal).toBeDefined());
+
+    view.unmount();
+    expect(accessSignal?.aborted).toBe(true);
+    await act(async () => {
+      accessResponse.resolve(jsonResponse({ enabled: true }));
+      await Promise.resolve();
+    });
     expect(screen.queryByRole("link", { name: "노래 관리" })).toBeNull();
   });
 
@@ -348,7 +590,11 @@ describe("global auth header", () => {
 });
 
 function renderHeader(navigateToAuth = vi.fn()) {
-  return render(
+  return render(headerTree(navigateToAuth));
+}
+
+function headerTree(navigateToAuth = vi.fn()) {
+  return (
     <AuthProvider>
       <AuthHeader navigateToAuth={navigateToAuth} />
       <AuthTestControls />
@@ -379,6 +625,22 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     json: async () => body
   } as Response;
+}
+
+function malformedJsonResponse(): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => {
+      throw new SyntaxError("Malformed JSON");
+    }
+  } as unknown as Response;
+}
+
+function catalogAccessCalls(fetcher: ReturnType<typeof vi.fn>) {
+  return fetcher.mock.calls.filter(
+    ([input]) => input.toString() === "/api/admin/catalog-access"
+  );
 }
 
 function deferred<T>() {
