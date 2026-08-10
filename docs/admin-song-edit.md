@@ -56,6 +56,38 @@ limited to the normalized key, song ID and display summary, timestamps, alias
 and entry IDs, and favorite counts; it contains no user IDs. A non-empty exact
 duplicate report requires a separate data-cleanup ticket.
 
+### Guarded system alias repair
+
+Missing corresponding `canonical_title`, `display_title`, or `artist` system
+aliases require a separate repair before identity backfill can proceed. The
+repair command defaults to a read-only transaction and prints a credential-free
+target fingerprint plus the exact deterministic aliases it would create:
+
+```sh
+DATABASE_URL='postgresql://...' \
+npm run db:admin-song-repair-system-aliases
+```
+
+Apply only after the dry-run target and create count have been independently
+verified. The apply path requires the exact fingerprint, an expected create
+count, and an explicit confirmation; it locks `songs` and `song_aliases`, rolls
+back on any plan drift or invariant blocker, and verifies that no repair remains
+before committing:
+
+```sh
+ADMIN_SONG_SYSTEM_ALIAS_REPAIR_CONFIRMED=1 \
+ADMIN_SONG_SYSTEM_ALIAS_REPAIR_TARGET_SHA256='<dry-run fingerprint>' \
+DATABASE_URL='postgresql://...' \
+npm run db:admin-song-repair-system-aliases -- \
+  --apply --expected-create-count='<verified count>'
+```
+
+This command never changes Song, KaraokeEntry, Favorite, User, or existing alias
+rows. It does not replace migration deployment, normalized identity backfill,
+or the later contract gate. For a shared, staging, or production database,
+record the target identity, backup/rollback readiness, dry-run output, explicit
+approval, and postflight result in the owning ticket before applying.
+
 The contract migration's `rollback.sql` drops only the new composite unique
 constraint. It preserves the two normalized columns owned by the earlier
 expand migration and does not alter or delete existing Song rows. Roll back the

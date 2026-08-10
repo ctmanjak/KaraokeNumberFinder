@@ -36,6 +36,7 @@
     "db:studio": "prisma studio",
     "db:admin-song-preflight": "vite-node scripts/admin-song/preflight.ts",
     "db:admin-song-backfill": "vite-node scripts/admin-song/backfill.ts",
+    "db:admin-song-repair-system-aliases": "vite-node scripts/admin-song/repair-system-aliases.ts",
     "test:admin-song-migration": "vite-node scripts/admin-song/verify-migration.ts",
     "perf:admin-song-prepare": "vite-node scripts/admin-song/prepare-perf.ts",
     "perf:admin-song-duplicate": "vite-node scripts/admin-song/perf.ts",
