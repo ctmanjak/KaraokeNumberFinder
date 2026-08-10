@@ -1,0 +1,46 @@
+name: Admin catalog gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  migration-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: karaoke_number_finder_admin_catalog_test
+          POSTGRES_PASSWORD: prisma
+          POSTGRES_USER: prisma
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U prisma -d karaoke_number_finder_admin_catalog_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://prisma:prisma@127.0.0.1:5432/karaoke_number_finder_admin_catalog_test
+      ADMIN_SONG_DISPOSABLE_DB_CONFIRMED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npx prisma migrate deploy
+      - run: npm run seed:import
+      - run: npm run test:admin-song-migration

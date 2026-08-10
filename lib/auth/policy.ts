@@ -9,7 +9,9 @@ export const SESSION_ABSOLUTE_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const ALLOWED_AUTH_CALLBACK_PATHS = [
   "/",
   "/favorites",
-  "/settings"
+  "/settings",
+  "/admin/songs",
+  "/admin/songs/new"
 ] as const;
 
 export type AllowedAuthCallbackPath =

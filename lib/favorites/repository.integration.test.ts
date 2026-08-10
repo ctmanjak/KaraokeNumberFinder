@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { optionalM3TestDatabaseUrl } from "../../scripts/m3/test-db-url";
 import { PrismaClient } from "../generated/prisma/client";
+import { normalizeSongIdentity } from "../song-identity/normalize";
 import { createPrismaFavoriteRepository } from "./repository";
 
 const testDatabaseUrl = optionalM3TestDatabaseUrl(
@@ -131,13 +132,21 @@ async function createUser(prisma: PrismaClient): Promise<string> {
 }
 
 async function createSong(prisma: PrismaClient): Promise<string> {
+  const canonicalTitle = "Favorite Integration Test Song";
+  const canonicalArtist = "Favorite Integration Test Artist";
+  const identity = normalizeSongIdentity({
+    canonical_title: canonicalTitle,
+    canonical_artist: canonicalArtist
+  });
   const song = await prisma.song.create({
     data: {
       id: `favorite-song-${randomUUID()}`,
       originalLanguage: "ja",
-      canonicalTitle: "Favorite Integration Test Song",
+      canonicalTitle,
       displayTitle: "Favorite Integration Test Song",
-      canonicalArtist: "Favorite Integration Test Artist",
+      canonicalArtist,
+      normalizedCanonicalTitle: identity.normalizedCanonicalTitle,
+      normalizedCanonicalArtist: identity.normalizedCanonicalArtist,
       verifiedBy: "m3-favorite-integration-test"
     },
     select: { id: true }

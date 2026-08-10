@@ -9,7 +9,8 @@ export function isMutationMethod(method: string): boolean {
 
 export function validateMutationRequest(
   request: Request,
-  trustedOrigin?: string
+  trustedOrigin?: string,
+  options: Readonly<{ requireJson?: boolean }> = {}
 ): void {
   const method = request.method.toUpperCase();
 
@@ -35,7 +36,10 @@ export function validateMutationRequest(
     throw personalizationError("CSRF_REJECTED");
   }
 
-  if (!isJsonContentType(request.headers.get("content-type"))) {
+  if (
+    options.requireJson !== false &&
+    !isJsonContentType(request.headers.get("content-type"))
+  ) {
     throw personalizationError("CSRF_REJECTED");
   }
 

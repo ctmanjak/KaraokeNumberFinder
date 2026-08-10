@@ -183,13 +183,18 @@ Synthetic generation must be reproducible.
 - Generated timestamps and dates must be deterministic or intentionally omitted
   when the CSV/model allows nulls.
 
-Suggested initial metadata:
+Current deterministic metadata:
 
-| Dataset label                      | Random seed | Initial generator version |
+| Dataset label                      | Random seed | Current generator version |
 | ---------------------------------- | ----------: | ------------------------- |
-| `synthetic-1k-songs-10k-aliases`   |        1009 | `synthetic-search-v1`     |
-| `synthetic-10k-songs-100k-aliases` |       10009 | `synthetic-search-v1`     |
-| `synthetic-50k-songs-500k-aliases` |       50009 | `synthetic-search-v1`     |
+| `synthetic-1k-songs-10k-aliases`   |        1009 | `synthetic-search-v2`     |
+| `synthetic-10k-songs-100k-aliases` |       10009 | `synthetic-search-v2`     |
+| `synthetic-50k-songs-500k-aliases` |       50009 | `synthetic-search-v2`     |
+
+`synthetic-search-v2` keeps each generated Song's canonical-title,
+display-title, and artist system aliases inside the contracted alias total. It
+does not add aliases after import, so the 10k label remains exactly 100,000
+aliases on the Prisma path.
 
 ## Fixture/Search-case CSV Contract
 
@@ -280,7 +285,7 @@ Example shape:
 {
   "schema_version": 1,
   "dataset_label": "synthetic-1k-songs-10k-aliases",
-  "generator_version": "synthetic-search-v1",
+  "generator_version": "synthetic-search-v2",
   "random_seed": 1009,
   "db_label": "local",
   "row_counts": {

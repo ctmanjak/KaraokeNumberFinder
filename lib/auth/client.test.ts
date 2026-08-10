@@ -18,7 +18,7 @@ describe("browser auth client", () => {
       )
     ).resolves.toEqual({
       status: "authenticated",
-      user: { id: "user-a" }
+      user: { id: "user-a", is_admin: false }
     });
     await expect(
       fetchBrowserAuthState(fetchOnce(jsonResponse(null, 503)))
@@ -49,7 +49,18 @@ describe("browser auth client", () => {
       )
     ).resolves.toEqual({
       status: "authenticated",
-      user: { id: "user-a", name: "Display Name" }
+      user: { id: "user-a", name: "Display Name", is_admin: false }
+    });
+  });
+
+  it("exposes only the derived admin flag", async () => {
+    await expect(
+      fetchBrowserAuthState(
+        fetchOnce(jsonResponse({ user: { id: "admin-a", is_admin: true } }))
+      )
+    ).resolves.toEqual({
+      status: "authenticated",
+      user: { id: "admin-a", is_admin: true }
     });
   });
 

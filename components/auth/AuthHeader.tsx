@@ -3,20 +3,36 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { fetchAdminCatalogAccess } from "@/lib/admin-catalog/client";
 import { createGoogleSignInUrl } from "@/lib/auth/client";
 import type { AllowedAuthCallbackPath } from "@/lib/auth/policy";
+import { createRequestTimeout } from "@/lib/http/client";
 import { useAuth } from "./AuthProvider";
 import { useResetAuthNavigationPending } from "./use-reset-auth-navigation-pending";
 
+const ADMIN_CATALOG_MENU_TIMEOUT_MS = 8_000;
+
+type AdminCatalogAccessState =
+  | Readonly<{ actorId: null; status: "unknown" }>
+  | Readonly<{
+      actorId: string;
+      status: "loading" | "enabled" | "disabled";
+    }>;
+
 export function AuthHeader({
   navigateToAuth = (url) => window.location.assign(url)
-}: Readonly<{ navigateToAuth?: (url: string) => void }> = {}) {
+}: Readonly<{
+  navigateToAuth?: (url: string) => void;
+}>) {
   const pathname = usePathname();
   const auth = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [loginPending, setLoginPending] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [callbackMessage, setCallbackMessage] = useState<string | null>(null);
+  const [adminCatalogAccess, setAdminCatalogAccess] =
+    useState<AdminCatalogAccessState>({ actorId: null, status: "unknown" });
+  const adminCatalogRequestVersion = useRef(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -62,6 +78,83 @@ export function AuthHeader({
     };
   }, [menuOpen]);
 
+  const adminActorId =
+    auth.state.status === "authenticated" && auth.state.user.is_admin
+      ? auth.state.user.id
+      : null;
+  const adminCatalogMenuEnabled =
+    adminCatalogAccess.actorId === adminActorId &&
+    adminCatalogAccess.status === "enabled";
+
+  useEffect(() => {
+    const version = adminCatalogRequestVersion.current + 1;
+    adminCatalogRequestVersion.current = version;
+    let active = true;
+
+    if (adminActorId === null) {
+      queueMicrotask(() => {
+        if (active && adminCatalogRequestVersion.current === version) {
+          setAdminCatalogAccess({ actorId: null, status: "unknown" });
+        }
+      });
+      return () => {
+        active = false;
+        if (adminCatalogRequestVersion.current === version) {
+          adminCatalogRequestVersion.current += 1;
+        }
+      };
+    }
+
+    const controller = new AbortController();
+    const request = createRequestTimeout(
+      ADMIN_CATALOG_MENU_TIMEOUT_MS,
+      controller.signal
+    );
+    queueMicrotask(async () => {
+      if (
+        !active ||
+        request.signal.aborted ||
+        adminCatalogRequestVersion.current !== version
+      ) {
+        request.clear();
+        return;
+      }
+      setAdminCatalogAccess({ actorId: adminActorId, status: "loading" });
+      try {
+        const enabled = await fetchAdminCatalogAccess(fetch, request.signal);
+        if (
+          active &&
+          !request.signal.aborted &&
+          adminCatalogRequestVersion.current === version
+        ) {
+          setAdminCatalogAccess({
+            actorId: adminActorId,
+            status: enabled ? "enabled" : "disabled"
+          });
+        }
+      } catch {
+        // Actor changes and unmounts abort this controller; timeouts must record disabled access.
+        if (
+          active &&
+          !controller.signal.aborted &&
+          adminCatalogRequestVersion.current === version
+        ) {
+          setAdminCatalogAccess({ actorId: adminActorId, status: "disabled" });
+        }
+      } finally {
+        request.clear();
+      }
+    });
+    return () => {
+      active = false;
+      if (adminCatalogRequestVersion.current === version) {
+        adminCatalogRequestVersion.current += 1;
+      }
+      controller.abort();
+      request.clear();
+    };
+  }, [adminActorId]);
+
   async function handleLogin(): Promise<void> {
     if (loginPending) {
       return;
@@ -80,6 +173,10 @@ export function AuthHeader({
       );
       setLoginPending(false);
     }
+  }
+
+  function toggleUserMenu(): void {
+    setMenuOpen(!menuOpen);
   }
 
   const displayName =
@@ -101,11 +198,9 @@ export function AuthHeader({
           <Link className="header-link" href="/">
             검색
           </Link>
-          {auth.state.status === "authenticated" ? null : (
-            <Link className="header-link" href="/favorites">
-              즐겨찾기
-            </Link>
-          )}
+          <Link className="header-link" href="/favorites">
+            즐겨찾기
+          </Link>
         </nav>
 
         <div className="auth-header-account">
@@ -146,18 +241,23 @@ export function AuthHeader({
                 aria-haspopup="menu"
                 aria-controls="global-user-menu"
                 aria-label={`${displayName} 사용자 메뉴`}
-                onClick={() => setMenuOpen((current) => !current)}
+                onClick={toggleUserMenu}
               >
                 {displayName}
               </button>
               {menuOpen ? (
                 <div id="global-user-menu" className="user-menu-panel">
-                  <Link href="/favorites" onClick={() => setMenuOpen(false)}>
-                    즐겨찾기
-                  </Link>
                   <Link href="/settings" onClick={() => setMenuOpen(false)}>
                     설정
                   </Link>
+                  {auth.state.user.is_admin && adminCatalogMenuEnabled ? (
+                    <Link
+                      href="/admin/songs"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      노래 관리
+                    </Link>
+                  ) : null}
                   <button
                     type="button"
                     disabled={auth.signOutPending}
@@ -205,7 +305,12 @@ export function AuthHeader({
 }
 
 function callbackPath(pathname: string): AllowedAuthCallbackPath {
-  return pathname === "/favorites" || pathname === "/settings" ? pathname : "/";
+  return pathname === "/favorites" ||
+    pathname === "/settings" ||
+    pathname === "/admin/songs" ||
+    pathname === "/admin/songs/new"
+    ? pathname
+    : "/";
 }
 
 function authCallbackMessage(code: string | null): string | null {

@@ -8,6 +8,9 @@ const testDatabaseURL = requireM3TestDatabaseUrl(
   process.env.M3_TEST_DATABASE_URL
 );
 const baseURL = process.env.KNF_E2E_BASE_URL ?? "https://127.0.0.1:3443";
+const adminCatalogMode = requireAdminCatalogMode(
+  process.env.KNF_E2E_ADMIN_CATALOG_MODE
+);
 const environment: NodeJS.ProcessEnv = {
   ...process.env,
   NODE_ENV: "production",
@@ -16,6 +19,7 @@ const environment: NodeJS.ProcessEnv = {
   M3_TEST_DATABASE_URL: testDatabaseURL,
   KNF_RUNTIME_ENV: "e2e",
   KNF_E2E_AUTH_ENABLED: "1",
+  ADMIN_CATALOG_MODE: adminCatalogMode,
   BETTER_AUTH_SECRET: randomBytes(48).toString("base64url"),
   BETTER_AUTH_URL: baseURL,
   AUTH_TRUSTED_ORIGIN: baseURL,
@@ -104,4 +108,10 @@ function assertSucceeded(
   if (status !== 0) {
     throw new Error(`${command} failed with exit code ${status ?? "unknown"}.`);
   }
+}
+
+function requireAdminCatalogMode(value: string | undefined): "off" | "on" {
+  if (value === undefined || value === "on") return "on";
+  if (value === "off") return "off";
+  throw new Error("KNF_E2E_ADMIN_CATALOG_MODE must be off or on.");
 }

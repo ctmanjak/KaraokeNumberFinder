@@ -1,4 +1,9 @@
-export { parseJsonBody, requireValidInput } from "./body";
+export {
+  parseJsonBody,
+  parseLimitedJsonBody,
+  requireJsonContentType,
+  requireValidInput
+} from "./body";
 export { isMutationMethod, validateMutationRequest } from "./csrf";
 export {
   PERSONALIZATION_ERROR_CODES,
@@ -8,9 +13,11 @@ export {
   personalizationError,
   personalizationDomainError,
   type PersonalizationErrorCode,
+  type PersonalizationErrorDetails,
   type PersonalizationErrorEnvelope,
   type PersonalizationFailureEvent,
   type PersonalizationHttpStatus,
+  type PersonalizationValidationIssue,
   type WritePersonalizationSafeLog
 } from "./errors";
 export {

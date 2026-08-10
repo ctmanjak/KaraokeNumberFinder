@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import { buildAliasSearchFields } from "../search/normalize";
+import { normalizeSongIdentity } from "../song-identity/normalize";
 import { parseCsv, recordsFromCsvRows, type CsvRecord } from "./csv";
 import {
   formatSeedValidationIssue,
@@ -33,6 +35,8 @@ export type SongImportData = {
   canonicalTitle: string;
   displayTitle: string;
   canonicalArtist: string;
+  normalizedCanonicalTitle: string | null;
+  normalizedCanonicalArtist: string | null;
   releaseYear: number | null;
   tieIn: string | null;
   sourceUrl: string | null;
@@ -107,6 +111,7 @@ export type SeedImportResult = SeedImportPlan & {
 export type SeedImportOptions = {
   seedDir?: string;
   dryRun?: boolean;
+  writeBatchSize?: number;
 };
 
 type SeedImportTable<File extends SeedFileName = SeedFileName> = {
@@ -125,8 +130,13 @@ type UpsertArgs<TData> = {
   update: Omit<TData, "id">;
 };
 
+type CreateManyArgs<TData> = {
+  data: TData[];
+};
+
 type SeedModelDelegate<TData extends { id: string }> = {
   findMany(args: FindManyArgs): Promise<TData[]>;
+  createMany?(args: CreateManyArgs<TData>): Promise<unknown>;
   upsert(args: UpsertArgs<TData>): Promise<unknown>;
 };
 
@@ -146,6 +156,8 @@ export type SeedImportTransactionClient = Omit<
 >;
 
 const DEFAULT_SEED_DIR = "seed";
+export const SEED_IMPORT_QUERY_BATCH_SIZE = 1_000;
+export const SEED_IMPORT_MAX_WRITE_BATCH_SIZE = 1_000;
 
 export const SEED_IMPORT_ORDER = [
   "karaoke_providers.csv",
@@ -160,6 +172,7 @@ export async function importSeedDirectory(
 ): Promise<SeedImportResult> {
   const seedDir = options.seedDir ?? DEFAULT_SEED_DIR;
   const mode: SeedImportMode = options.dryRun === true ? "dry-run" : "import";
+  const writeBatchSize = normalizeWriteBatchSize(options.writeBatchSize);
   const validation = validateSeedDirectory(seedDir);
 
   if (validation.errors.length > 0) {
@@ -167,7 +180,17 @@ export async function importSeedDirectory(
   }
 
   const tables = readSeedImportTables(seedDir);
-  const plan = await buildSeedImportPlan(db, tables, validation);
+  const systemAliasCandidates = buildSystemAliasCandidates(tables);
+  await assertSystemAliasCandidateIdsAvailable(
+    db,
+    tables,
+    systemAliasCandidates
+  );
+  const planningTables = includeSystemAliasCandidates(
+    tables,
+    systemAliasCandidates
+  );
+  const plan = await buildSeedImportPlan(db, planningTables, validation);
 
   if (mode === "dry-run") {
     return { ...plan, mode, applied: false };
@@ -180,11 +203,30 @@ export async function importSeedDirectory(
     ])
   );
 
-  await db.$transaction(async (tx) => {
+  if (writeBatchSize === undefined) {
+    await db.$transaction(async (tx) => {
+      for (const table of tables) {
+        await upsertTable(tx, table, rowPlansByFile.get(table.file) ?? []);
+      }
+      await ensureSystemAliases(tx, systemAliasCandidates);
+    });
+  } else {
     for (const table of tables) {
-      await upsertTable(tx, table, rowPlansByFile.get(table.file) ?? []);
+      await upsertTableInBatches(
+        db,
+        table,
+        rowPlansByFile.get(table.file) ?? [],
+        writeBatchSize
+      );
     }
-  });
+    await upsertRowsInBatches(
+      db,
+      "song_aliases.csv",
+      systemAliasCandidates,
+      rowPlansByFile.get("song_aliases.csv") ?? [],
+      writeBatchSize
+    );
+  }
 
   return { ...plan, mode, applied: true };
 }
@@ -198,9 +240,16 @@ export async function buildSeedImportPlan(
   const files: SeedImportFileReport[] = [];
 
   for (const table of tables) {
-    const existingRows = await modelFor(db, table.file).findMany({
-      where: { id: { in: table.data.map((row) => row.id) } }
-    });
+    const model = modelFor(db, table.file);
+    const existingRows: { id: string }[] = [];
+    for (const batch of batches(table.data, SEED_IMPORT_QUERY_BATCH_SIZE)) {
+      const found = await model.findMany({
+        where: { id: { in: batch.map((row) => row.id) } }
+      });
+      for (const row of found) {
+        existingRows.push(row);
+      }
+    }
     const existingById = new Map(existingRows.map((row) => [row.id, row]));
     const fileRows: SeedImportRowPlan[] = table.data.map((row, index) => {
       const existing = existingById.get(row.id);
@@ -219,7 +268,9 @@ export async function buildSeedImportPlan(
       };
     });
 
-    rows.push(...fileRows);
+    for (const row of fileRows) {
+      rows.push(row);
+    }
     files.push({
       file: table.file,
       create: countAction(fileRows, "create"),
@@ -244,7 +295,10 @@ export function readSeedImportTables(seedDir: string): SeedImportTable[] {
   return SEED_IMPORT_ORDER.map((file) => readSeedImportTable(seedDir, file));
 }
 
-export function formatSeedImportResult(result: SeedImportResult): string[] {
+export function formatSeedImportResult(
+  result: SeedImportResult,
+  options: { includeRows?: boolean } = {}
+): string[] {
   const lines = [
     `Seed import ${result.mode === "dry-run" ? "dry-run" : "import"} ${result.applied ? "applied" : "planned"}.`,
     ...result.warnings.map(
@@ -261,12 +315,14 @@ export function formatSeedImportResult(result: SeedImportResult): string[] {
   ];
 
   if (result.rows.length > 0) {
-    lines.push(
-      "Row plan:",
-      ...result.rows.map(
-        (row) => `${row.file} row ${row.row}: ${row.action} ${row.id}`
-      )
-    );
+    if (options.includeRows === false) {
+      lines.push(`Row plan omitted (${result.rows.length} rows).`);
+    } else {
+      lines.push("Row plan:");
+      for (const row of result.rows) {
+        lines.push(`${row.file} row ${row.row}: ${row.action} ${row.id}`);
+      }
+    }
   }
 
   if (result.mode === "dry-run") {
@@ -353,12 +409,18 @@ function parseProvider(record: CsvRecord): ProviderImportData {
 }
 
 function parseSong(record: CsvRecord): SongImportData {
+  const identity = normalizeSongIdentity({
+    canonical_title: record.values.canonical_title,
+    canonical_artist: record.values.canonical_artist
+  });
   return {
     id: record.values.id,
     originalLanguage: record.values.original_language,
     canonicalTitle: record.values.canonical_title,
     displayTitle: record.values.display_title,
     canonicalArtist: record.values.canonical_artist,
+    normalizedCanonicalTitle: identity.normalizedCanonicalTitle,
+    normalizedCanonicalArtist: identity.normalizedCanonicalArtist,
     releaseYear: nullableInteger(record.values.release_year),
     tieIn: nullableString(record.values.tie_in),
     sourceUrl: nullableString(record.values.source_url),
@@ -405,24 +467,265 @@ async function upsertTable(
   table: SeedImportTable,
   rowPlans: readonly SeedImportRowPlan[]
 ): Promise<void> {
-  const model = modelFor(tx, table.file);
-  const writableIds = new Set(
-    rowPlans
-      .filter((row) => row.action === "create" || row.action === "update")
-      .map((row) => row.id)
-  );
+  await upsertRows(modelFor(tx, table.file), table.data, rowPlans);
+}
 
-  for (const row of table.data) {
-    if (!writableIds.has(row.id)) {
-      continue;
-    }
+async function upsertTableInBatches(
+  db: SeedImportDbClient,
+  table: SeedImportTable,
+  rowPlans: readonly SeedImportRowPlan[],
+  batchSize: number
+): Promise<void> {
+  await upsertRowsInBatches(db, table.file, table.data, rowPlans, batchSize);
+}
 
-    await model.upsert({
-      where: { id: row.id },
-      create: row,
-      update: withoutId(row)
+async function upsertRowsInBatches<TData extends { id: string }>(
+  db: SeedImportDbClient,
+  file: SeedFileName,
+  rows: readonly TData[],
+  rowPlans: readonly SeedImportRowPlan[],
+  batchSize: number
+): Promise<void> {
+  if (rows.length === 0) {
+    return;
+  }
+  const plannedRows = writableRows(rows, rowPlans);
+  for (const batch of batches(plannedRows, batchSize)) {
+    await db.$transaction(async (tx) => {
+      await upsertPlannedRows(modelFor(tx, file), batch, true);
     });
   }
+}
+
+async function upsertRows<TData extends { id: string }>(
+  model: SeedModelDelegate<TData>,
+  rows: readonly TData[],
+  rowPlans: readonly SeedImportRowPlan[]
+): Promise<void> {
+  if (rows.length === 0) {
+    return;
+  }
+  await upsertPlannedRows(model, writableRows(rows, rowPlans), false);
+}
+
+async function ensureSystemAliases(
+  tx: SeedImportTransactionClient,
+  candidates: readonly AliasImportData[]
+): Promise<void> {
+  for (const row of candidates) {
+    const [stored] = await tx.songAlias.findMany({
+      where: { id: { in: [row.id] } }
+    });
+    if (
+      stored !== undefined &&
+      sameImportData(
+        stored as unknown as Record<string, unknown>,
+        row as unknown as Record<string, unknown>
+      )
+    ) {
+      continue;
+    }
+    await upsertRow(tx.songAlias, row);
+  }
+}
+
+type PlannedWritableRow<TData extends { id: string }> = {
+  data: TData;
+  action: Extract<SeedImportAction, "create" | "update">;
+};
+
+function writableRows<TData extends { id: string }>(
+  rows: readonly TData[],
+  rowPlans: readonly SeedImportRowPlan[]
+): PlannedWritableRow<TData>[] {
+  const actionById = new Map(
+    rowPlans.map((row) => [row.id, row.action] as const)
+  );
+  const writable: PlannedWritableRow<TData>[] = [];
+  for (const data of rows) {
+    const action = actionById.get(data.id);
+    if (action === "create" || action === "update") {
+      writable.push({ data, action });
+    }
+  }
+  return writable;
+}
+
+async function upsertPlannedRows<TData extends { id: string }>(
+  model: SeedModelDelegate<TData>,
+  rows: readonly PlannedWritableRow<TData>[],
+  bulkCreate: boolean
+): Promise<void> {
+  if (bulkCreate && model.createMany !== undefined) {
+    const createRows: TData[] = [];
+    for (const row of rows) {
+      if (row.action === "create") {
+        createRows.push(row.data);
+      }
+    }
+    if (createRows.length > 0) {
+      await model.createMany({ data: createRows });
+    }
+    for (const row of rows) {
+      if (row.action === "update") {
+        await upsertRow(model, row.data);
+      }
+    }
+    return;
+  }
+
+  for (const row of rows) {
+    await upsertRow(model, row.data);
+  }
+}
+
+async function upsertRow<TData extends { id: string }>(
+  model: SeedModelDelegate<TData>,
+  row: TData
+): Promise<void> {
+  await model.upsert({
+    where: { id: row.id },
+    create: row,
+    update: withoutId(row)
+  });
+}
+
+function includeSystemAliasCandidates(
+  tables: readonly SeedImportTable[],
+  candidates: readonly AliasImportData[]
+): SeedImportTable[] {
+  return tables.map((table) =>
+    table.file === "song_aliases.csv"
+      ? ({
+          ...table,
+          data: [...(table.data as AliasImportData[]), ...candidates]
+        } as SeedImportTable)
+      : table
+  );
+}
+
+function buildSystemAliasCandidates(
+  tables: readonly SeedImportTable[]
+): AliasImportData[] {
+  const songTable = tables.find(
+    (table): table is SeedImportTable<"songs.csv"> => table.file === "songs.csv"
+  );
+  const aliasTable = tables.find(
+    (table): table is SeedImportTable<"song_aliases.csv"> =>
+      table.file === "song_aliases.csv"
+  );
+  if (songTable === undefined || aliasTable === undefined) {
+    throw new Error("Song and alias seed tables are required.");
+  }
+  const existingAliasKeys = new Set(
+    aliasTable.data.map((alias) =>
+      systemAliasKey(alias.songId, alias.aliasType, alias.normalizedAlias)
+    )
+  );
+  const candidates: AliasImportData[] = [];
+  for (const song of songTable.data) {
+    const systemValues = [
+      {
+        aliasType: "canonical_title",
+        alias: song.canonicalTitle
+      },
+      {
+        aliasType: "display_title",
+        alias: song.displayTitle
+      },
+      {
+        aliasType: "artist",
+        alias: song.canonicalArtist
+      }
+    ] as const;
+    for (const system of systemValues) {
+      const search = buildAliasSearchFields(system.alias);
+      const key = systemAliasKey(
+        song.id,
+        system.aliasType,
+        search.normalizedAlias
+      );
+      if (existingAliasKeys.has(key)) {
+        continue;
+      }
+      const row: AliasImportData = {
+        id: `alias_system_${song.id}_${system.aliasType}`,
+        songId: song.id,
+        alias: system.alias,
+        language: song.originalLanguage,
+        aliasType: system.aliasType,
+        normalizedAlias: search.normalizedAlias,
+        chosungAlias: search.chosungAlias || null,
+        sourceUrl: song.sourceUrl,
+        sourceName: song.sourceName,
+        verifiedBy: song.verifiedBy,
+        verificationNote: song.verificationNote
+      };
+      candidates.push(row);
+      existingAliasKeys.add(key);
+    }
+  }
+  return candidates;
+}
+
+async function assertSystemAliasCandidateIdsAvailable(
+  db: SeedImportDbClient,
+  tables: readonly SeedImportTable[],
+  candidates: readonly AliasImportData[]
+): Promise<void> {
+  const aliasTable = tables.find(
+    (table): table is SeedImportTable<"song_aliases.csv"> =>
+      table.file === "song_aliases.csv"
+  );
+  if (aliasTable === undefined) {
+    throw new Error("Alias seed table is required.");
+  }
+
+  const inputAliasesById = new Map(
+    aliasTable.data.map((alias) => [alias.id, alias])
+  );
+  for (const candidate of candidates) {
+    const inputAlias = inputAliasesById.get(candidate.id);
+    if (
+      inputAlias !== undefined &&
+      aliasIdentityKey(inputAlias) !== aliasIdentityKey(candidate)
+    ) {
+      throw new Error(
+        `System alias ID collision in seed input: ${candidate.id}`
+      );
+    }
+  }
+
+  const storedAliasesById = new Map<string, AliasImportData>();
+  for (const batch of batches(candidates, SEED_IMPORT_QUERY_BATCH_SIZE)) {
+    const storedAliases = await db.songAlias.findMany({
+      where: { id: { in: batch.map((candidate) => candidate.id) } }
+    });
+    for (const alias of storedAliases) {
+      storedAliasesById.set(alias.id, alias);
+    }
+  }
+  for (const candidate of candidates) {
+    const storedAlias = storedAliasesById.get(candidate.id);
+    if (
+      storedAlias !== undefined &&
+      aliasIdentityKey(storedAlias) !== aliasIdentityKey(candidate)
+    ) {
+      throw new Error(`System alias ID collision in database: ${candidate.id}`);
+    }
+  }
+}
+
+function aliasIdentityKey(alias: AliasImportData): string {
+  return systemAliasKey(alias.songId, alias.aliasType, alias.normalizedAlias);
+}
+
+function systemAliasKey(
+  songId: string,
+  aliasType: string,
+  normalizedAlias: string
+): string {
+  return JSON.stringify([songId, aliasType, normalizedAlias]);
 }
 
 function modelFor(
@@ -497,7 +800,42 @@ function countAction(
   rows: readonly SeedImportRowPlan[],
   action: SeedImportAction
 ): number {
-  return rows.filter((row) => row.action === action).length;
+  let count = 0;
+  for (const row of rows) {
+    if (row.action === action) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function normalizeWriteBatchSize(
+  value: number | undefined
+): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (
+    !Number.isInteger(value) ||
+    value <= 0 ||
+    value > SEED_IMPORT_MAX_WRITE_BATCH_SIZE
+  ) {
+    throw new Error(
+      `writeBatchSize must be an integer between 1 and ${SEED_IMPORT_MAX_WRITE_BATCH_SIZE}`
+    );
+  }
+
+  return value;
+}
+
+function* batches<T>(
+  rows: readonly T[],
+  batchSize: number
+): Generator<T[], void, undefined> {
+  for (let index = 0; index < rows.length; index += batchSize) {
+    yield rows.slice(index, index + batchSize);
+  }
 }
 
 function nullableString(value: string): string | null {
