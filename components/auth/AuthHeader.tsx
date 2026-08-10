@@ -12,6 +12,13 @@ import { useResetAuthNavigationPending } from "./use-reset-auth-navigation-pendi
 
 const ADMIN_CATALOG_MENU_TIMEOUT_MS = 8_000;
 
+type AdminCatalogAccessState =
+  | Readonly<{ actorId: null; status: "unknown" }>
+  | Readonly<{
+      actorId: string;
+      status: "loading" | "enabled" | "disabled";
+    }>;
+
 export function AuthHeader({
   navigateToAuth = (url) => window.location.assign(url)
 }: Readonly<{
@@ -23,7 +30,9 @@ export function AuthHeader({
   const [loginPending, setLoginPending] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [callbackMessage, setCallbackMessage] = useState<string | null>(null);
-  const [adminCatalogMenuEnabled, setAdminCatalogMenuEnabled] = useState(false);
+  const [adminCatalogAccess, setAdminCatalogAccess] =
+    useState<AdminCatalogAccessState>({ actorId: null, status: "unknown" });
+  const adminCatalogRequestVersion = useRef(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -35,7 +44,6 @@ export function AuthHeader({
     );
     queueMicrotask(() => {
       setMenuOpen(false);
-      setAdminCatalogMenuEnabled(false);
       setLoginError(null);
       setCallbackMessage(authCallbackMessage(errorCode));
     });
@@ -74,10 +82,27 @@ export function AuthHeader({
     auth.state.status === "authenticated" && auth.state.user.is_admin
       ? auth.state.user.id
       : null;
+  const adminCatalogMenuEnabled =
+    adminCatalogAccess.actorId === adminActorId &&
+    adminCatalogAccess.status === "enabled";
 
   useEffect(() => {
-    if (!menuOpen || adminActorId === null) {
-      return;
+    const version = adminCatalogRequestVersion.current + 1;
+    adminCatalogRequestVersion.current = version;
+    let active = true;
+
+    if (adminActorId === null) {
+      queueMicrotask(() => {
+        if (active && adminCatalogRequestVersion.current === version) {
+          setAdminCatalogAccess({ actorId: null, status: "unknown" });
+        }
+      });
+      return () => {
+        active = false;
+        if (adminCatalogRequestVersion.current === version) {
+          adminCatalogRequestVersion.current += 1;
+        }
+      };
     }
 
     const controller = new AbortController();
@@ -86,24 +111,49 @@ export function AuthHeader({
       controller.signal
     );
     queueMicrotask(async () => {
+      if (
+        !active ||
+        request.signal.aborted ||
+        adminCatalogRequestVersion.current !== version
+      ) {
+        request.clear();
+        return;
+      }
+      setAdminCatalogAccess({ actorId: adminActorId, status: "loading" });
       try {
         const enabled = await fetchAdminCatalogAccess(fetch, request.signal);
-        if (!request.signal.aborted) {
-          setAdminCatalogMenuEnabled(enabled);
+        if (
+          active &&
+          !request.signal.aborted &&
+          adminCatalogRequestVersion.current === version
+        ) {
+          setAdminCatalogAccess({
+            actorId: adminActorId,
+            status: enabled ? "enabled" : "disabled"
+          });
         }
       } catch {
-        if (!controller.signal.aborted) {
-          setAdminCatalogMenuEnabled(false);
+        // Actor changes and unmounts abort this controller; timeouts must record disabled access.
+        if (
+          active &&
+          !controller.signal.aborted &&
+          adminCatalogRequestVersion.current === version
+        ) {
+          setAdminCatalogAccess({ actorId: adminActorId, status: "disabled" });
         }
       } finally {
         request.clear();
       }
     });
     return () => {
+      active = false;
+      if (adminCatalogRequestVersion.current === version) {
+        adminCatalogRequestVersion.current += 1;
+      }
       controller.abort();
       request.clear();
     };
-  }, [adminActorId, menuOpen]);
+  }, [adminActorId]);
 
   async function handleLogin(): Promise<void> {
     if (loginPending) {
@@ -126,9 +176,7 @@ export function AuthHeader({
   }
 
   function toggleUserMenu(): void {
-    const nextOpen = !menuOpen;
-    setAdminCatalogMenuEnabled(false);
-    setMenuOpen(nextOpen);
+    setMenuOpen(!menuOpen);
   }
 
   const displayName =

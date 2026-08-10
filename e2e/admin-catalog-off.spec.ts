@@ -24,15 +24,28 @@ test("feature-off hides navigation and rejects direct page and API access fail-c
   expect((await regularUser.json()).error.code).toBe("FORBIDDEN");
 
   await users.loginAdmin(page.request, actor);
-  await page.goto("/");
+  let accessRequestCount = 0;
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/admin/catalog-access") {
+      accessRequestCount += 1;
+    }
+  });
   const menuAccess = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === "/api/admin/catalog-access"
   );
-  await page.getByRole("button", { name: `${actor.name} 사용자 메뉴` }).click();
+  await page.goto("/");
   expect((await menuAccess).status()).toBe(403);
+  expect(accessRequestCount).toBe(1);
+
+  await page.getByRole("button", { name: `${actor.name} 사용자 메뉴` }).click();
   await expect(page.getByRole("link", { name: "노래 관리" })).toHaveCount(0);
   await expect(page.getByText(/준비 중/u)).toHaveCount(0);
+  await page.waitForTimeout(100);
+  expect(accessRequestCount).toBe(1);
+  await page.getByRole("button", { name: `${actor.name} 사용자 메뉴` }).click();
+  await page.getByRole("button", { name: `${actor.name} 사용자 메뉴` }).click();
+  expect(accessRequestCount).toBe(1);
 
   const pageResponse = await page.goto("/admin/songs");
   expect(pageResponse?.status()).toBe(403);
